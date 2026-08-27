@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/language/*",
+  "crates/types/*",
+  "crates/extensions/*",
+  "crates/std/*",
+  "crates/cli",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+version = "0.0.1"
+
+[workspace.dependencies]
+thiserror = "2"
+rust_decimal = "1.42"
+
+[profile.release]
+lto = true
