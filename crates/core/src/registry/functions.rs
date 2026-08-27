@@ -7,11 +7,15 @@ use super::Registry;
 impl Registry {
     /// Registers a native function overload and returns its stable dense ID.
     ///
-    /// Multiple overloads may share a name. The compiler selects the first
-    /// registered overload whose signature matches the argument base types.
-    /// Every referenced input and output type must already be registered.
+    /// Multiple overloads may share a name, but each signature may be
+    /// registered only once. Exact signatures always take precedence over an
+    /// [`FunctionSignature::AnySingle`] fallback, independently of extension
+    /// registration order. Every referenced input and output type must already
+    /// be registered.
+    ///
     /// Returns [`CoreError::UnknownTypeId`] when a signature or output refers to
-    /// an unknown type.
+    /// an unknown type, or [`CoreError::DuplicateFunctionSignature`] when the
+    /// same name and signature are already registered.
     pub fn register_function(
         &mut self,
         name: &'static str,
@@ -26,6 +30,18 @@ impl Registry {
         }
         if let Some(type_id) = output {
             self.type_descriptor(type_id)?;
+        }
+        if self.functions_by_name.get(name).is_some_and(|candidates| {
+            candidates.iter().any(|id| {
+                self.functions
+                    .get(id.index)
+                    .is_some_and(|function| function.signature == signature)
+            })
+        }) {
+            return Err(CoreError::DuplicateFunctionSignature {
+                name: name.to_string(),
+                signature: self.function_signature_name(&signature),
+            });
         }
 
         let id = FunctionId {
@@ -45,9 +61,11 @@ impl Registry {
 
     /// Resolves a function call by name and exact argument base types.
     ///
-    /// The lookup first narrows candidates by name, then checks their
-    /// signatures in registration order. Subtypes are intentionally ignored
-    /// here; functions currently dispatch on base types only.
+    /// The lookup first narrows candidates by name, then prefers an exact
+    /// signature before considering an [`FunctionSignature::AnySingle`]
+    /// fallback. Subtypes are intentionally ignored here; functions currently
+    /// dispatch on base types only. Registration order never changes the
+    /// selected overload.
     pub fn resolve_function(
         &self,
         name: &str,
@@ -60,13 +78,23 @@ impl Registry {
 
         for id in candidates {
             let function = &self.functions[id.index];
-            let matches = match &function.signature {
-                FunctionSignature::Exact(types) => types.as_slice() == arg_types,
-                FunctionSignature::AnySingle => arg_types.len() == 1,
-            };
-            if matches {
+            if matches!(
+                &function.signature,
+                FunctionSignature::Exact(types) if types.as_slice() == arg_types
+            ) {
                 return Ok(*id);
             }
+        }
+
+        if arg_types.len() == 1
+            && let Some(id) = candidates.iter().find(|id| {
+                matches!(
+                    self.functions[id.index].signature,
+                    FunctionSignature::AnySingle
+                )
+            })
+        {
+            return Ok(*id);
         }
 
         Err(CoreError::NoMatchingFunction {
@@ -89,5 +117,20 @@ impl Registry {
         self.functions
             .get(id.index)
             .ok_or(CoreError::UnknownFunctionId(id))
+    }
+
+    /// Formats a registered function signature for deterministic diagnostics.
+    fn function_signature_name(&self, signature: &FunctionSignature) -> String {
+        match signature {
+            FunctionSignature::Exact(types) => format!(
+                "({})",
+                types
+                    .iter()
+                    .map(|type_id| self.type_name(*type_id))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            FunctionSignature::AnySingle => "(any)".to_string(),
+        }
     }
 }

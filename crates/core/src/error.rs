@@ -79,6 +79,8 @@ pub enum CoreError {
     },
     #[error("unknown function `{0}`")]
     UnknownFunction(String),
+    #[error("function `{name}` already has overload `{signature}`")]
+    DuplicateFunctionSignature { name: String, signature: String },
     #[error("no overload of `{name}` accepts ({})", .arguments.join(", "))]
     NoMatchingFunction {
         name: String,

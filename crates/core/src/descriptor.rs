@@ -24,9 +24,12 @@ pub struct BinaryOperatorDescriptor {
     pub execute: BinaryOperatorExecutor,
 }
 
-#[derive(Clone)]
+/// Describes which argument base types a native function accepts.
+#[derive(Clone, PartialEq, Eq)]
 pub enum FunctionSignature {
+    /// Matches one exact, ordered list of argument base types.
     Exact(Vec<TypeId>),
+    /// Matches any call with exactly one argument when no exact overload exists.
     AnySingle,
 }
 
