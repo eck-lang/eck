@@ -169,6 +169,23 @@ fn subtype_references_must_be_registered_before_use() {
 }
 
 #[test]
+fn subtype_rules_require_at_least_one_qualified_operand() {
+    let mut registry = Registry::new();
+
+    assert!(matches!(
+        registry.register_subtype_binary_rule(
+            BinaryOperator::Addition,
+            None,
+            None,
+            SubtypeBinaryRule::new(None),
+        ),
+        Err(CoreError::UnreachableSubtypeOperatorRule(
+            BinaryOperator::Addition
+        ))
+    ));
+}
+
+#[test]
 fn subtype_conversions_reject_invalid_identity_scales() {
     let mut registry = Registry::new();
     let subtype = register_subtype(&mut registry, "meter");

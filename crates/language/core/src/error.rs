@@ -55,6 +55,8 @@ pub enum CoreError {
         left_operand_subtype: String,
         right_operand_subtype: String,
     },
+    #[error("subtype operator `{0}` cannot register a rule for two plain operands")]
+    UnreachableSubtypeOperatorRule(BinaryOperator),
     #[error("conversion from subtype `{from}` to `{to}` is already registered")]
     DuplicateSubtypeConversion { from: String, to: String },
     #[error("conversion from subtype `{0}` to itself must use the identity scale")]
