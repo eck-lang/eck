@@ -68,8 +68,13 @@ impl Registry {
     ///
     /// `None` denotes a plain, unqualified value. The rule can choose an output
     /// subtype and independent scale factors for both input magnitudes.
+    /// A rule must qualify at least one operand: the registry resolves two plain
+    /// operands directly through their base-type operator and never consults a
+    /// subtype rule for them.
+    ///
     /// Every present input or output subtype must already be registered. Returns
     /// [`CoreError::UnknownSubtypeId`] for an unknown subtype,
+    /// [`CoreError::UnreachableSubtypeOperatorRule`] when both inputs are plain,
     /// [`CoreError::InvalidScale`] for a zero denominator, or
     /// [`CoreError::DuplicateSubtypeOperator`] for an existing rule.
     pub fn register_subtype_binary_rule(
@@ -79,6 +84,9 @@ impl Registry {
         right_operand_subtype: Option<SubtypeId>,
         rule: SubtypeBinaryRule,
     ) -> Result<(), CoreError> {
+        if left_operand_subtype.is_none() && right_operand_subtype.is_none() {
+            return Err(CoreError::UnreachableSubtypeOperatorRule(operator));
+        }
         self.validate_optional_subtype(left_operand_subtype)?;
         self.validate_optional_subtype(right_operand_subtype)?;
         self.validate_optional_subtype(rule.output)?;
