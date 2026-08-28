@@ -1,6 +1,6 @@
 //! Pratt parsing for expressions, postfix conversions, and calls.
 
-use syntax::{BinaryOperator, Expression, Span};
+use syntax::{BinaryOperator, Expression, Span, UnaryOperator};
 
 use crate::{ParseError, lexer::TokenKind};
 
@@ -85,6 +85,7 @@ impl Parser {
         let token = self.advance().clone();
         match token.kind {
             TokenKind::Number(raw_text) => Ok(self.parse_number_literal(token.span, raw_text)),
+            TokenKind::Minus => self.parse_negation(token.span),
             TokenKind::String(value) => Ok(Expression::String {
                 value,
                 span: token.span,
@@ -115,6 +116,29 @@ impl Parser {
             suffix,
             span,
         }
+    }
+
+    /// Parses negation with lower precedence than a power and higher precedence than products.
+    ///
+    /// This gives `-2 ** 2` the conventional interpretation `-(2 ** 2)`,
+    /// while still allowing a negative exponent such as `2 ** -1`.
+    fn parse_negation(&mut self, start: Span) -> Result<Expression, ParseError> {
+        if matches!(self.peek().kind, TokenKind::Minus) {
+            return Err(self.error_at(
+                self.peek().span,
+                "`--` is not supported; write `-(-expression)` for double negation",
+            ));
+        }
+        let operand = self.parse_expression(5)?;
+        let span = Span {
+            start: start.start,
+            end: operand.span().end,
+        };
+        Ok(Expression::Unary {
+            operator: UnaryOperator::Negation,
+            operand: Box::new(operand),
+            span,
+        })
     }
 
     /// Parses an identifier as either a call or a variable reference.
