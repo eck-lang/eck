@@ -1,0 +1,10 @@
+[package]
+name = "eck-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+logos = "0.16"
+syntax = { package = "eck-syntax", path = "../syntax" }
+thiserror.workspace = true
