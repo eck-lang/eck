@@ -1,4 +1,4 @@
-use crate::{BinaryOperator, Span};
+use crate::{BinaryOperator, Span, UnaryOperator};
 
 #[derive(Clone, Debug)]
 pub struct Program {
@@ -31,6 +31,11 @@ pub enum Expression {
         name: String,
         span: Span,
     },
+    Unary {
+        operator: UnaryOperator,
+        operand: Box<Expression>,
+        span: Span,
+    },
     Binary {
         operator: BinaryOperator,
         left_operand: Box<Expression>,
@@ -55,6 +60,7 @@ impl Expression {
             Expression::Number { span, .. }
             | Expression::String { span, .. }
             | Expression::Variable { span, .. }
+            | Expression::Unary { span, .. }
             | Expression::Binary { span, .. }
             | Expression::Convert { span, .. }
             | Expression::Call { span, .. } => *span,
@@ -65,7 +71,7 @@ impl Expression {
 #[cfg(test)]
 mod tests {
     use super::Expression;
-    use crate::{BinaryOperator, Span};
+    use crate::{BinaryOperator, Span, UnaryOperator};
 
     fn span(start: usize, end: usize) -> Span {
         Span { start, end }
@@ -103,6 +109,18 @@ mod tests {
         let expected_span = span(1, 9);
         let expression = Expression::Variable {
             name: "distance".into(),
+            span: expected_span,
+        };
+
+        assert_eq!(expression.span(), expected_span);
+    }
+
+    #[test]
+    fn unary_expression_returns_its_span() {
+        let expected_span = span(2, 4);
+        let expression = Expression::Unary {
+            operator: UnaryOperator::Negation,
+            operand: Box::new(number_expression(span(3, 4))),
             span: expected_span,
         };
 
