@@ -10,7 +10,8 @@ use crate::ParseError;
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r"[ \t\r]+")]
 enum RawTokenKind {
-    #[regex(r"#[^\n]*", logos::skip, allow_greedy = true)]
+    #[regex(r"//[^\r\n]*", logos::skip, allow_greedy = true)]
+    #[regex(r"/\*([^*]|\*+[^*/])*\*+/", logos::skip)]
     Comment,
 
     #[token("\n")]
@@ -179,7 +180,7 @@ mod tests {
 
     #[test]
     fn lexes_eck_tokens_and_preserves_spans() {
-        let tokens = lex("distance: decimal = 1.5m->km # convert\n").unwrap();
+        let tokens = lex("distance: decimal = 1.5m->km // convert\n").unwrap();
 
         assert_eq!(
             tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
@@ -198,7 +199,31 @@ mod tests {
         );
         assert_eq!(tokens[0].span, Span { start: 0, end: 8 });
         assert_eq!(tokens[4].span, Span { start: 20, end: 23 });
-        assert_eq!(tokens[8].span, Span { start: 38, end: 39 });
+        assert_eq!(tokens[8].span, Span { start: 39, end: 40 });
+    }
+
+    #[test]
+    fn skips_line_and_multiline_comments() {
+        let tokens = lex("first: int = 1 // line\n/* block\ncomment */ second: int = 2\n").unwrap();
+
+        assert_eq!(
+            tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
+            vec![
+                &TokenKind::Ident("first".into()),
+                &TokenKind::Colon,
+                &TokenKind::Ident("int".into()),
+                &TokenKind::Equal,
+                &TokenKind::Number("1".into()),
+                &TokenKind::Newline,
+                &TokenKind::Ident("second".into()),
+                &TokenKind::Colon,
+                &TokenKind::Ident("int".into()),
+                &TokenKind::Equal,
+                &TokenKind::Number("2".into()),
+                &TokenKind::Newline,
+                &TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
@@ -216,6 +241,10 @@ mod tests {
         let invalid_character = lex("@").unwrap_err();
         assert_eq!(invalid_character.message, "unexpected character `@`");
         assert_eq!(invalid_character.span, Span { start: 0, end: 1 });
+
+        let legacy_comment = lex("# legacy comment").unwrap_err();
+        assert_eq!(legacy_comment.message, "unexpected character `#`");
+        assert_eq!(legacy_comment.span, Span { start: 0, end: 1 });
 
         let unterminated_string = lex("\"missing").unwrap_err();
         assert_eq!(unterminated_string.message, "unterminated string literal");
