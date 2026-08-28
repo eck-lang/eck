@@ -14,7 +14,11 @@ impl Extension for DoubleExtension {
         "double"
     }
 
-    /// Registers `double` and its arithmetic operators.
+    /// Registers `double`, its arithmetic operators, and Float promotion operators.
+    ///
+    /// When `float` is already registered, mixed Float/Double arithmetic
+    /// promotes the Float operand to `double`. Register `FloatExtension`
+    /// before this extension to enable those overloads.
     fn register(&self, registry: &mut Registry) -> Result<(), CoreError> {
         let id = registry.allocate_type_id();
         registry.register_type(TypeDescriptor {
@@ -37,7 +41,8 @@ pub(crate) fn test_type_id() -> language_core::TypeId {
 
 #[cfg(test)]
 mod tests {
-    use language_core::{CoreError, Extension, Registry};
+    use float::FloatExtension;
+    use language_core::{BinaryOperator, CoreError, Extension, Registry, ValueType};
 
     use super::DoubleExtension;
 
@@ -62,5 +67,47 @@ mod tests {
         let result = registry.parse_numeric("not-a-number", Some(double));
 
         assert!(matches!(result, Err(CoreError::InvalidLiteral { .. })));
+    }
+
+    #[test]
+    fn double_registers_all_lossless_float_promotion_operators() {
+        let mut registry = Registry::new();
+        FloatExtension.register(&mut registry).unwrap();
+        DoubleExtension.register(&mut registry).unwrap();
+
+        let float = registry.type_by_name("float").unwrap();
+        let double = registry.type_by_name("double").unwrap();
+
+        for operator in [
+            BinaryOperator::Addition,
+            BinaryOperator::Subtraction,
+            BinaryOperator::Multiplication,
+            BinaryOperator::Division,
+            BinaryOperator::Remainder,
+            BinaryOperator::Power,
+        ] {
+            assert_eq!(
+                registry
+                    .resolve_binary_operation(
+                        operator,
+                        ValueType::plain(float),
+                        ValueType::plain(double),
+                    )
+                    .unwrap()
+                    .output,
+                ValueType::plain(double)
+            );
+            assert_eq!(
+                registry
+                    .resolve_binary_operation(
+                        operator,
+                        ValueType::plain(double),
+                        ValueType::plain(float),
+                    )
+                    .unwrap()
+                    .output,
+                ValueType::plain(double)
+            );
+        }
     }
 }
