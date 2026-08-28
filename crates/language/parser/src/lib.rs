@@ -18,7 +18,7 @@ pub fn parse(source: &str) -> Result<Program, ParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syntax::{BinaryOperator, Expression, Statement};
+    use syntax::{BinaryOperator, Expression, Statement, UnaryOperator};
 
     #[test]
     fn parses_remainder_and_power() {
@@ -74,6 +74,45 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn parses_a_negative_power_exponent_as_negation() {
+        let program = parse("print(2 ** -1)\n").unwrap();
+        let Statement::Expression(Expression::Call { arguments, .. }) = &program.statements[0]
+        else {
+            panic!("expected a call expression");
+        };
+        let Expression::Binary { right_operand, .. } = &arguments[0] else {
+            panic!("expected a power expression");
+        };
+        assert!(matches!(
+            right_operand.as_ref(),
+            Expression::Unary {
+                operator: UnaryOperator::Negation,
+                operand,
+                ..
+            } if matches!(operand.as_ref(), Expression::Number { raw_text, .. } if raw_text == "1")
+        ));
+    }
+
+    #[test]
+    fn parses_negation_of_variables_and_parenthesized_expressions() {
+        let program = parse("print(-value, -(value + 1), -(-value))\n").unwrap();
+        let Statement::Expression(Expression::Call { arguments, .. }) = &program.statements[0]
+        else {
+            panic!("expected a call expression");
+        };
+        assert!(matches!(arguments[0], Expression::Unary { .. }));
+        assert!(matches!(arguments[1], Expression::Unary { .. }));
+        assert!(matches!(arguments[2], Expression::Unary { .. }));
+    }
+
+    #[test]
+    fn rejects_double_minus_to_reserve_pre_decrement_syntax() {
+        let error = parse("print(--value)\n").unwrap_err();
+
+        assert!(error.message.contains("`--` is not supported"));
     }
 
     #[test]
