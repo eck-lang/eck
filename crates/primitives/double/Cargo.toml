@@ -6,3 +6,6 @@ license.workspace = true
 
 [dependencies]
 language_core = { package = "eck-core", path = "../../language/core" }
+
+[dev-dependencies]
+float = { package = "eck-float", path = "../float" }
