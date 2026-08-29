@@ -90,6 +90,10 @@ impl Parser {
                 value,
                 span: token.span,
             }),
+            TokenKind::Boolean(raw_text) => Ok(Expression::Boolean {
+                raw_text,
+                span: token.span,
+            }),
             TokenKind::Ident(name) => self.parse_identifier_expression(token.span, name),
             TokenKind::LeftParenthesis => {
                 let expression = self.parse_expression(0)?;

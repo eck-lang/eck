@@ -47,6 +47,10 @@ enum RawTokenKind {
     #[regex(r"[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]*)?")]
     Number,
 
+    #[token("true")]
+    #[token("false")]
+    Boolean,
+
     #[regex(r"[A-Za-z_][A-Za-z0-9_]*")]
     Ident,
 
@@ -59,6 +63,7 @@ pub(crate) enum TokenKind {
     Ident(String),
     Number(String),
     String(String),
+    Boolean(String),
     Colon,
     Equal,
     Plus,
@@ -130,6 +135,7 @@ fn convert_raw_token(raw_kind: RawTokenKind, raw_text: &str) -> TokenKind {
         RawTokenKind::Number => TokenKind::Number(raw_text.into()),
         RawTokenKind::Ident => TokenKind::Ident(raw_text.into()),
         RawTokenKind::String => TokenKind::String(decode_string(raw_text)),
+        RawTokenKind::Boolean => TokenKind::Boolean(raw_text.into()),
     }
 }
 
