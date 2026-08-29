@@ -209,3 +209,7 @@ impl Registry {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "types.tests.rs"]
+mod tests;

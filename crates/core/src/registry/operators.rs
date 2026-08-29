@@ -85,3 +85,7 @@ impl Registry {
             .ok_or(CoreError::UnknownOperatorId(id))
     }
 }
+
+#[cfg(test)]
+#[path = "operators.tests.rs"]
+mod tests;

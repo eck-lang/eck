@@ -274,3 +274,7 @@ impl Registry {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "subtypes.tests.rs"]
+mod tests;

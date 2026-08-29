@@ -21,6 +21,3 @@ pub use subtype::{
     ValueType,
 };
 pub use value::Value;
-
-#[cfg(test)]
-mod tests;
