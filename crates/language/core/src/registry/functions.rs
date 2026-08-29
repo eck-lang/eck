@@ -134,3 +134,7 @@ impl Registry {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "functions.tests.rs"]
+mod tests;

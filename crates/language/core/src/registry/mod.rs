@@ -18,6 +18,8 @@ use crate::{
 mod functions;
 mod operators;
 mod subtypes;
+#[cfg(test)]
+mod test_support;
 mod types;
 
 static NEXT_REGISTRY_ID: AtomicU64 = AtomicU64::new(1);
