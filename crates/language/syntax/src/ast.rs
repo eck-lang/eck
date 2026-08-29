@@ -27,6 +27,10 @@ pub enum Expression {
         value: String,
         span: Span,
     },
+    Boolean {
+        raw_text: String,
+        span: Span,
+    },
     Variable {
         name: String,
         span: Span,
@@ -59,6 +63,7 @@ impl Expression {
         match self {
             Expression::Number { span, .. }
             | Expression::String { span, .. }
+            | Expression::Boolean { span, .. }
             | Expression::Variable { span, .. }
             | Expression::Unary { span, .. }
             | Expression::Binary { span, .. }
@@ -67,7 +72,6 @@ impl Expression {
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::Expression;
