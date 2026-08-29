@@ -75,6 +75,8 @@ pub struct Registry {
     default_fractional: Option<TypeId>,
     /// Selects the base type for uncontextualized string literals.
     default_string: Option<TypeId>,
+    /// Selects the base type for uncontextualized boolean literals.
+    default_boolean: Option<TypeId>,
 }
 
 impl Default for Registry {
@@ -99,6 +101,7 @@ impl Default for Registry {
             default_integer: None,
             default_fractional: None,
             default_string: None,
+            default_boolean: None,
         }
     }
 }

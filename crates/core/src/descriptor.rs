@@ -11,6 +11,7 @@ pub struct TypeDescriptor {
     pub name: &'static str,
     pub parse_numeric_literal: Option<LiteralParser>,
     pub parse_string_literal: Option<LiteralParser>,
+    pub parse_boolean_literal: Option<LiteralParser>,
     pub format: ValueFormatter,
 }
 

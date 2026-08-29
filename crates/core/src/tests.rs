@@ -21,6 +21,7 @@ fn type_descriptor(id: TypeId, name: &'static str) -> TypeDescriptor {
         name,
         parse_numeric_literal: None,
         parse_string_literal: None,
+        parse_boolean_literal: None,
         format: format_value,
     }
 }
@@ -106,6 +107,10 @@ fn type_references_must_be_registered_before_use() {
 
     assert!(matches!(
         registry.set_default_integer(unknown),
+        Err(CoreError::UnknownTypeId(id)) if id == unknown
+    ));
+    assert!(matches!(
+        registry.set_default_boolean(unknown),
         Err(CoreError::UnknownTypeId(id)) if id == unknown
     ));
     assert!(matches!(
