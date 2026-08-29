@@ -98,6 +98,22 @@ impl Registry {
             .ok_or(CoreError::MissingDefault("string"))
     }
 
+    /// Configures the type selected for boolean literals without explicit context.
+    ///
+    /// Returns [`CoreError::UnknownTypeId`] when `id` is not registered, leaving
+    /// the previously configured default unchanged.
+    pub fn set_default_boolean(&mut self, id: TypeId) -> Result<(), CoreError> {
+        self.type_descriptor(id)?;
+        self.default_boolean = Some(id);
+        Ok(())
+    }
+
+    /// Returns the configured default boolean type.
+    pub fn default_boolean(&self) -> Result<TypeId, CoreError> {
+        self.default_boolean
+            .ok_or(CoreError::MissingDefault("boolean"))
+    }
+
     /// Parses a numeric token through its expected or inferred registered type.
     ///
     /// Explicit context always wins. Without it, an integer-shaped token uses
@@ -136,6 +152,27 @@ impl Registry {
             .ok_or_else(|| CoreError::UnsupportedLiteral {
                 type_name: ty.name.to_string(),
                 literal_kind: "string",
+            })?;
+        parser(raw_text, type_id)
+    }
+
+    /// Parses a boolean token through its expected or default registered type.
+    ///
+    /// Explicit context takes precedence. Without it, the configured default
+    /// boolean type is used. Returns [`CoreError::UnsupportedLiteral`] when
+    /// the selected type does not accept boolean literals.
+    pub fn parse_boolean(
+        &self,
+        raw_text: &str,
+        expected: Option<TypeId>,
+    ) -> Result<Value, CoreError> {
+        let type_id = expected.unwrap_or(self.default_boolean()?);
+        let ty = self.type_descriptor(type_id)?;
+        let parser = ty
+            .parse_boolean_literal
+            .ok_or_else(|| CoreError::UnsupportedLiteral {
+                type_name: ty.name.to_string(),
+                literal_kind: "boolean",
             })?;
         parser(raw_text, type_id)
     }
