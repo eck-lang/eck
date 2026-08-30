@@ -47,7 +47,10 @@ impl Registry {
     /// This method is intended for diagnostics, where producing a useful error
     /// must not hide the original failure behind another lookup error.
     pub fn type_name(&self, id: TypeId) -> &str {
-        self.types.get(&id).map(|ty| ty.name).unwrap_or("<unknown>")
+        self.types
+            .get(&id)
+            .map(|type_descriptor| type_descriptor.name)
+            .unwrap_or("<unknown>")
     }
 
     /// Configures the type selected for integer literals without explicit context.
@@ -129,13 +132,14 @@ impl Registry {
             None if raw_text.contains(['.', 'e', 'E']) => self.default_fractional()?,
             None => self.default_integer()?,
         };
-        let ty = self.type_descriptor(type_id)?;
-        let parser = ty
-            .parse_numeric_literal
-            .ok_or_else(|| CoreError::UnsupportedLiteral {
-                type_name: ty.name.to_string(),
-                literal_kind: "numeric",
-            })?;
+        let type_descriptor = self.type_descriptor(type_id)?;
+        let parser =
+            type_descriptor
+                .parse_numeric_literal
+                .ok_or_else(|| CoreError::UnsupportedLiteral {
+                    type_name: type_descriptor.name.to_string(),
+                    literal_kind: "numeric",
+                })?;
         parser(raw_text, type_id)
     }
 
@@ -146,13 +150,14 @@ impl Registry {
         expected: Option<TypeId>,
     ) -> Result<Value, CoreError> {
         let type_id = expected.unwrap_or(self.default_string()?);
-        let ty = self.type_descriptor(type_id)?;
-        let parser = ty
-            .parse_string_literal
-            .ok_or_else(|| CoreError::UnsupportedLiteral {
-                type_name: ty.name.to_string(),
-                literal_kind: "string",
-            })?;
+        let type_descriptor = self.type_descriptor(type_id)?;
+        let parser =
+            type_descriptor
+                .parse_string_literal
+                .ok_or_else(|| CoreError::UnsupportedLiteral {
+                    type_name: type_descriptor.name.to_string(),
+                    literal_kind: "string",
+                })?;
         parser(raw_text, type_id)
     }
 
@@ -167,13 +172,14 @@ impl Registry {
         expected: Option<TypeId>,
     ) -> Result<Value, CoreError> {
         let type_id = expected.unwrap_or(self.default_boolean()?);
-        let ty = self.type_descriptor(type_id)?;
-        let parser = ty
-            .parse_boolean_literal
-            .ok_or_else(|| CoreError::UnsupportedLiteral {
-                type_name: ty.name.to_string(),
-                literal_kind: "boolean",
-            })?;
+        let type_descriptor = self.type_descriptor(type_id)?;
+        let parser =
+            type_descriptor
+                .parse_boolean_literal
+                .ok_or_else(|| CoreError::UnsupportedLiteral {
+                    type_name: type_descriptor.name.to_string(),
+                    literal_kind: "boolean",
+                })?;
         parser(raw_text, type_id)
     }
 
@@ -183,8 +189,8 @@ impl Registry {
     /// the canonical suffix afterwards so every formatter treats qualified and
     /// plain values consistently.
     pub fn format_value(&self, value: &Value) -> Result<String, CoreError> {
-        let ty = self.type_descriptor(value.type_id())?;
-        let formatted = (ty.format)(value)?;
+        let type_descriptor = self.type_descriptor(value.type_id())?;
+        let formatted = (type_descriptor.format)(value)?;
         match value.subtype_id() {
             Some(id) => Ok(format!(
                 "{formatted}{}",

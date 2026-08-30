@@ -69,7 +69,7 @@ impl Registry {
     pub fn resolve_function(
         &self,
         name: &str,
-        arg_types: &[TypeId],
+        argument_types: &[TypeId],
     ) -> Result<FunctionId, CoreError> {
         let candidates = self
             .functions_by_name
@@ -80,13 +80,13 @@ impl Registry {
             let function = &self.functions[id.index];
             if matches!(
                 &function.signature,
-                FunctionSignature::Exact(types) if types.as_slice() == arg_types
+                FunctionSignature::Exact(types) if types.as_slice() == argument_types
             ) {
                 return Ok(*id);
             }
         }
 
-        if arg_types.len() == 1
+        if argument_types.len() == 1
             && let Some(id) = candidates.iter().find(|id| {
                 matches!(
                     self.functions[id.index].signature,
@@ -99,7 +99,7 @@ impl Registry {
 
         Err(CoreError::NoMatchingFunction {
             name: name.to_string(),
-            arguments: arg_types
+            arguments: argument_types
                 .iter()
                 .map(|id| self.type_name(*id).to_string())
                 .collect(),
