@@ -11,3 +11,7 @@ pub(crate) fn parse(raw_text: &str, type_id: TypeId) -> Result<Value, CoreError>
             message: error.to_string(),
         })
 }
+
+#[cfg(test)]
+#[path = "literal.tests.rs"]
+mod tests;

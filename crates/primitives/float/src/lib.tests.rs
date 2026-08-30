@@ -58,25 +58,45 @@ fn float_literals_reject_invalid_source_text() {
     assert!(matches!(result, Err(CoreError::InvalidLiteral { .. })));
 }
 
-/// Verifies mixed multiplication when integer is registered before float.
+/// Verifies all arithmetic operators that convert integer operands to float.
 #[test]
-fn registers_float_integer_multiplication_after_integer() {
+fn float_registers_all_integer_promotion_operators() {
     let mut registry = Registry::new();
     IntegerExtension.register(&mut registry).unwrap();
     FloatExtension.register(&mut registry).unwrap();
     let integer = registry.type_by_name("int").unwrap();
     let float = registry.type_by_name("float").unwrap();
 
-    for (left, right) in [(integer, float), (float, integer)] {
-        let resolution = registry
-            .resolve_binary_operation(
-                BinaryOperator::Multiplication,
-                ValueType::plain(left),
-                ValueType::plain(right),
-            )
-            .unwrap();
-
-        assert_eq!(resolution.output, ValueType::plain(float));
+    for operator in [
+        BinaryOperator::Addition,
+        BinaryOperator::Subtraction,
+        BinaryOperator::Multiplication,
+        BinaryOperator::Division,
+        BinaryOperator::Remainder,
+        BinaryOperator::Power,
+    ] {
+        assert_eq!(
+            registry
+                .resolve_binary_operation(
+                    operator,
+                    ValueType::plain(integer),
+                    ValueType::plain(float),
+                )
+                .unwrap()
+                .output,
+            ValueType::plain(float)
+        );
+        assert_eq!(
+            registry
+                .resolve_binary_operation(
+                    operator,
+                    ValueType::plain(float),
+                    ValueType::plain(integer),
+                )
+                .unwrap()
+                .output,
+            ValueType::plain(float)
+        );
     }
 }
 

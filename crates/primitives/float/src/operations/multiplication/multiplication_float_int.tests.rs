@@ -2,6 +2,7 @@ use language_core::{Registry, Value};
 
 use super::multiplication_float_int;
 
+/// Allocates distinct integer and float type identifiers for mixed-operation tests.
 fn type_ids() -> (language_core::TypeId, language_core::TypeId) {
     let mut registry = Registry::new();
     let integer = registry.allocate_type_id();
@@ -9,6 +10,7 @@ fn type_ids() -> (language_core::TypeId, language_core::TypeId) {
     (integer, float)
 }
 
+/// Verifies float/integer multiplication in both operand orders.
 #[test]
 fn multiplies_float_and_integer_values_in_both_orders() {
     let (integer_id, float_id) = type_ids();
