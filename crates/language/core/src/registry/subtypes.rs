@@ -57,6 +57,20 @@ impl Registry {
         self.subtypes_by_suffix.get(suffix).copied()
     }
 
+    /// Returns a snapshot iterator over every registered subtype ID.
+    ///
+    /// IDs are yielded in their registry allocation order, rather than the
+    /// unspecified iteration order of the registry's hash-map index. The
+    /// iterator includes only fully registered subtypes; IDs that have been
+    /// allocated but not registered are omitted. This allows an extension to
+    /// register rules against capabilities installed by earlier extensions
+    /// without depending on their concrete crates.
+    pub fn registered_subtype_ids(&self) -> impl Iterator<Item = SubtypeId> + use<> {
+        let mut subtype_ids = self.subtypes.keys().copied().collect::<Vec<_>>();
+        subtype_ids.sort_unstable_by_key(|id| id.index);
+        subtype_ids.into_iter()
+    }
+
     /// Returns the descriptor for a registered subtype ID.
     pub fn subtype_descriptor(&self, id: SubtypeId) -> Result<&SubtypeDescriptor, CoreError> {
         self.subtypes
@@ -108,23 +122,23 @@ impl Registry {
 
     /// Resolves a binary operation for fully qualified operand types.
     ///
-    /// Base-type operator resolution selects the executable operation first.
-    /// If either input is qualified, a subtype rule then selects output
-    /// qualification and scaling; no fallback or implicit subtype conversion is
-    /// attempted.
+    /// Plain operands resolve directly to their exact base-type operator. For
+    /// qualified operands, a subtype rule first determines any magnitude
+    /// scales; the executable operation is then selected for the resulting
+    /// base types. No fallback or implicit subtype conversion is attempted.
     pub fn resolve_binary_operation(
         &self,
         operator: BinaryOperator,
         left_operand_type: ValueType,
         right_operand_type: ValueType,
     ) -> Result<ResolvedBinaryOperator, CoreError> {
-        let resolved_operator = self.resolve_binary_operator(
-            operator,
-            left_operand_type.base,
-            right_operand_type.base,
-        )?;
-        let result_base_type = self.operator(resolved_operator)?.result_type;
         if left_operand_type.subtype.is_none() && right_operand_type.subtype.is_none() {
+            let resolved_operator = self.resolve_binary_operator(
+                operator,
+                left_operand_type.base,
+                right_operand_type.base,
+            )?;
+            let result_base_type = self.operator(resolved_operator)?.result_type;
             return Ok(ResolvedBinaryOperator {
                 operator: resolved_operator,
                 output: ValueType::plain(result_base_type),
@@ -146,6 +160,17 @@ impl Registry {
                 left_operand_type: self.value_type_name(left_operand_type),
                 right_operand_type: self.value_type_name(right_operand_type),
             })?;
+        let scaled_left_operand_type =
+            self.resolve_scaled_base_type(left_operand_type.base, rule.left_operand_scale)?;
+        let scaled_right_operand_type =
+            self.resolve_scaled_base_type(right_operand_type.base, rule.right_operand_scale)?;
+        let resolved_operator = self.resolve_binary_operator(
+            operator,
+            scaled_left_operand_type,
+            scaled_right_operand_type,
+        )?;
+        let result_base_type = self.operator(resolved_operator)?.result_type;
+
         Ok(ResolvedBinaryOperator {
             operator: resolved_operator,
             output: ValueType {
@@ -228,25 +253,7 @@ impl Registry {
                 })?
         };
 
-        let mut output_base = source.base;
-        if scale.numerator != 1 {
-            let operator = self.resolve_binary_operator(
-                BinaryOperator::Multiplication,
-                output_base,
-                output_base,
-            )?;
-            output_base = self.operator(operator)?.result_type;
-        }
-        if scale.denominator != 1 {
-            let divisor_type = if self.default_integer == Some(output_base) {
-                self.default_fractional()?
-            } else {
-                output_base
-            };
-            let operator =
-                self.resolve_binary_operator(BinaryOperator::Division, output_base, divisor_type)?;
-            output_base = self.operator(operator)?.result_type;
-        }
+        let output_base = self.resolve_scaled_base_type(source.base, scale)?;
 
         Ok(ResolvedSubtypeConversion {
             output: ValueType::qualified(output_base, target),
@@ -254,8 +261,45 @@ impl Registry {
         })
     }
 
+    /// Resolves the base type produced by applying a magnitude scale.
+    ///
+    /// Scaling follows the same operator sequence used by the runtime: it
+    /// first multiplies by the numerator using the current type, then divides
+    /// by the denominator. Division of the configured default integer type
+    /// uses the configured default fractional type as its divisor so a
+    /// fractional scale does not truncate its magnitude.
+    pub(super) fn resolve_scaled_base_type(
+        &self,
+        base_type: crate::TypeId,
+        scale: Scale,
+    ) -> Result<crate::TypeId, CoreError> {
+        let mut scaled_base_type = base_type;
+        if scale.numerator != 1 {
+            let operator = self.resolve_binary_operator(
+                BinaryOperator::Multiplication,
+                scaled_base_type,
+                scaled_base_type,
+            )?;
+            scaled_base_type = self.operator(operator)?.result_type;
+        }
+        if scale.denominator != 1 {
+            let divisor_type = if self.default_integer == Some(scaled_base_type) {
+                self.default_fractional()?
+            } else {
+                scaled_base_type
+            };
+            let operator = self.resolve_binary_operator(
+                BinaryOperator::Division,
+                scaled_base_type,
+                divisor_type,
+            )?;
+            scaled_base_type = self.operator(operator)?.result_type;
+        }
+        Ok(scaled_base_type)
+    }
+
     /// Returns a subtype name for diagnostics, including a marker for plain values.
-    fn optional_subtype_name(&self, id: Option<SubtypeId>) -> String {
+    pub(super) fn optional_subtype_name(&self, id: Option<SubtypeId>) -> String {
         match id {
             Some(id) => self
                 .subtypes
@@ -267,7 +311,7 @@ impl Registry {
     }
 
     /// Verifies that an optional subtype reference is either plain or registered.
-    fn validate_optional_subtype(&self, id: Option<SubtypeId>) -> Result<(), CoreError> {
+    pub(super) fn validate_optional_subtype(&self, id: Option<SubtypeId>) -> Result<(), CoreError> {
         if let Some(id) = id {
             self.subtype_descriptor(id)?;
         }

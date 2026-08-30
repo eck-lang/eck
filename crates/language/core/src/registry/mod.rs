@@ -11,10 +11,12 @@ use std::{
 };
 
 use crate::{
-    BinaryOperator, BinaryOperatorDescriptor, FunctionDescriptor, FunctionId, OperatorId, Scale,
-    SubtypeBinaryRule, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId,
+    BinaryOperator, BinaryOperatorDescriptor, ComparisonDescriptor, ComparisonId,
+    ComparisonOperator, FunctionDescriptor, FunctionId, OperatorId, Scale, SubtypeBinaryRule,
+    SubtypeComparisonRule, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId,
 };
 
+mod comparisons;
 mod functions;
 mod operators;
 mod subtypes;
@@ -58,6 +60,9 @@ pub struct Registry {
     /// Resolves subtype-aware arithmetic rules by operator and operand subtype.
     subtype_operator_index:
         HashMap<(BinaryOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeBinaryRule>,
+    /// Resolves subtype-aware comparison rules by operator and operand subtype.
+    subtype_comparison_index:
+        HashMap<(ComparisonOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeComparisonRule>,
     /// Resolves direct conversions between registered subtypes.
     subtype_conversion_index: HashMap<(SubtypeId, SubtypeId), Scale>,
 
@@ -65,6 +70,11 @@ pub struct Registry {
     operator_index: HashMap<(BinaryOperator, TypeId, TypeId), OperatorId>,
     /// Stores executable operator descriptors in ID order.
     operators: Vec<BinaryOperatorDescriptor>,
+
+    /// Resolves a base-type comparison to a dense comparison ID.
+    comparison_index: HashMap<(ComparisonOperator, TypeId, TypeId), ComparisonId>,
+    /// Stores executable comparison descriptors in ID order.
+    comparisons: Vec<ComparisonDescriptor>,
 
     /// Resolves a function name to its candidate overload IDs.
     functions_by_name: HashMap<&'static str, Vec<FunctionId>>,
@@ -95,9 +105,12 @@ impl Default for Registry {
             subtypes_by_suffix: HashMap::new(),
             subtypes: HashMap::new(),
             subtype_operator_index: HashMap::new(),
+            subtype_comparison_index: HashMap::new(),
             subtype_conversion_index: HashMap::new(),
             operator_index: HashMap::new(),
             operators: Vec::new(),
+            comparison_index: HashMap::new(),
+            comparisons: Vec::new(),
             functions_by_name: HashMap::new(),
             functions: Vec::new(),
             default_integer: None,

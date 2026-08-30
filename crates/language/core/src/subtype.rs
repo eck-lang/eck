@@ -1,9 +1,49 @@
-use crate::{OperatorId, SubtypeId, TypeId};
+use crate::{ComparisonId, OperatorId, SubtypeId, TypeId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ValueType {
     pub base: TypeId,
     pub subtype: Option<SubtypeId>,
+}
+
+/// Defines how qualified operands are scaled before a comparison.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SubtypeComparisonRule {
+    pub left_operand_scale: Scale,
+    pub right_operand_scale: Scale,
+}
+
+impl SubtypeComparisonRule {
+    pub const fn new() -> Self {
+        Self {
+            left_operand_scale: Scale::IDENTITY,
+            right_operand_scale: Scale::IDENTITY,
+        }
+    }
+
+    pub const fn with_operand_scales(
+        mut self,
+        left_operand_scale: Scale,
+        right_operand_scale: Scale,
+    ) -> Self {
+        self.left_operand_scale = left_operand_scale;
+        self.right_operand_scale = right_operand_scale;
+        self
+    }
+}
+
+impl Default for SubtypeComparisonRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResolvedComparison {
+    pub comparison: ComparisonId,
+    pub output: ValueType,
+    pub left_operand_scale: Scale,
+    pub right_operand_scale: Scale,
 }
 
 impl ValueType {
