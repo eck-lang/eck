@@ -1,6 +1,6 @@
 //! Pratt parsing for expressions, postfix conversions, and calls.
 
-use syntax::{BinaryOperator, Expression, Span, UnaryOperator};
+use syntax::{BinaryOperator, ComparisonOperator, Expression, Span, UnaryOperator};
 
 use crate::{ParseError, lexer::TokenKind};
 
@@ -39,6 +39,27 @@ impl Parser {
                 right_operand: Box::new(right_operand),
                 span,
             };
+        }
+        if min_bp == 0
+            && let Some(operator) = self.current_comparison_operator()
+        {
+            self.advance();
+            let right_operand = self.parse_expression(1)?;
+            let span = Span {
+                start: left_operand.span().start,
+                end: right_operand.span().end,
+            };
+            left_operand = Expression::Comparison {
+                operator,
+                left_operand: Box::new(left_operand),
+                right_operand: Box::new(right_operand),
+                span,
+            };
+            if self.current_comparison_operator().is_some() {
+                return Err(self.error_here(
+                    "chained comparisons are not supported; parenthesize each comparison",
+                ));
+            }
         }
         Ok(left_operand)
     }
@@ -104,7 +125,12 @@ impl Parser {
         }
     }
 
-    /// Parses a numeric literal and its optional adjacent unit suffix.
+    /// Parses a numeric literal and its optional suffix.
+    ///
+    /// Identifier suffixes retain their existing whitespace-tolerant syntax,
+    /// while `%` is a suffix only when it is immediately adjacent to the
+    /// literal. This keeps spaced percent signs available as the remainder
+    /// operator.
     fn parse_number_literal(&mut self, span: Span, raw_text: String) -> Expression {
         let mut span = span;
         let suffix = match &self.peek().kind {
@@ -112,6 +138,10 @@ impl Parser {
                 let value = value.clone();
                 span.end = self.advance().span.end;
                 Some(value)
+            }
+            TokenKind::Percent if self.peek().span.start == span.end => {
+                span.end = self.advance().span.end;
+                Some("%".into())
             }
             _ => None,
         };
@@ -177,4 +207,21 @@ impl Parser {
             span: Span { start, end },
         })
     }
+
+    /// Returns the non-associative comparison operator at the cursor.
+    fn current_comparison_operator(&self) -> Option<ComparisonOperator> {
+        match &self.peek().kind {
+            TokenKind::EqualEqual => Some(ComparisonOperator::Equal),
+            TokenKind::BangEqual => Some(ComparisonOperator::NotEqual),
+            TokenKind::Less => Some(ComparisonOperator::Less),
+            TokenKind::LessEqual => Some(ComparisonOperator::LessOrEqual),
+            TokenKind::Greater => Some(ComparisonOperator::Greater),
+            TokenKind::GreaterEqual => Some(ComparisonOperator::GreaterOrEqual),
+            _ => None,
+        }
+    }
 }
+
+#[cfg(test)]
+#[path = "expressions.tests.rs"]
+mod tests;
