@@ -7,3 +7,7 @@ pub(crate) fn get(value: &Value) -> Result<f64, CoreError> {
         .copied()
         .ok_or_else(|| CoreError::InvalidValueRepresentation("double".into()))
 }
+
+#[cfg(test)]
+#[path = "value.tests.rs"]
+mod tests;

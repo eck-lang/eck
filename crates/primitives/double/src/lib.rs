@@ -17,9 +17,9 @@ impl Extension for DoubleExtension {
 
     /// Registers `double`, its arithmetic operators, and numeric comparisons.
     ///
-    /// When `float` is already registered, mixed float/double arithmetic
-    /// promotes the float operand to `double`. Comparison declarations with
-    /// `float` and `int` activate independently of extension registration order.
+    /// When `float` or `int` is already registered, mixed arithmetic promotes
+    /// the other operand to `double`. Comparison declarations with both types
+    /// activate independently of extension registration order.
     fn register(&self, registry: &mut Registry) -> Result<(), CoreError> {
         let id = registry.allocate_type_id();
         registry.register_type(TypeDescriptor {
