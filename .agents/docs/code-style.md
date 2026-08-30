@@ -16,3 +16,16 @@ abbreviation from its context.
 The only exception is an identifier imposed directly by the Rust core or a
 third-party library. Keep that external identifier unchanged when the API
 requires it, but do not carry its abbreviation into project-defined names.
+
+## Documentation
+
+Document every project-defined function and method with a Rust doc comment,
+including private helpers and test functions. At minimum, state the function's
+responsibility. When behavior is not evident from the signature, also explain
+the relevant representation, conversion, ordering, error, or side-effect
+semantics.
+
+Prefer concise comments that add useful context, but do not omit documentation
+merely because a function is small or its name is descriptive. Keep detailed
+implementation commentary next to the specific algorithm or invariant it
+explains.
