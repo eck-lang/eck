@@ -17,6 +17,8 @@ impl Extension for FloatExtension {
 
     /// Registers `float`, its arithmetic operators, and numeric comparisons.
     ///
+    /// Mixed arithmetic with `int` produces `float`; integer magnitudes outside
+    /// exact single-precision representation may be rounded during conversion.
     /// Comparison declarations with `int` activate independently of extension
     /// registration order.
     fn register(&self, registry: &mut Registry) -> Result<(), CoreError> {
