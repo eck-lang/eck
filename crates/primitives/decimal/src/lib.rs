@@ -1,3 +1,4 @@
+mod comparisons;
 mod formatting;
 mod literal;
 pub(crate) mod operations;
@@ -5,7 +6,7 @@ pub(crate) mod value;
 
 use language_core::{CoreError, Extension, Registry, TypeDescriptor};
 
-/// Registers the built-in fixed-precision decimal type and its operators.
+/// Registers the built-in fixed-precision decimal type and its semantics.
 pub struct DecimalExtension;
 
 impl Extension for DecimalExtension {
@@ -14,7 +15,8 @@ impl Extension for DecimalExtension {
         "decimal"
     }
 
-    /// Registers `decimal`, makes it the default fractional type, and adds its operators.
+    /// Registers `decimal`, makes it the default fractional type, and adds its
+    /// arithmetic and comparison relations.
     fn register(&self, registry: &mut Registry) -> Result<(), CoreError> {
         let id = registry.allocate_type_id();
         registry.register_type(TypeDescriptor {
@@ -22,10 +24,12 @@ impl Extension for DecimalExtension {
             name: "decimal",
             parse_numeric_literal: Some(literal::parse),
             parse_string_literal: None,
+            parse_boolean_literal: None,
             format: formatting::format,
         })?;
         registry.set_default_fractional(id)?;
-        operations::register(registry, id)
+        operations::register(registry, id)?;
+        comparisons::register(registry)
     }
 }
 
@@ -43,64 +47,5 @@ pub(crate) fn test_type_id(index: u32) -> language_core::TypeId {
 }
 
 #[cfg(test)]
-mod tests {
-    use double::DoubleExtension;
-    use float::FloatExtension;
-    use language_core::{BinaryOperator, Extension, Registry, ValueType};
-
-    use super::DecimalExtension;
-
-    #[test]
-    fn decimal_is_the_default_fractional_type() {
-        let mut registry = Registry::new();
-        DecimalExtension.register(&mut registry).unwrap();
-
-        let value = registry.parse_numeric("0.2", None).unwrap();
-
-        assert_eq!(value.type_id(), registry.type_by_name("decimal").unwrap());
-    }
-
-    #[test]
-    fn decimal_registers_all_mixed_float_and_double_operators() {
-        let mut registry = Registry::new();
-        FloatExtension.register(&mut registry).unwrap();
-        DoubleExtension.register(&mut registry).unwrap();
-        DecimalExtension.register(&mut registry).unwrap();
-
-        let decimal = registry.type_by_name("decimal").unwrap();
-        let float = registry.type_by_name("float").unwrap();
-        let double = registry.type_by_name("double").unwrap();
-
-        for operator in [
-            BinaryOperator::Addition,
-            BinaryOperator::Subtraction,
-            BinaryOperator::Multiplication,
-            BinaryOperator::Division,
-            BinaryOperator::Remainder,
-            BinaryOperator::Power,
-        ] {
-            assert_eq!(
-                registry
-                    .resolve_binary_operation(
-                        operator,
-                        ValueType::plain(decimal),
-                        ValueType::plain(float),
-                    )
-                    .unwrap()
-                    .output,
-                ValueType::plain(decimal)
-            );
-            assert_eq!(
-                registry
-                    .resolve_binary_operation(
-                        operator,
-                        ValueType::plain(decimal),
-                        ValueType::plain(double),
-                    )
-                    .unwrap()
-                    .output,
-                ValueType::plain(decimal)
-            );
-        }
-    }
-}
+#[path = "lib.tests.rs"]
+mod tests;

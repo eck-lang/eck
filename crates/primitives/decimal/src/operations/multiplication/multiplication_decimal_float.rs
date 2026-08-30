@@ -3,30 +3,18 @@ use language_core::{CoreError, Value};
 use crate::operations::{checked_multiplication, decimal_float_operands};
 
 /// Multiplies one decimal and one single-precision float, regardless of operand order.
-pub(crate) fn multiplication_decimal_float(lhs: &Value, rhs: &Value) -> Result<Value, CoreError> {
-    let (lhs, rhs, decimal_id) = decimal_float_operands(lhs, rhs)?;
-    Ok(Value::new(decimal_id, checked_multiplication(lhs, rhs)?))
+pub(crate) fn multiplication_decimal_float(
+    left_operand: &Value,
+    right_operand: &Value,
+) -> Result<Value, CoreError> {
+    let (left_operand, right_operand, decimal_id) =
+        decimal_float_operands(left_operand, right_operand)?;
+    Ok(Value::new(
+        decimal_id,
+        checked_multiplication(left_operand, right_operand)?,
+    ))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use rust_decimal::Decimal;
-
-    use crate::value::get as get_decimal;
-
-    #[test]
-    fn multiplies_decimal_and_float_in_both_orders() {
-        let decimal = Value::new(crate::test_type_id(1), Decimal::new(25, 1));
-        let float = Value::new(crate::test_type_id(2), 2.0_f32);
-
-        assert_eq!(
-            get_decimal(&multiplication_decimal_float(&decimal, &float).unwrap()).unwrap(),
-            Decimal::new(5, 0)
-        );
-        assert_eq!(
-            get_decimal(&multiplication_decimal_float(&float, &decimal).unwrap()).unwrap(),
-            Decimal::new(5, 0)
-        );
-    }
-}
+#[path = "multiplication_decimal_float.tests.rs"]
+mod tests;
