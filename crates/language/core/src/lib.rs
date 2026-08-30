@@ -8,9 +8,9 @@ mod subtype;
 mod value;
 
 pub use descriptor::{
-    BinaryOperatorDescriptor, BinaryOperatorExecutor, ComparisonDescriptor, ComparisonExecutor,
-    FunctionDescriptor, FunctionSignature, LiteralParser, NativeFunction, TypeDescriptor,
-    ValueFormatter,
+    BinaryOperatorDescriptor, BinaryOperatorExecutor, BooleanEvaluator, ComparisonDescriptor,
+    ComparisonExecutor, FunctionDescriptor, FunctionSignature, LiteralParser, NativeFunction,
+    TypeDescriptor, ValueFormatter,
 };
 pub use error::CoreError;
 pub use extension::Extension;

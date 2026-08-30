@@ -16,6 +16,17 @@ pub(super) fn format_value(_: &Value) -> Result<String, CoreError> {
     Ok(String::new())
 }
 
+/// Reads the Rust boolean payload used by registry fixtures.
+///
+/// Tests that configure a default boolean use this evaluator to satisfy the
+/// extension-owned representation contract without depending on `eck-bool`.
+pub(super) fn evaluate_boolean(value: &Value) -> Result<bool, CoreError> {
+    value
+        .downcast_ref::<bool>()
+        .copied()
+        .ok_or_else(|| CoreError::InvalidValueRepresentation("test bool".into()))
+}
+
 /// An operator callback that returns its left operand unchanged.
 ///
 /// Tests use this as a valid executable callback when their subject is

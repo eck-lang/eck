@@ -1,6 +1,8 @@
-use crate::{CoreError, Registry};
+use super::*;
 
-use super::super::test_support::{foreign_type_id, register_type, type_descriptor};
+use super::super::test_support::{
+    evaluate_boolean, foreign_type_id, register_type, type_descriptor,
+};
 
 #[test]
 fn type_registration_rejects_unallocated_and_duplicate_ids() {
@@ -40,7 +42,31 @@ fn default_types_must_be_registered_before_use() {
         Err(CoreError::UnknownTypeId(id)) if id == unknown
     ));
     assert!(matches!(
-        registry.set_default_boolean(unknown),
+        registry.set_default_boolean(unknown, evaluate_boolean),
         Err(CoreError::UnknownTypeId(id)) if id == unknown
+    ));
+}
+
+#[test]
+fn default_boolean_evaluation_uses_the_registered_type_contract() {
+    let mut registry = Registry::new();
+    let boolean = register_type(&mut registry, "bool");
+    let integer = register_type(&mut registry, "int");
+    registry
+        .set_default_boolean(boolean, evaluate_boolean)
+        .unwrap();
+
+    assert!(
+        registry
+            .evaluate_boolean(&crate::Value::new(boolean, true))
+            .unwrap()
+    );
+    assert!(matches!(
+        registry.evaluate_boolean(&crate::Value::new(integer, 1_i64)),
+        Err(CoreError::UnexpectedBooleanValueType { .. })
+    ));
+    assert!(matches!(
+        registry.evaluate_boolean(&crate::Value::new(boolean, 1_i64)),
+        Err(CoreError::InvalidValueRepresentation(name)) if name == "test bool"
     ));
 }
