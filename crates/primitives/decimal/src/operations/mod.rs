@@ -29,9 +29,9 @@ pub(crate) use self::subtraction::{
 use language_core::{BinaryOperator, BinaryOperatorExecutor, CoreError, Registry, TypeId, Value};
 use rust_decimal::{Decimal, prelude::ToPrimitive};
 
-use crate::value::get as get_decimal;
+use crate::value::{from_double, from_float, get as get_decimal};
 
-/// Registers decimal operators and their mixed-type overloads.
+/// Registers decimal arithmetic operators and their mixed-type overloads.
 pub(crate) fn register(registry: &mut Registry, decimal_id: TypeId) -> Result<(), CoreError> {
     registry.register_binary_operator(
         BinaryOperator::Addition,
@@ -257,17 +257,25 @@ fn register_mixed(
 
 /// Converts a decimal/float pair into decimal operands in source order.
 pub(super) fn decimal_float_operands(
-    lhs: &Value,
-    rhs: &Value,
+    left_operand: &Value,
+    right_operand: &Value,
 ) -> Result<(Decimal, Decimal, TypeId), CoreError> {
-    if let Some(decimal_lhs) = lhs.downcast_ref::<Decimal>() {
-        let float_rhs = get_float(rhs)?;
-        return Ok((*decimal_lhs, float_as_decimal(float_rhs)?, lhs.type_id()));
+    if let Some(decimal_left_operand) = left_operand.downcast_ref::<Decimal>() {
+        let float_right_operand = get_float(right_operand)?;
+        return Ok((
+            *decimal_left_operand,
+            from_float(float_right_operand)?,
+            left_operand.type_id(),
+        ));
     }
 
-    if let Some(float_lhs) = lhs.downcast_ref::<f32>() {
-        let decimal_rhs = get_decimal(rhs)?;
-        return Ok((float_as_decimal(*float_lhs)?, decimal_rhs, rhs.type_id()));
+    if let Some(float_left_operand) = left_operand.downcast_ref::<f32>() {
+        let decimal_right_operand = get_decimal(right_operand)?;
+        return Ok((
+            from_float(*float_left_operand)?,
+            decimal_right_operand,
+            right_operand.type_id(),
+        ));
     }
 
     Err(CoreError::InvalidValueRepresentation(
@@ -277,17 +285,25 @@ pub(super) fn decimal_float_operands(
 
 /// Converts a decimal/double pair into decimal operands in source order.
 pub(super) fn decimal_double_operands(
-    lhs: &Value,
-    rhs: &Value,
+    left_operand: &Value,
+    right_operand: &Value,
 ) -> Result<(Decimal, Decimal, TypeId), CoreError> {
-    if let Some(decimal_lhs) = lhs.downcast_ref::<Decimal>() {
-        let double_rhs = get_double(rhs)?;
-        return Ok((*decimal_lhs, double_as_decimal(double_rhs)?, lhs.type_id()));
+    if let Some(decimal_left_operand) = left_operand.downcast_ref::<Decimal>() {
+        let double_right_operand = get_double(right_operand)?;
+        return Ok((
+            *decimal_left_operand,
+            from_double(double_right_operand)?,
+            left_operand.type_id(),
+        ));
     }
 
-    if let Some(double_lhs) = lhs.downcast_ref::<f64>() {
-        let decimal_rhs = get_decimal(rhs)?;
-        return Ok((double_as_decimal(*double_lhs)?, decimal_rhs, rhs.type_id()));
+    if let Some(double_left_operand) = left_operand.downcast_ref::<f64>() {
+        let decimal_right_operand = get_decimal(right_operand)?;
+        return Ok((
+            from_double(*double_left_operand)?,
+            decimal_right_operand,
+            right_operand.type_id(),
+        ));
     }
 
     Err(CoreError::InvalidValueRepresentation(
@@ -297,17 +313,25 @@ pub(super) fn decimal_double_operands(
 
 /// Converts a decimal/int pair into decimal operands in source order.
 pub(super) fn decimal_int_operands(
-    lhs: &Value,
-    rhs: &Value,
+    left_operand: &Value,
+    right_operand: &Value,
 ) -> Result<(Decimal, Decimal, TypeId), CoreError> {
-    if let Some(decimal_lhs) = lhs.downcast_ref::<Decimal>() {
-        let integer_rhs = get_integer(rhs)?;
-        return Ok((*decimal_lhs, Decimal::from(integer_rhs), lhs.type_id()));
+    if let Some(decimal_left_operand) = left_operand.downcast_ref::<Decimal>() {
+        let integer_right_operand = get_integer(right_operand)?;
+        return Ok((
+            *decimal_left_operand,
+            Decimal::from(integer_right_operand),
+            left_operand.type_id(),
+        ));
     }
 
-    if let Some(integer_lhs) = lhs.downcast_ref::<i64>() {
-        let decimal_rhs = get_decimal(rhs)?;
-        return Ok((Decimal::from(*integer_lhs), decimal_rhs, rhs.type_id()));
+    if let Some(integer_left_operand) = left_operand.downcast_ref::<i64>() {
+        let decimal_right_operand = get_decimal(right_operand)?;
+        return Ok((
+            Decimal::from(*integer_left_operand),
+            decimal_right_operand,
+            right_operand.type_id(),
+        ));
     }
 
     Err(CoreError::InvalidValueRepresentation(
@@ -339,18 +363,6 @@ fn get_integer(value: &Value) -> Result<i64, CoreError> {
         .ok_or_else(|| CoreError::InvalidValueRepresentation("int".into()))
 }
 
-/// Converts a finite floating-point value to a decimal value.
-fn float_as_decimal(value: f32) -> Result<Decimal, CoreError> {
-    Decimal::try_from(value)
-        .map_err(|error| CoreError::Runtime(format!("cannot convert float to decimal: {error}")))
-}
-
-/// Converts a finite double-precision value to a decimal value.
-fn double_as_decimal(value: f64) -> Result<Decimal, CoreError> {
-    Decimal::try_from(value)
-        .map_err(|error| CoreError::Runtime(format!("cannot convert double to decimal: {error}")))
-}
-
 /// Converts an integer-valued decimal exponent into an `i64`.
 pub(super) fn decimal_exponent(value: Decimal) -> Result<i64, CoreError> {
     if !value.is_integer() {
@@ -364,32 +376,52 @@ pub(super) fn decimal_exponent(value: Decimal) -> Result<i64, CoreError> {
 }
 
 /// Adds decimals and converts overflow into a language error.
-pub(super) fn checked_addition(lhs: Decimal, rhs: Decimal) -> Result<Decimal, CoreError> {
-    lhs.checked_add(rhs)
+pub(super) fn checked_addition(
+    left_operand: Decimal,
+    right_operand: Decimal,
+) -> Result<Decimal, CoreError> {
+    left_operand
+        .checked_add(right_operand)
         .ok_or_else(|| CoreError::Runtime("decimal overflow in addition".into()))
 }
 
 /// Subtracts decimals and converts overflow into a language error.
-pub(super) fn checked_subtraction(lhs: Decimal, rhs: Decimal) -> Result<Decimal, CoreError> {
-    lhs.checked_sub(rhs)
+pub(super) fn checked_subtraction(
+    left_operand: Decimal,
+    right_operand: Decimal,
+) -> Result<Decimal, CoreError> {
+    left_operand
+        .checked_sub(right_operand)
         .ok_or_else(|| CoreError::Runtime("decimal overflow in subtraction".into()))
 }
 
 /// Multiplies decimals and converts overflow into a language error.
-pub(super) fn checked_multiplication(lhs: Decimal, rhs: Decimal) -> Result<Decimal, CoreError> {
-    lhs.checked_mul(rhs)
+pub(super) fn checked_multiplication(
+    left_operand: Decimal,
+    right_operand: Decimal,
+) -> Result<Decimal, CoreError> {
+    left_operand
+        .checked_mul(right_operand)
         .ok_or_else(|| CoreError::Runtime("decimal overflow in multiplication".into()))
 }
 
 /// Divides decimals and converts arithmetic overflow into a language error.
-pub(super) fn checked_division(lhs: Decimal, rhs: Decimal) -> Result<Decimal, CoreError> {
-    lhs.checked_div(rhs)
+pub(super) fn checked_division(
+    left_operand: Decimal,
+    right_operand: Decimal,
+) -> Result<Decimal, CoreError> {
+    left_operand
+        .checked_div(right_operand)
         .ok_or_else(|| CoreError::Runtime("decimal overflow in division".into()))
 }
 
 /// Calculates a decimal remainder and converts failure into a language error.
-pub(super) fn checked_remainder(lhs: Decimal, rhs: Decimal) -> Result<Decimal, CoreError> {
-    lhs.checked_rem(rhs)
+pub(super) fn checked_remainder(
+    left_operand: Decimal,
+    right_operand: Decimal,
+) -> Result<Decimal, CoreError> {
+    left_operand
+        .checked_rem(right_operand)
         .ok_or_else(|| CoreError::Runtime("decimal overflow in remainder".into()))
 }
 
