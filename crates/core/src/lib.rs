@@ -8,16 +8,17 @@ mod subtype;
 mod value;
 
 pub use descriptor::{
-    BinaryOperatorDescriptor, BinaryOperatorExecutor, FunctionDescriptor, FunctionSignature,
-    LiteralParser, NativeFunction, TypeDescriptor, ValueFormatter,
+    BinaryOperatorDescriptor, BinaryOperatorExecutor, ComparisonDescriptor, ComparisonExecutor,
+    FunctionDescriptor, FunctionSignature, LiteralParser, NativeFunction, TypeDescriptor,
+    ValueFormatter,
 };
 pub use error::CoreError;
 pub use extension::Extension;
-pub use ids::{FunctionId, OperatorId, SubtypeId, TypeId};
-pub use operator::BinaryOperator;
+pub use ids::{ComparisonId, FunctionId, OperatorId, SubtypeId, TypeId};
+pub use operator::{BinaryOperator, ComparisonOperator};
 pub use registry::Registry;
 pub use subtype::{
-    ResolvedBinaryOperator, ResolvedSubtypeConversion, Scale, SubtypeBinaryRule, SubtypeDescriptor,
-    ValueType,
+    ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion, Scale,
+    SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, ValueType,
 };
 pub use value::Value;

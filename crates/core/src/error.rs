@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-use crate::{BinaryOperator, FunctionId, OperatorId, SubtypeId, TypeId};
+use crate::{
+    BinaryOperator, ComparisonId, ComparisonOperator, FunctionId, OperatorId, SubtypeId, TypeId,
+};
 
 #[derive(Debug, Error)]
 pub enum CoreError {
@@ -30,6 +32,8 @@ pub enum CoreError {
     UnknownTypeId(TypeId),
     #[error("unknown operator id {0:?}")]
     UnknownOperatorId(OperatorId),
+    #[error("unknown comparison id {0:?}")]
+    UnknownComparisonId(ComparisonId),
     #[error("unknown function id {0:?}")]
     UnknownFunctionId(FunctionId),
     #[error("default {0} type is not configured")]
@@ -48,6 +52,14 @@ pub enum CoreError {
         right_operand_type: String,
     },
     #[error(
+        "comparison `{operator}` is already registered for `{left_operand_type}` and `{right_operand_type}`"
+    )]
+    DuplicateComparison {
+        operator: ComparisonOperator,
+        left_operand_type: String,
+        right_operand_type: String,
+    },
+    #[error(
         "subtype operator `{operator}` is already registered for `{left_operand_subtype}` and `{right_operand_subtype}`"
     )]
     DuplicateSubtypeOperator {
@@ -55,8 +67,18 @@ pub enum CoreError {
         left_operand_subtype: String,
         right_operand_subtype: String,
     },
+    #[error(
+        "subtype comparison `{operator}` is already registered for `{left_operand_subtype}` and `{right_operand_subtype}`"
+    )]
+    DuplicateSubtypeComparison {
+        operator: ComparisonOperator,
+        left_operand_subtype: String,
+        right_operand_subtype: String,
+    },
     #[error("subtype operator `{0}` cannot register a rule for two plain operands")]
     UnreachableSubtypeOperatorRule(BinaryOperator),
+    #[error("subtype comparison `{0}` cannot register a rule for two plain operands")]
+    UnreachableSubtypeComparisonRule(ComparisonOperator),
     #[error("conversion from subtype `{from}` to `{to}` is already registered")]
     DuplicateSubtypeConversion { from: String, to: String },
     #[error("conversion from subtype `{0}` to itself must use the identity scale")]
@@ -72,10 +94,26 @@ pub enum CoreError {
         right_operand_type: String,
     },
     #[error(
+        "comparison `{operator}` is not defined for `{left_operand_type}` and `{right_operand_type}`"
+    )]
+    SubtypeComparisonNotDefined {
+        operator: ComparisonOperator,
+        left_operand_type: String,
+        right_operand_type: String,
+    },
+    #[error(
         "operator `{operator}` is not defined for `{left_operand_type}` and `{right_operand_type}`"
     )]
     OperatorNotDefined {
         operator: BinaryOperator,
+        left_operand_type: String,
+        right_operand_type: String,
+    },
+    #[error(
+        "comparison `{operator}` is not defined for `{left_operand_type}` and `{right_operand_type}`"
+    )]
+    ComparisonNotDefined {
+        operator: ComparisonOperator,
         left_operand_type: String,
         right_operand_type: String,
     },
