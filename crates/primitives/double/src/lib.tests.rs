@@ -99,6 +99,49 @@ fn double_registers_all_lossless_float_promotion_operators() {
     }
 }
 
+/// Verifies all arithmetic operators that convert integer operands to double.
+#[test]
+fn double_registers_all_integer_promotion_operators() {
+    let mut registry = Registry::new();
+    IntegerExtension.register(&mut registry).unwrap();
+    DoubleExtension.register(&mut registry).unwrap();
+
+    let integer = registry.type_by_name("int").unwrap();
+    let double = registry.type_by_name("double").unwrap();
+
+    for operator in [
+        BinaryOperator::Addition,
+        BinaryOperator::Subtraction,
+        BinaryOperator::Multiplication,
+        BinaryOperator::Division,
+        BinaryOperator::Remainder,
+        BinaryOperator::Power,
+    ] {
+        assert_eq!(
+            registry
+                .resolve_binary_operation(
+                    operator,
+                    ValueType::plain(integer),
+                    ValueType::plain(double),
+                )
+                .unwrap()
+                .output,
+            ValueType::plain(double)
+        );
+        assert_eq!(
+            registry
+                .resolve_binary_operation(
+                    operator,
+                    ValueType::plain(double),
+                    ValueType::plain(integer),
+                )
+                .unwrap()
+                .output,
+            ValueType::plain(double)
+        );
+    }
+}
+
 /// Verifies comparisons when float and integer are registered before double.
 #[test]
 fn double_registers_comparisons_when_other_types_are_registered_first() {
