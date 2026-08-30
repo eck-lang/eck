@@ -128,6 +128,8 @@ pub enum CoreError {
     },
     #[error("invalid value representation for type `{0}`")]
     InvalidValueRepresentation(String),
+    #[error("expected boolean value of type `{expected}`, found `{actual}`")]
+    UnexpectedBooleanValueType { expected: String, actual: String },
     #[error("invalid literal `{raw_text}` for type `{type_name}`: {message}")]
     InvalidLiteral {
         raw_text: String,

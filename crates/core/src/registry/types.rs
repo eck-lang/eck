@@ -1,6 +1,6 @@
 //! Type registration, literal parsing, defaults, and value formatting.
 
-use crate::{CoreError, TypeDescriptor, TypeId, Value, ValueType};
+use crate::{BooleanEvaluator, CoreError, TypeDescriptor, TypeId, Value, ValueType};
 
 use super::Registry;
 
@@ -21,9 +21,11 @@ impl Registry {
             return Err(CoreError::UnallocatedTypeId(id));
         }
 
-        self.types_by_name.insert(descriptor.name, id);
+        let name = descriptor.name;
+        self.types_by_name.insert(name, id);
         self.types.insert(id, descriptor);
         self.allocated_type_ids.remove(&id);
+        self.activate_comparison_declarations_for(name);
         Ok(())
     }
 
@@ -101,20 +103,47 @@ impl Registry {
             .ok_or(CoreError::MissingDefault("string"))
     }
 
-    /// Configures the type selected for boolean literals without explicit context.
+    /// Configures the type used by boolean literals and conditional evaluation.
     ///
-    /// Returns [`CoreError::UnknownTypeId`] when `id` is not registered, leaving
-    /// the previously configured default unchanged.
-    pub fn set_default_boolean(&mut self, id: TypeId) -> Result<(), CoreError> {
+    /// `evaluate` belongs to the type extension and validates its opaque value
+    /// representation before returning the language-level truth value. Returns
+    /// [`CoreError::UnknownTypeId`] when `id` is not registered, leaving the
+    /// previously configured default unchanged.
+    pub fn set_default_boolean(
+        &mut self,
+        id: TypeId,
+        evaluate: BooleanEvaluator,
+    ) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
-        self.default_boolean = Some(id);
+        self.default_boolean = Some((id, evaluate));
         Ok(())
     }
 
     /// Returns the configured default boolean type.
     pub fn default_boolean(&self) -> Result<TypeId, CoreError> {
         self.default_boolean
+            .map(|(id, _)| id)
             .ok_or(CoreError::MissingDefault("boolean"))
+    }
+
+    /// Evaluates a plain value of the configured default boolean type.
+    ///
+    /// The registered type extension owns validation of the opaque payload.
+    /// Values with another base type or a subtype qualifier are rejected before
+    /// invoking that evaluator.
+    pub fn evaluate_boolean(&self, value: &Value) -> Result<bool, CoreError> {
+        let (boolean_type, evaluate) = self
+            .default_boolean
+            .ok_or(CoreError::MissingDefault("boolean"))?;
+        let expected = ValueType::plain(boolean_type);
+        let actual = value.value_type();
+        if actual != expected {
+            return Err(CoreError::UnexpectedBooleanValueType {
+                expected: self.value_type_name(expected),
+                actual: self.value_type_name(actual),
+            });
+        }
+        evaluate(value)
     }
 
     /// Parses a numeric token through its expected or inferred registered type.

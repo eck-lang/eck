@@ -7,6 +7,14 @@ use crate::{
 
 use super::Registry;
 
+#[derive(Clone, Copy)]
+pub(super) struct ComparisonDeclaration {
+    operator: ComparisonOperator,
+    left_operand_type_name: &'static str,
+    right_operand_type_name: &'static str,
+    execute: ComparisonExecutor,
+}
+
 impl Registry {
     /// Registers one comparison implementation for an exact pair of base types.
     ///
@@ -33,19 +41,114 @@ impl Registry {
             });
         }
 
-        let id = ComparisonId {
+        Ok(self.insert_comparison(operator, left_operand_type, right_operand_type, execute))
+    }
+
+    /// Declares one comparison implementation using stable operand type names.
+    ///
+    /// The comparison is activated immediately when both types already exist.
+    /// Otherwise the declaration remains pending and is activated when the
+    /// missing type is registered. This lets an extension define optional
+    /// cross-extension relations without imposing an extension registration
+    /// order. Returns [`CoreError::DuplicateComparison`] when the named
+    /// signature was already declared or its exact comparison already exists.
+    pub fn declare_comparison(
+        &mut self,
+        operator: ComparisonOperator,
+        left_operand_type_name: &'static str,
+        right_operand_type_name: &'static str,
+        execute: ComparisonExecutor,
+    ) -> Result<(), CoreError> {
+        let declaration_key = (operator, left_operand_type_name, right_operand_type_name);
+        if self.comparison_declaration_index.contains(&declaration_key) {
+            return Err(CoreError::DuplicateComparison {
+                operator,
+                left_operand_type: left_operand_type_name.to_string(),
+                right_operand_type: right_operand_type_name.to_string(),
+            });
+        }
+
+        if let (Some(left_operand_type), Some(right_operand_type)) = (
+            self.type_by_name(left_operand_type_name),
+            self.type_by_name(right_operand_type_name),
+        ) {
+            self.register_comparison(operator, left_operand_type, right_operand_type, execute)?;
+        }
+
+        self.comparison_declarations.push(ComparisonDeclaration {
+            operator,
+            left_operand_type_name,
+            right_operand_type_name,
+            execute,
+        });
+        self.comparison_declaration_index.insert(declaration_key);
+        Ok(())
+    }
+
+    /// Activates declarations completed by one newly registered type.
+    ///
+    /// Declarations that still reference a missing type remain pending. The
+    /// caller must provide the stable name of a type that was just registered;
+    /// already active signatures are left unchanged.
+    pub(super) fn activate_comparison_declarations_for(
+        &mut self,
+        registered_type_name: &'static str,
+    ) {
+        let declarations = self
+            .comparison_declarations
+            .iter()
+            .filter(|declaration| {
+                declaration.left_operand_type_name == registered_type_name
+                    || declaration.right_operand_type_name == registered_type_name
+            })
+            .filter_map(|declaration| {
+                let left_operand_type = self.type_by_name(declaration.left_operand_type_name)?;
+                let right_operand_type = self.type_by_name(declaration.right_operand_type_name)?;
+                Some((*declaration, left_operand_type, right_operand_type))
+            })
+            .collect::<Vec<_>>();
+
+        for (declaration, left_operand_type, right_operand_type) in declarations {
+            let key = (declaration.operator, left_operand_type, right_operand_type);
+            if self.comparison_index.contains_key(&key) {
+                continue;
+            }
+            self.insert_comparison(
+                declaration.operator,
+                left_operand_type,
+                right_operand_type,
+                declaration.execute,
+            );
+        }
+    }
+
+    /// Inserts a validated, non-duplicate comparison and assigns its dense ID.
+    ///
+    /// Callers must validate both operand IDs and signature uniqueness first.
+    /// The returned ID remains stable for the lifetime of this registry.
+    fn insert_comparison(
+        &mut self,
+        operator: ComparisonOperator,
+        left_operand_type: TypeId,
+        right_operand_type: TypeId,
+        execute: ComparisonExecutor,
+    ) -> ComparisonId {
+        let comparison_id = ComparisonId {
             registry_id: self.registry_id,
             index: self.comparisons.len(),
         };
         self.comparisons.push(ComparisonDescriptor {
-            id,
+            id: comparison_id,
             operator,
             left_operand_type,
             right_operand_type,
             execute,
         });
-        self.comparison_index.insert(key, id);
-        Ok(id)
+        self.comparison_index.insert(
+            (operator, left_operand_type, right_operand_type),
+            comparison_id,
+        );
+        comparison_id
     }
 
     /// Resolves a comparison for an exact pair of base types.

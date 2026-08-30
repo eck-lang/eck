@@ -1,4 +1,5 @@
-use crate::{ComparisonOperator, CoreError, Registry, Scale, SubtypeComparisonRule, ValueType};
+use super::*;
+use crate::Scale;
 
 use super::super::test_support::{
     foreign_subtype_id, foreign_type_id, register_subtype, register_type,
@@ -52,6 +53,68 @@ fn rejects_invalid_and_duplicate_comparison_registrations() {
             integer,
             integer,
             execute_comparison
+        ),
+        Err(CoreError::DuplicateComparison { .. })
+    ));
+}
+
+#[test]
+fn named_comparisons_activate_independently_of_type_registration_order() {
+    let mut decimal_first = Registry::new();
+    let decimal = register_type(&mut decimal_first, "decimal");
+    decimal_first
+        .declare_comparison(
+            ComparisonOperator::Equal,
+            "decimal",
+            "float",
+            execute_comparison,
+        )
+        .unwrap();
+    let float = register_type(&mut decimal_first, "float");
+
+    assert!(
+        decimal_first
+            .resolve_comparison(ComparisonOperator::Equal, decimal, float)
+            .is_ok()
+    );
+
+    let mut float_first = Registry::new();
+    let float = register_type(&mut float_first, "float");
+    let decimal = register_type(&mut float_first, "decimal");
+    float_first
+        .declare_comparison(
+            ComparisonOperator::Equal,
+            "decimal",
+            "float",
+            execute_comparison,
+        )
+        .unwrap();
+
+    assert!(
+        float_first
+            .resolve_comparison(ComparisonOperator::Equal, decimal, float)
+            .is_ok()
+    );
+}
+
+#[test]
+fn named_comparisons_reject_duplicate_declarations() {
+    let mut registry = Registry::new();
+    registry
+        .declare_comparison(
+            ComparisonOperator::Equal,
+            "decimal",
+            "float",
+            execute_comparison,
+        )
+        .unwrap();
+
+    assert!(matches!(
+        registry.declare_comparison(
+            ComparisonOperator::Equal,
+            "decimal",
+            "float",
+            execute_comparison,
         ),
         Err(CoreError::DuplicateComparison { .. })
     ));
@@ -148,7 +211,9 @@ fn qualified_comparisons_apply_scales_and_return_plain_boolean() {
     let mut registry = Registry::new();
     let integer = register_type(&mut registry, "int");
     let boolean = register_type(&mut registry, "bool");
-    registry.set_default_boolean(boolean).unwrap();
+    registry
+        .set_default_boolean(boolean, super::super::test_support::evaluate_boolean)
+        .unwrap();
     let meter = register_subtype(&mut registry, "meter");
     let centimeter = registry.allocate_subtype_id();
     registry
@@ -201,7 +266,9 @@ fn qualified_comparisons_require_an_exact_subtype_rule() {
     let mut registry = Registry::new();
     let integer = register_type(&mut registry, "int");
     let boolean = register_type(&mut registry, "bool");
-    registry.set_default_boolean(boolean).unwrap();
+    registry
+        .set_default_boolean(boolean, super::super::test_support::evaluate_boolean)
+        .unwrap();
     let meter = register_subtype(&mut registry, "meter");
 
     assert!(matches!(

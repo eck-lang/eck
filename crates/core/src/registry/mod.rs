@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::{
-    BinaryOperator, BinaryOperatorDescriptor, ComparisonDescriptor, ComparisonId,
+    BinaryOperator, BinaryOperatorDescriptor, BooleanEvaluator, ComparisonDescriptor, ComparisonId,
     ComparisonOperator, FunctionDescriptor, FunctionId, OperatorId, Scale, SubtypeBinaryRule,
     SubtypeComparisonRule, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId,
 };
@@ -75,6 +75,10 @@ pub struct Registry {
     comparison_index: HashMap<(ComparisonOperator, TypeId, TypeId), ComparisonId>,
     /// Stores executable comparison descriptors in ID order.
     comparisons: Vec<ComparisonDescriptor>,
+    /// Rejects duplicate comparison declarations expressed through stable type names.
+    comparison_declaration_index: HashSet<(ComparisonOperator, &'static str, &'static str)>,
+    /// Retains named comparisons so optional cross-extension relations can activate later.
+    comparison_declarations: Vec<comparisons::ComparisonDeclaration>,
 
     /// Resolves a function name to its candidate overload IDs.
     functions_by_name: HashMap<&'static str, Vec<FunctionId>>,
@@ -87,8 +91,8 @@ pub struct Registry {
     default_fractional: Option<TypeId>,
     /// Selects the base type for uncontextualized string literals.
     default_string: Option<TypeId>,
-    /// Selects the base type for uncontextualized boolean literals.
-    default_boolean: Option<TypeId>,
+    /// Selects and evaluates the base type for boolean language semantics.
+    default_boolean: Option<(TypeId, BooleanEvaluator)>,
 }
 
 impl Default for Registry {
@@ -111,6 +115,8 @@ impl Default for Registry {
             operators: Vec::new(),
             comparison_index: HashMap::new(),
             comparisons: Vec::new(),
+            comparison_declaration_index: HashSet::new(),
+            comparison_declarations: Vec::new(),
             functions_by_name: HashMap::new(),
             functions: Vec::new(),
             default_integer: None,
