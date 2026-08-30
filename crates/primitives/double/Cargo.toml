@@ -9,3 +9,4 @@ language_core = { package = "eck-core", path = "../../language/core" }
 
 [dev-dependencies]
 float = { package = "eck-float", path = "../float" }
+integer = { package = "eck-int", path = "../integer" }
