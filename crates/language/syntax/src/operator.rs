@@ -8,6 +8,17 @@ pub enum BinaryOperator {
     Power,
 }
 
+/// An operator that compares two expressions and yields a boolean value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ComparisonOperator {
+    Equal,
+    NotEqual,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+}
+
 /// An operator applied to one expression.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOperator {
