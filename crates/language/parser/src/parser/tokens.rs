@@ -35,6 +35,16 @@ impl Parser {
         }
     }
 
+    /// Consumes a type name which may be a keyword such as `null`.
+    pub(super) fn expect_type_name(&mut self, message: &str) -> Result<String, ParseError> {
+        let token = self.advance().clone();
+        match token.kind {
+            TokenKind::Ident(value) => Ok(value),
+            TokenKind::Null => Ok("null".into()),
+            _ => Err(self.error_at(token.span, message)),
+        }
+    }
+
     /// Returns the token at the current cursor position.
     pub(super) fn peek(&self) -> &Token {
         &self.tokens[self.pos]

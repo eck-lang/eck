@@ -1,50 +1,72 @@
 //! Pratt parsing for expressions, postfix conversions, and calls.
 
-use syntax::{BinaryOperator, ComparisonOperator, Expression, Span, UnaryOperator};
+use syntax::{
+    BinaryOperator, ComparisonOperator, Expression, FrameLiteralColumn, LogicalOperator, Span,
+    UnaryOperator,
+};
 
 use crate::{ParseError, lexer::TokenKind};
 
 use super::Parser;
 
 impl Parser {
-    /// Parses an expression whose next binary operator must meet `min_bp`.
+    /// Parses an expression while preserving the legacy Pratt entry point.
     ///
-    /// This Pratt parser assigns higher binding power to multiplication and
-    /// division, and makes exponentiation right-associative.
+    /// A zero binding power parses the complete logical-expression grammar.
+    /// Recursive arithmetic parsing uses nonzero binding powers internally.
     pub(super) fn parse_expression(&mut self, min_bp: u8) -> Result<Expression, ParseError> {
-        let mut left_operand = self.parse_primary()?;
-        loop {
-            if matches!(&self.peek().kind, TokenKind::Arrow) {
-                left_operand = self.parse_postfix_conversion(left_operand)?;
-                continue;
-            }
+        if min_bp == 0 {
+            return self.parse_logical_or();
+        }
+        self.parse_arithmetic(min_bp)
+    }
 
-            let Some((operator, left_binding_power, right_binding_power)) =
-                self.current_binary_operator()
-            else {
-                break;
-            };
-            if left_binding_power < min_bp {
-                break;
-            }
+    /// Parses `||` expressions, which have the lowest expression precedence.
+    fn parse_logical_or(&mut self) -> Result<Expression, ParseError> {
+        let mut left_operand = self.parse_logical_and()?;
+        while matches!(&self.peek().kind, TokenKind::PipePipe) {
             self.advance();
-            let right_operand = self.parse_expression(right_binding_power)?;
+            let right_operand = self.parse_logical_and()?;
             let span = Span {
                 start: left_operand.span().start,
                 end: right_operand.span().end,
             };
-            left_operand = Expression::Binary {
-                operator,
+            left_operand = Expression::Logical {
+                operator: LogicalOperator::Or,
                 left_operand: Box::new(left_operand),
                 right_operand: Box::new(right_operand),
                 span,
             };
         }
-        if min_bp == 0
-            && let Some(operator) = self.current_comparison_operator()
-        {
+        Ok(left_operand)
+    }
+
+    /// Parses `&&` expressions above logical OR and below comparisons.
+    fn parse_logical_and(&mut self) -> Result<Expression, ParseError> {
+        let mut left_operand = self.parse_comparison()?;
+        while matches!(&self.peek().kind, TokenKind::AmpersandAmpersand) {
             self.advance();
-            let right_operand = self.parse_expression(1)?;
+            let right_operand = self.parse_comparison()?;
+            let span = Span {
+                start: left_operand.span().start,
+                end: right_operand.span().end,
+            };
+            left_operand = Expression::Logical {
+                operator: LogicalOperator::And,
+                left_operand: Box::new(left_operand),
+                right_operand: Box::new(right_operand),
+                span,
+            };
+        }
+        Ok(left_operand)
+    }
+
+    /// Parses one optional non-associative comparison.
+    fn parse_comparison(&mut self) -> Result<Expression, ParseError> {
+        let mut left_operand = self.parse_arithmetic(0)?;
+        if let Some(operator) = self.current_comparison_operator() {
+            self.advance();
+            let right_operand = self.parse_arithmetic(0)?;
             let span = Span {
                 start: left_operand.span().start,
                 end: right_operand.span().end,
@@ -62,6 +84,61 @@ impl Parser {
             }
         }
         Ok(left_operand)
+    }
+
+    /// Parses arithmetic with Pratt binding powers and postfix operations.
+    fn parse_arithmetic(&mut self, min_bp: u8) -> Result<Expression, ParseError> {
+        let mut left_operand = self.parse_primary()?;
+        loop {
+            if matches!(&self.peek().kind, TokenKind::Dot) {
+                left_operand = self.parse_postfix_field_access(left_operand)?;
+                continue;
+            }
+            if matches!(&self.peek().kind, TokenKind::Arrow) {
+                left_operand = self.parse_postfix_conversion(left_operand)?;
+                continue;
+            }
+
+            let Some((operator, left_binding_power, right_binding_power)) =
+                self.current_binary_operator()
+            else {
+                break;
+            };
+            if left_binding_power < min_bp {
+                break;
+            }
+            self.advance();
+            let right_operand = self.parse_arithmetic(right_binding_power)?;
+            let span = Span {
+                start: left_operand.span().start,
+                end: right_operand.span().end,
+            };
+            left_operand = Expression::Binary {
+                operator,
+                left_operand: Box::new(left_operand),
+                right_operand: Box::new(right_operand),
+                span,
+            };
+        }
+        Ok(left_operand)
+    }
+
+    /// Parses a postfix `.field` access without materializing a row object.
+    fn parse_postfix_field_access(
+        &mut self,
+        expression: Expression,
+    ) -> Result<Expression, ParseError> {
+        self.advance();
+        let field = self.expect_identifier("expected field name after `.`")?;
+        let span = Span {
+            start: expression.span().start,
+            end: self.previous().span.end,
+        };
+        Ok(Expression::FieldAccess {
+            expression: Box::new(expression),
+            field,
+            span,
+        })
     }
 
     /// Parses a postfix `->unit` conversion when the cursor is at an arrow.
@@ -115,7 +192,9 @@ impl Parser {
                 raw_text,
                 span: token.span,
             }),
+            TokenKind::Null => Ok(Expression::Null { span: token.span }),
             TokenKind::Ident(name) => self.parse_identifier_expression(token.span, name),
+            TokenKind::Frame => self.parse_frame_literal(token.span.start),
             TokenKind::LeftParenthesis => {
                 let expression = self.parse_expression(0)?;
                 self.expect_simple(TokenKind::RightParenthesis)?;
@@ -123,6 +202,52 @@ impl Parser {
             }
             _ => Err(self.error_at(token.span, "expected expression")),
         }
+    }
+
+    /// Parses `frame { column: [values] }` into explicit column-oriented syntax.
+    fn parse_frame_literal(&mut self, start: usize) -> Result<Expression, ParseError> {
+        self.skip_newlines();
+        self.expect_simple(TokenKind::LeftBrace)?;
+        self.skip_newlines();
+        let mut columns = Vec::new();
+        while !matches!(&self.peek().kind, TokenKind::RightBrace) {
+            if matches!(&self.peek().kind, TokenKind::Eof) {
+                return Err(self.error_here("expected `}` to close frame literal"));
+            }
+            let column_start = self.peek().span.start;
+            let name = self.expect_identifier("expected frame column name")?;
+            self.expect_simple(TokenKind::Colon)?;
+            self.expect_simple(TokenKind::LeftBracket)?;
+            let mut values = Vec::new();
+            if !matches!(&self.peek().kind, TokenKind::RightBracket) {
+                loop {
+                    values.push(self.parse_expression(0)?);
+                    if !matches!(&self.peek().kind, TokenKind::Comma) {
+                        break;
+                    }
+                    self.advance();
+                }
+            }
+            let column_end = self.expect_simple(TokenKind::RightBracket)?.span.end;
+            columns.push(FrameLiteralColumn {
+                name,
+                values,
+                span: Span {
+                    start: column_start,
+                    end: column_end,
+                },
+            });
+            match &self.peek().kind {
+                TokenKind::Newline => self.skip_newlines(),
+                TokenKind::RightBrace => {}
+                _ => return Err(self.error_here("expected end of line or `}` in frame literal")),
+            }
+        }
+        let end = self.expect_simple(TokenKind::RightBrace)?.span.end;
+        Ok(Expression::FrameLiteral {
+            columns,
+            span: Span { start, end },
+        })
     }
 
     /// Parses a numeric literal and its optional suffix.
@@ -163,7 +288,7 @@ impl Parser {
                 "`--` is not supported; write `-(-expression)` for double negation",
             ));
         }
-        let operand = self.parse_expression(5)?;
+        let operand = self.parse_arithmetic(5)?;
         let span = Span {
             start: start.start,
             end: operand.span().end,

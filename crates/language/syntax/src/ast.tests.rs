@@ -1,5 +1,5 @@
-use super::Expression;
-use crate::{BinaryOperator, ComparisonOperator, Span, UnaryOperator};
+use super::{Expression, FrameLiteralColumn};
+use crate::{BinaryOperator, ComparisonOperator, LogicalOperator, Span, UnaryOperator};
 
 fn span(start: usize, end: usize) -> Span {
     Span { start, end }
@@ -30,6 +30,22 @@ fn every_expression_variant_returns_its_span() {
             name: "distance".into(),
             span: expected_span,
         },
+        Expression::FieldAccess {
+            expression: Box::new(Expression::Variable {
+                name: "employee".into(),
+                span: expected_span,
+            }),
+            field: "name".into(),
+            span: expected_span,
+        },
+        Expression::FrameLiteral {
+            columns: vec![FrameLiteralColumn {
+                name: "value".into(),
+                values: vec![number_expression(expected_span)],
+                span: expected_span,
+            }],
+            span: expected_span,
+        },
         Expression::Unary {
             operator: UnaryOperator::Negation,
             operand: Box::new(number_expression(expected_span)),
@@ -45,6 +61,18 @@ fn every_expression_variant_returns_its_span() {
             operator: ComparisonOperator::Less,
             left_operand: Box::new(number_expression(expected_span)),
             right_operand: Box::new(number_expression(expected_span)),
+            span: expected_span,
+        },
+        Expression::Logical {
+            operator: LogicalOperator::And,
+            left_operand: Box::new(Expression::Boolean {
+                raw_text: "true".into(),
+                span: expected_span,
+            }),
+            right_operand: Box::new(Expression::Boolean {
+                raw_text: "false".into(),
+                span: expected_span,
+            }),
             span: expected_span,
         },
         Expression::Convert {
