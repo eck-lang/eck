@@ -6,19 +6,23 @@ use super::IntegerExtension;
 #[test]
 fn integer_is_the_default_integer_type() {
     let mut registry = Registry::new();
-    IntegerExtension.register(&mut registry).unwrap();
+    IntegerExtension::new().register(&mut registry).unwrap();
 
     let value = registry.parse_numeric("42", None).unwrap();
 
-    assert_eq!(value.type_id(), registry.type_by_name("int").unwrap());
+    assert_eq!(value.type_id(), registry.type_by_name("int64").unwrap());
+    assert_eq!(
+        registry.type_by_name("int64").unwrap(),
+        registry.type_by_name("int").unwrap()
+    );
 }
 
 /// Verifies that integer registers every same-type comparison operator.
 #[test]
 fn integer_registers_all_comparisons() {
     let mut registry = Registry::new();
-    IntegerExtension.register(&mut registry).unwrap();
-    let integer = registry.type_by_name("int").unwrap();
+    IntegerExtension::new().register(&mut registry).unwrap();
+    let integer = registry.type_by_name("int64").unwrap();
 
     for operator in [
         ComparisonOperator::Equal,

@@ -1,4 +1,4 @@
-mod integer;
+mod integer64;
 
 use std::cmp::Ordering;
 
@@ -15,7 +15,7 @@ const OPERATORS: [ComparisonOperator; 6] = [
 
 /// Registers the integer comparison relation.
 pub(crate) fn register(registry: &mut Registry) -> Result<(), CoreError> {
-    integer::register(registry)
+    integer64::register(registry)
 }
 
 /// Declares all comparison operators for one ordered pair of operand types.

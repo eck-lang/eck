@@ -1,16 +1,16 @@
-mod addition_integer;
-mod division_integer;
-mod multiplication_integer;
-mod power_integer;
-mod remainder_integer;
-mod subtraction_integer;
+mod addition_integer64;
+mod division_integer64;
+mod multiplication_integer64;
+mod power_integer64;
+mod remainder_integer64;
+mod subtraction_integer64;
 
 use language_core::{BinaryOperator, CoreError, Registry, TypeId};
 
 use self::{
-    addition_integer::addition_integer, division_integer::division_integer,
-    multiplication_integer::multiplication_integer, power_integer::power_integer,
-    remainder_integer::remainder_integer, subtraction_integer::subtraction_integer,
+    addition_integer64::addition_integer, division_integer64::division_integer,
+    multiplication_integer64::multiplication_integer, power_integer64::power_integer,
+    remainder_integer64::remainder_integer, subtraction_integer64::subtraction_integer,
 };
 
 /// Registers every binary arithmetic operator for two `int` operands.
