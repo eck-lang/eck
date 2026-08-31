@@ -4,6 +4,7 @@ LLM-specific project documentation lives in `.agents/docs/`.
 
 Read the relevant files before making changes:
 
+* `.agents/docs/repository.md` — repository-wide conventions including language
 * `.agents/docs/code-style.md` — naming and code-style conventions
 * `.agents/docs/commits.md` — commit message and commit workflow conventions
 * `.agents/docs/eck-lang/crate-structure.md` — common crate and operation layout
