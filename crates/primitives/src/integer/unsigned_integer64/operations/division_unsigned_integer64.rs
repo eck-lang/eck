@@ -13,6 +13,7 @@ pub(crate) fn division_unsigned_integer(lhs: &Value, rhs: &Value) -> Result<Valu
         .ok_or_else(|| CoreError::Runtime("unsigned integer overflow in division".into()))?;
     Ok(Value::new(lhs.type_id(), value))
 }
+
 #[cfg(test)]
 #[path = "division_unsigned_integer64.tests.rs"]
 mod tests;

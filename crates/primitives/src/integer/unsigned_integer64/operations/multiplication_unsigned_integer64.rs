@@ -12,6 +12,7 @@ pub(crate) fn multiplication_unsigned_integer(
         .ok_or_else(|| CoreError::Runtime("unsigned integer overflow in multiplication".into()))?;
     Ok(Value::new(lhs.type_id(), value))
 }
+
 #[cfg(test)]
 #[path = "multiplication_unsigned_integer64.tests.rs"]
 mod tests;

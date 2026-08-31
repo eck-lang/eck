@@ -6,6 +6,7 @@ use super::value::get;
 pub(crate) fn format(value: &Value) -> Result<String, CoreError> {
     Ok(get(value)?.to_string())
 }
+
 #[cfg(test)]
 #[path = "formatting.tests.rs"]
 mod tests;
