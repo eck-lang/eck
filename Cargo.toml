@@ -3,9 +3,11 @@ resolver = "2"
 members = [
   "crates/language/*",
   "crates/primitives",
+  "crates/subtypes/*",
   "crates/extensions/*",
   "crates/std/*",
   "crates/cli",
+  "testing/runner",
 ]
 
 [workspace.package]
@@ -19,3 +21,5 @@ rust_decimal = "1.42"
 
 [profile.release]
 lto = true
+codegen-units = 1
+strip = "symbols"
