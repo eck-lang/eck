@@ -12,5 +12,7 @@ pub use double::DoubleExtension;
 pub use float::FloatExtension;
 pub use integer::Integer64Extension;
 pub use integer::IntegerExtension;
+pub use integer::UnsignedInteger64Extension;
+pub use integer::UnsignedIntegerExtension;
 pub use null::NullExtension;
 pub use string::StringExtension;
