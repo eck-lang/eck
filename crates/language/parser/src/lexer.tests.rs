@@ -49,6 +49,65 @@ fn decodes_strings_and_reports_invalid_tokens() {
     );
 }
 
+/// Verifies delimiter-specific escapes for single, double, and backtick strings.
+#[test]
+fn decodes_every_string_delimiter_and_its_escape_sequences() {
+    let tokens = lex(r#"print('L\'acqua')
+print("disse: \"ciao\"")
+print(`quote: ' and ", backtick: \``)
+print("\r\t\0\\\u{1F600}")"#)
+    .unwrap();
+    let values = tokens
+        .iter()
+        .filter_map(|token| match &token.kind {
+            TokenKind::String(value) => Some(value.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        values,
+        [
+            "L'acqua",
+            "disse: \"ciao\"",
+            "quote: ' and \", backtick: `",
+            "\r\t\0\\😀",
+        ]
+    );
+}
+
+/// Verifies that backtick strings retain physical line breaks and indentation.
+#[test]
+fn preserves_multiline_backtick_content() {
+    let tokens = lex("value: string = `first\n  second\nthird`\n").unwrap();
+
+    assert!(
+        matches!(&tokens[4].kind, TokenKind::String(value) if value == "first\n  second\nthird")
+    );
+}
+
+/// Verifies that ordinary quoted strings remain single-line literals.
+#[test]
+fn rejects_physical_newlines_in_single_and_double_quoted_strings() {
+    for source in ["'first\nsecond'", "\"first\nsecond\""] {
+        assert_eq!(
+            lex(source).unwrap_err().message,
+            "unterminated string literal"
+        );
+    }
+}
+
+/// Verifies strict validation of unknown and malformed escape sequences.
+#[test]
+fn rejects_invalid_string_escape_sequences() {
+    for source in [r#""\q""#, r#"'\"'"#, r#""\u{}""#, r#""\u{110000}""#] {
+        assert!(
+            lex(source).is_err(),
+            "source unexpectedly succeeded: {source}"
+        );
+    }
+}
+
 #[test]
 fn skips_line_and_multiline_comments() {
     let tokens = lex("first: int = 1 // line\n/* block\ncomment */ second: int = 2\n").unwrap();
@@ -74,5 +133,28 @@ fn skips_line_and_multiline_comments() {
             TokenKind::Newline,
             TokenKind::Eof,
         ]
+    ));
+}
+
+#[test]
+fn lexes_if_and_braces_without_claiming_prefixed_identifiers() {
+    let tokens = lex("if (iffy) { print(iffy) }").unwrap();
+    let kinds = tokens.iter().map(|token| &token.kind).collect::<Vec<_>>();
+
+    assert!(matches!(
+        kinds.as_slice(),
+        [
+            TokenKind::If,
+            TokenKind::LeftParenthesis,
+            TokenKind::Ident(name),
+            TokenKind::RightParenthesis,
+            TokenKind::LeftBrace,
+            TokenKind::Ident(_),
+            TokenKind::LeftParenthesis,
+            TokenKind::Ident(_),
+            TokenKind::RightParenthesis,
+            TokenKind::RightBrace,
+            TokenKind::Eof,
+        ] if name == "iffy"
     ));
 }

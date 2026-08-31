@@ -51,8 +51,15 @@ enum RawTokenKind {
     LeftParenthesis,
     #[token(")")]
     RightParenthesis,
+    #[token("{")]
+    LeftBrace,
+    #[token("}")]
+    RightBrace,
     #[token(",")]
     Comma,
+
+    #[token("if")]
+    If,
 
     // Preserve the source spelling: each concrete type validates the numeric
     // literal only after the compiler resolves its expected type.
@@ -66,8 +73,12 @@ enum RawTokenKind {
     #[regex(r"[A-Za-z_][A-Za-z0-9_]*")]
     Ident,
 
-    #[regex(r#""([^"\\]|\\[\s\S])*""#)]
-    String,
+    #[regex(r#""([^"\\\r\n]|\\[\s\S])*""#)]
+    DoubleQuotedString,
+    #[regex(r"'([^'\\\r\n]|\\[\s\S])*'")]
+    SingleQuotedString,
+    #[regex(r"`([^`\\]|\\[\s\S])*`")]
+    BacktickString,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -93,7 +104,10 @@ pub(crate) enum TokenKind {
     Percent,
     LeftParenthesis,
     RightParenthesis,
+    LeftBrace,
+    RightBrace,
     Comma,
+    If,
     Newline,
     Eof,
 }
@@ -119,7 +133,7 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, ParseError> {
             end: range.end,
         };
         let raw_kind = result.map_err(|_| invalid_token_error(source, span))?;
-        let kind = convert_raw_token(raw_kind, &source[range]);
+        let kind = convert_raw_token(raw_kind, &source[range], span)?;
         tokens.push(Token { kind, span });
     }
 
@@ -134,8 +148,12 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, ParseError> {
 }
 
 /// Maps a Logos token to the parser representation, retaining its source text.
-fn convert_raw_token(raw_kind: RawTokenKind, raw_text: &str) -> TokenKind {
-    match raw_kind {
+fn convert_raw_token(
+    raw_kind: RawTokenKind,
+    raw_text: &str,
+    span: Span,
+) -> Result<TokenKind, ParseError> {
+    Ok(match raw_kind {
         RawTokenKind::Comment => unreachable!("comments are skipped by Logos"),
         RawTokenKind::Newline => TokenKind::Newline,
         RawTokenKind::Colon => TokenKind::Colon,
@@ -155,19 +173,24 @@ fn convert_raw_token(raw_kind: RawTokenKind, raw_text: &str) -> TokenKind {
         RawTokenKind::Percent => TokenKind::Percent,
         RawTokenKind::LeftParenthesis => TokenKind::LeftParenthesis,
         RawTokenKind::RightParenthesis => TokenKind::RightParenthesis,
+        RawTokenKind::LeftBrace => TokenKind::LeftBrace,
+        RawTokenKind::RightBrace => TokenKind::RightBrace,
         RawTokenKind::Comma => TokenKind::Comma,
+        RawTokenKind::If => TokenKind::If,
         RawTokenKind::Number => TokenKind::Number(raw_text.into()),
         RawTokenKind::Ident => TokenKind::Ident(raw_text.into()),
-        RawTokenKind::String => TokenKind::String(decode_string(raw_text)),
+        RawTokenKind::DoubleQuotedString => TokenKind::String(decode_string(raw_text, '"', span)?),
+        RawTokenKind::SingleQuotedString => TokenKind::String(decode_string(raw_text, '\'', span)?),
+        RawTokenKind::BacktickString => TokenKind::String(decode_string(raw_text, '`', span)?),
         RawTokenKind::Boolean => TokenKind::Boolean(raw_text.into()),
-    }
+    })
 }
 
 /// Decodes the escape sequences allowed inside an already matched string token.
-fn decode_string(raw_text: &str) -> String {
+fn decode_string(raw_text: &str, delimiter: char, span: Span) -> Result<String, ParseError> {
     let content = &raw_text[1..raw_text.len() - 1];
     let mut decoded = String::new();
-    let mut characters = content.chars();
+    let mut characters = content.chars().peekable();
     while let Some(character) = characters.next() {
         if character != '\\' {
             decoded.push(character);
@@ -175,19 +198,84 @@ fn decode_string(raw_text: &str) -> String {
         }
         match characters.next() {
             Some('n') => decoded.push('\n'),
+            Some('r') => decoded.push('\r'),
             Some('t') => decoded.push('\t'),
-            Some('"') => decoded.push('"'),
+            Some('0') => decoded.push('\0'),
             Some('\\') => decoded.push('\\'),
-            Some(other) => decoded.push(other),
+            Some('u') => decoded.push(decode_unicode_escape(&mut characters, span)?),
+            Some(escaped_delimiter) if escaped_delimiter == delimiter => {
+                decoded.push(escaped_delimiter);
+            }
+            Some(other) => {
+                return Err(string_literal_error(
+                    span,
+                    format!("unknown string escape `\\{other}`"),
+                ));
+            }
             None => unreachable!("a matched string cannot end with an escape"),
         }
     }
-    decoded
+    Ok(decoded)
+}
+
+/// Decodes one `\\u{...}` escape after its leading `u` has been consumed.
+fn decode_unicode_escape(
+    characters: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    span: Span,
+) -> Result<char, ParseError> {
+    if characters.next() != Some('{') {
+        return Err(string_literal_error(
+            span,
+            "Unicode escapes must use `\\u{...}`",
+        ));
+    }
+
+    let mut digits = String::new();
+    loop {
+        match characters.next() {
+            Some('}') if digits.is_empty() => {
+                return Err(string_literal_error(
+                    span,
+                    "Unicode escapes require at least one hexadecimal digit",
+                ));
+            }
+            Some('}') => break,
+            Some(character) if character.is_ascii_hexdigit() && digits.len() < 6 => {
+                digits.push(character);
+            }
+            Some(_) => {
+                return Err(string_literal_error(
+                    span,
+                    "Unicode escapes accept at most six hexadecimal digits",
+                ));
+            }
+            None => {
+                return Err(string_literal_error(
+                    span,
+                    "unterminated Unicode escape in string literal",
+                ));
+            }
+        }
+    }
+
+    let scalar =
+        u32::from_str_radix(&digits, 16).expect("validated hexadecimal Unicode escape must parse");
+    char::from_u32(scalar).ok_or_else(|| {
+        string_literal_error(span, "Unicode escape is not a valid Unicode scalar value")
+    })
+}
+
+/// Builds a lexical error covering one fully matched but invalid string token.
+fn string_literal_error(span: Span, message: impl Into<String>) -> ParseError {
+    ParseError {
+        message: message.into(),
+        span,
+    }
 }
 
 /// Builds a precise lexical error, distinguishing unterminated strings.
 fn invalid_token_error(source: &str, span: Span) -> ParseError {
-    if source[span.start..].starts_with('"') {
+    if source[span.start..].starts_with(['"', '\'', '`']) {
         return ParseError {
             message: "unterminated string literal".into(),
             span: Span {
