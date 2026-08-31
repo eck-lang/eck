@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
   "crates/language/*",
-  "crates/types/*",
+  "crates/primitives",
   "crates/extensions/*",
   "crates/std/*",
   "crates/cli",

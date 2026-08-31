@@ -1,8 +1,0 @@
-[package]
-name = "eck-int"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-
-[dependencies]
-language_core = { package = "eck-core", path = "../../language/core" }
