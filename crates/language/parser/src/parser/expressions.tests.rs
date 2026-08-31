@@ -1,6 +1,6 @@
 use super::*;
 use crate::lexer::lex;
-use syntax::{BinaryOperator, ComparisonOperator, Expression};
+use syntax::{BinaryOperator, ComparisonOperator, Expression, LogicalOperator};
 
 fn parse_expression(source: &str) -> Expression {
     let mut parser = Parser::new(lex(source).unwrap());
@@ -84,4 +84,28 @@ fn accepts_parenthesized_comparisons_but_rejects_chained_ones() {
     let mut parser = Parser::new(lex("a < b < c").unwrap());
     let error = parser.parse_expression(0).unwrap_err();
     assert!(error.message.contains("chained comparisons"));
+}
+
+/// Verifies role-qualified fields and boolean precedence used by relation predicates.
+#[test]
+fn parses_field_access_and_logical_predicates() {
+    let expression = parse_expression(
+        "orders.customer_id == customer.id || orders.company_id == customer.company_id && orders.id != customer.id",
+    );
+    let Expression::Logical {
+        operator,
+        right_operand,
+        ..
+    } = expression
+    else {
+        panic!("expected a logical expression");
+    };
+    assert_eq!(operator, LogicalOperator::Or);
+    assert!(matches!(
+        right_operand.as_ref(),
+        Expression::Logical {
+            operator: LogicalOperator::And,
+            ..
+        }
+    ));
 }

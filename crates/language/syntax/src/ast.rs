@@ -1,4 +1,4 @@
-use crate::{BinaryOperator, ComparisonOperator, Span, UnaryOperator};
+use crate::{BinaryOperator, ComparisonOperator, LogicalOperator, Span, UnaryOperator};
 
 #[derive(Clone, Debug)]
 pub struct Program {
@@ -13,6 +13,24 @@ pub struct Block {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
+    TypeDeclaration {
+        definition: TypeDefinition,
+        span: Span,
+    },
+    FrameDeclaration {
+        name: String,
+        row_type_name: String,
+        expression: Option<Expression>,
+        span: Span,
+    },
+    RelationDefinition {
+        definition: RelationDefinition,
+        span: Span,
+    },
+    RelationBinding {
+        binding: RelationBinding,
+        span: Span,
+    },
     Configuration {
         entries: Vec<ConfigurationEntry>,
         span: Span,
@@ -29,6 +47,72 @@ pub enum Statement {
         span: Span,
     },
     Expression(Expression),
+}
+
+/// Describes the logical fields that make up one user-defined row type.
+#[derive(Clone, Debug)]
+pub struct TypeDefinition {
+    pub name: String,
+    pub fields: Vec<TypeField>,
+    pub span: Span,
+}
+
+/// Describes one named field in a user-defined row type.
+#[derive(Clone, Debug)]
+pub struct TypeField {
+    pub name: String,
+    pub type_name: String,
+    pub span: Span,
+}
+
+/// Describes a reusable relation independently of concrete frame instances.
+#[derive(Clone, Debug)]
+pub struct RelationDefinition {
+    pub name: String,
+    pub roles: Vec<RelationRole>,
+    pub predicates: Vec<Expression>,
+    pub span: Span,
+}
+
+/// Describes one named participant in a relation definition.
+#[derive(Clone, Debug)]
+pub struct RelationRole {
+    pub name: String,
+    pub row_type_name: String,
+    pub cardinality: RelationCardinality,
+    pub span: Span,
+}
+
+/// Describes the expected number of matching rows for a relation role.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RelationCardinality {
+    One,
+    Many,
+}
+
+/// Connects one relation definition to explicitly named frame instances.
+#[derive(Clone, Debug)]
+pub struct RelationBinding {
+    pub name: String,
+    pub definition_name: String,
+    pub roles: Vec<RelationRoleBinding>,
+    pub span: Span,
+}
+
+/// Connects one relation role to one concrete frame variable.
+#[derive(Clone, Debug)]
+pub struct RelationRoleBinding {
+    pub role_name: String,
+    pub frame_name: String,
+    pub span: Span,
+}
+
+/// Stores one named typed column inside a hand-written frame literal.
+#[derive(Clone, Debug)]
+pub struct FrameLiteralColumn {
+    pub name: String,
+    pub values: Vec<Expression>,
+    pub span: Span,
 }
 
 /// Stores one named entry inside a source configuration object.
@@ -82,8 +166,20 @@ pub enum Expression {
         raw_text: String,
         span: Span,
     },
+    Null {
+        span: Span,
+    },
     Variable {
         name: String,
+        span: Span,
+    },
+    FieldAccess {
+        expression: Box<Expression>,
+        field: String,
+        span: Span,
+    },
+    FrameLiteral {
+        columns: Vec<FrameLiteralColumn>,
         span: Span,
     },
     Unary {
@@ -99,6 +195,12 @@ pub enum Expression {
     },
     Comparison {
         operator: ComparisonOperator,
+        left_operand: Box<Expression>,
+        right_operand: Box<Expression>,
+        span: Span,
+    },
+    Logical {
+        operator: LogicalOperator,
         left_operand: Box<Expression>,
         right_operand: Box<Expression>,
         span: Span,
@@ -121,10 +223,14 @@ impl Expression {
             Expression::Number { span, .. }
             | Expression::String { span, .. }
             | Expression::Boolean { span, .. }
+            | Expression::Null { span, .. }
             | Expression::Variable { span, .. }
+            | Expression::FieldAccess { span, .. }
+            | Expression::FrameLiteral { span, .. }
             | Expression::Unary { span, .. }
             | Expression::Binary { span, .. }
             | Expression::Comparison { span, .. }
+            | Expression::Logical { span, .. }
             | Expression::Convert { span, .. }
             | Expression::Call { span, .. } => *span,
         }

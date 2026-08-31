@@ -20,6 +20,19 @@ enum RawTokenKind {
     #[token("@config")]
     Config,
 
+    #[token("type")]
+    Type,
+    #[token("frame")]
+    Frame,
+    #[token("relation")]
+    Relation,
+    #[token("on")]
+    On,
+    #[token("one")]
+    One,
+    #[token("many")]
+    Many,
+
     #[token(":")]
     Colon,
     #[token("==")]
@@ -58,8 +71,18 @@ enum RawTokenKind {
     LeftBrace,
     #[token("}")]
     RightBrace,
+    #[token("[")]
+    LeftBracket,
+    #[token("]")]
+    RightBracket,
     #[token(",")]
     Comma,
+    #[token(".")]
+    Dot,
+    #[token("&&")]
+    AmpersandAmpersand,
+    #[token("||")]
+    PipePipe,
 
     #[token("if")]
     If,
@@ -72,6 +95,9 @@ enum RawTokenKind {
     #[token("true")]
     #[token("false")]
     Boolean,
+
+    #[token("null")]
+    Null,
 
     #[regex(r"[A-Za-z_][A-Za-z0-9_]*")]
     Ident,
@@ -90,6 +116,7 @@ pub(crate) enum TokenKind {
     Number(String),
     String(String),
     Boolean(String),
+    Null,
     Colon,
     Equal,
     EqualEqual,
@@ -109,10 +136,21 @@ pub(crate) enum TokenKind {
     RightParenthesis,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
     Comma,
     If,
     Newline,
     Config,
+    Type,
+    Frame,
+    Relation,
+    On,
+    One,
+    Many,
+    Dot,
+    AmpersandAmpersand,
+    PipePipe,
     Eof,
 }
 
@@ -161,6 +199,12 @@ fn convert_raw_token(
         RawTokenKind::Comment => unreachable!("comments are skipped by Logos"),
         RawTokenKind::Newline => TokenKind::Newline,
         RawTokenKind::Config => TokenKind::Config,
+        RawTokenKind::Type => TokenKind::Type,
+        RawTokenKind::Frame => TokenKind::Frame,
+        RawTokenKind::Relation => TokenKind::Relation,
+        RawTokenKind::On => TokenKind::On,
+        RawTokenKind::One => TokenKind::One,
+        RawTokenKind::Many => TokenKind::Many,
         RawTokenKind::Colon => TokenKind::Colon,
         RawTokenKind::Equal => TokenKind::Equal,
         RawTokenKind::EqualEqual => TokenKind::EqualEqual,
@@ -180,7 +224,12 @@ fn convert_raw_token(
         RawTokenKind::RightParenthesis => TokenKind::RightParenthesis,
         RawTokenKind::LeftBrace => TokenKind::LeftBrace,
         RawTokenKind::RightBrace => TokenKind::RightBrace,
+        RawTokenKind::LeftBracket => TokenKind::LeftBracket,
+        RawTokenKind::RightBracket => TokenKind::RightBracket,
         RawTokenKind::Comma => TokenKind::Comma,
+        RawTokenKind::Dot => TokenKind::Dot,
+        RawTokenKind::AmpersandAmpersand => TokenKind::AmpersandAmpersand,
+        RawTokenKind::PipePipe => TokenKind::PipePipe,
         RawTokenKind::If => TokenKind::If,
         RawTokenKind::Number => TokenKind::Number(raw_text.into()),
         RawTokenKind::Ident => TokenKind::Ident(raw_text.into()),
@@ -188,6 +237,7 @@ fn convert_raw_token(
         RawTokenKind::SingleQuotedString => TokenKind::String(decode_string(raw_text, '\'', span)?),
         RawTokenKind::BacktickString => TokenKind::String(decode_string(raw_text, '`', span)?),
         RawTokenKind::Boolean => TokenKind::Boolean(raw_text.into()),
+        RawTokenKind::Null => TokenKind::Null,
     })
 }
 

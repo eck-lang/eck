@@ -19,6 +19,13 @@ pub enum ComparisonOperator {
     GreaterOrEqual,
 }
 
+/// An operator that combines boolean expressions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LogicalOperator {
+    And,
+    Or,
+}
+
 /// An operator applied to one expression.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOperator {

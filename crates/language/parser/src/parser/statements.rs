@@ -1,24 +1,228 @@
 //! Statement recognition and variable declaration parsing.
 
-use syntax::{Block, ConfigurationEntry, ConfigurationValue, Span, Statement};
+use syntax::{
+    Block, ConfigurationEntry, ConfigurationValue, RelationBinding, RelationCardinality,
+    RelationDefinition, RelationRole, RelationRoleBinding, Span, Statement, TypeDefinition,
+    TypeField,
+};
 
 use crate::{ParseError, lexer::TokenKind};
 
 use super::Parser;
 
 impl Parser {
-    /// Parses either a typed variable declaration or a standalone expression.
+    /// Dispatches one declaration, control-flow statement, or expression.
     pub(super) fn parse_statement(&mut self) -> Result<Statement, ParseError> {
+        if matches!(&self.peek().kind, TokenKind::Type) {
+            return self.parse_type_declaration();
+        }
+        if matches!(&self.peek().kind, TokenKind::Relation) {
+            return self.parse_relation_statement();
+        }
         if matches!(&self.peek().kind, TokenKind::Config) {
             return self.parse_configuration_statement();
         }
         if matches!(&self.peek().kind, TokenKind::If) {
             return self.parse_if_statement();
         }
+        if self.starts_frame_declaration() {
+            return self.parse_frame_declaration();
+        }
         if self.starts_variable_declaration() {
             return self.parse_variable_declaration();
         }
         Ok(Statement::Expression(self.parse_expression(0)?))
+    }
+
+    /// Parses a TypeScript-like structural row type declaration.
+    fn parse_type_declaration(&mut self) -> Result<Statement, ParseError> {
+        let start = self.advance().span.start;
+        let name = self.expect_identifier("expected type name after `type`")?;
+        self.skip_newlines();
+        self.expect_simple(TokenKind::LeftBrace)?;
+        self.skip_newlines();
+        let mut fields = Vec::new();
+        while !matches!(&self.peek().kind, TokenKind::RightBrace) {
+            if matches!(&self.peek().kind, TokenKind::Eof) {
+                return Err(self.error_here("expected `}` to close type declaration"));
+            }
+            let field_start = self.peek().span.start;
+            let field_name = self.expect_identifier("expected field name")?;
+            self.expect_simple(TokenKind::Colon)?;
+            let type_name = self.expect_type_name("expected field type")?;
+            fields.push(TypeField {
+                name: field_name,
+                type_name,
+                span: Span {
+                    start: field_start,
+                    end: self.previous().span.end,
+                },
+            });
+            self.finish_braced_line("type declaration")?;
+        }
+        let end = self.expect_simple(TokenKind::RightBrace)?.span.end;
+        let span = Span { start, end };
+        Ok(Statement::TypeDeclaration {
+            definition: TypeDefinition { name, fields, span },
+            span,
+        })
+    }
+
+    /// Parses either a reusable relation definition or an explicit binding.
+    fn parse_relation_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.advance().span.start;
+        let name = self.expect_identifier("expected relation name after `relation`")?;
+        if matches!(&self.peek().kind, TokenKind::Colon) {
+            return self.parse_relation_binding(start, name);
+        }
+        self.parse_relation_definition(start, name)
+    }
+
+    /// Parses a reusable relation definition and its general boolean predicates.
+    fn parse_relation_definition(
+        &mut self,
+        start: usize,
+        name: String,
+    ) -> Result<Statement, ParseError> {
+        self.skip_newlines();
+        self.expect_simple(TokenKind::LeftBrace)?;
+        self.skip_newlines();
+        let mut roles = Vec::new();
+        while !matches!(&self.peek().kind, TokenKind::On) {
+            if matches!(&self.peek().kind, TokenKind::RightBrace | TokenKind::Eof) {
+                return Err(self.error_here("expected `on` block in relation definition"));
+            }
+            let role_start = self.peek().span.start;
+            let role_name = self.expect_identifier("expected relation role name")?;
+            self.expect_simple(TokenKind::Colon)?;
+            let row_type_name = self.expect_type_name("expected relation role type")?;
+            let cardinality = match self.advance().clone().kind {
+                TokenKind::One => RelationCardinality::One,
+                TokenKind::Many => RelationCardinality::Many,
+                _ => {
+                    return Err(self.error_at(
+                        self.previous().span,
+                        "invalid cardinality; expected `one` or `many`",
+                    ));
+                }
+            };
+            roles.push(RelationRole {
+                name: role_name,
+                row_type_name,
+                cardinality,
+                span: Span {
+                    start: role_start,
+                    end: self.previous().span.end,
+                },
+            });
+            self.finish_braced_line("relation definition")?;
+        }
+        self.advance();
+        self.skip_newlines();
+        self.expect_simple(TokenKind::LeftBrace)?;
+        self.skip_newlines();
+        let mut predicates = Vec::new();
+        while !matches!(&self.peek().kind, TokenKind::RightBrace) {
+            if matches!(&self.peek().kind, TokenKind::Eof) {
+                return Err(self.error_here("expected `}` to close relation predicate block"));
+            }
+            predicates.push(self.parse_expression(0)?);
+            self.finish_braced_line("relation predicate block")?;
+        }
+        self.expect_simple(TokenKind::RightBrace)?;
+        self.skip_newlines();
+        let end = self.expect_simple(TokenKind::RightBrace)?.span.end;
+        let span = Span { start, end };
+        Ok(Statement::RelationDefinition {
+            definition: RelationDefinition {
+                name,
+                roles,
+                predicates,
+                span,
+            },
+            span,
+        })
+    }
+
+    /// Parses an explicit mapping from relation roles to concrete frames.
+    fn parse_relation_binding(
+        &mut self,
+        start: usize,
+        name: String,
+    ) -> Result<Statement, ParseError> {
+        self.advance();
+        let definition_name =
+            self.expect_identifier("expected relation definition name after `:`")?;
+        self.skip_newlines();
+        self.expect_simple(TokenKind::LeftBrace)?;
+        self.skip_newlines();
+        let mut roles = Vec::new();
+        while !matches!(&self.peek().kind, TokenKind::RightBrace) {
+            if matches!(&self.peek().kind, TokenKind::Eof) {
+                return Err(self.error_here("expected `}` to close relation binding"));
+            }
+            let role_start = self.peek().span.start;
+            let role_name = self.expect_identifier("expected relation role name")?;
+            self.expect_simple(TokenKind::Equal)?;
+            let frame_name = self.expect_identifier("expected frame name in relation binding")?;
+            roles.push(RelationRoleBinding {
+                role_name,
+                frame_name,
+                span: Span {
+                    start: role_start,
+                    end: self.previous().span.end,
+                },
+            });
+            self.finish_braced_line("relation binding")?;
+        }
+        let end = self.expect_simple(TokenKind::RightBrace)?.span.end;
+        let span = Span { start, end };
+        Ok(Statement::RelationBinding {
+            binding: RelationBinding {
+                name,
+                definition_name,
+                roles,
+                span,
+            },
+            span,
+        })
+    }
+
+    /// Parses `name: frame RowType` with an optional future source expression.
+    fn parse_frame_declaration(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span.start;
+        let name = self.expect_identifier("expected frame variable name")?;
+        self.expect_simple(TokenKind::Colon)?;
+        self.expect_simple(TokenKind::Frame)?;
+        let row_type_name = self.expect_type_name("expected row type after `frame`")?;
+        let expression = if matches!(&self.peek().kind, TokenKind::Equal) {
+            self.advance();
+            Some(self.parse_expression(0)?)
+        } else {
+            None
+        };
+        let end = expression
+            .as_ref()
+            .map(|expression| expression.span().end)
+            .unwrap_or(self.previous().span.end);
+        Ok(Statement::FrameDeclaration {
+            name,
+            row_type_name,
+            expression,
+            span: Span { start, end },
+        })
+    }
+
+    /// Consumes a newline separator or accepts the closing brace at the cursor.
+    fn finish_braced_line(&mut self, context: &str) -> Result<(), ParseError> {
+        match &self.peek().kind {
+            TokenKind::Newline => {
+                self.skip_newlines();
+                Ok(())
+            }
+            TokenKind::RightBrace => Ok(()),
+            _ => Err(self.error_here(&format!("expected end of line or `}}` in {context}"))),
+        }
     }
 
     /// Parses a root-level `@config { ... }` modal configuration override.
@@ -175,12 +379,25 @@ impl Parser {
             )
     }
 
+    /// Reports whether the cursor begins `name: frame RowType`.
+    fn starts_frame_declaration(&self) -> bool {
+        matches!(&self.peek().kind, TokenKind::Ident(_))
+            && matches!(
+                self.peek_n(1).map(|token| &token.kind),
+                Some(TokenKind::Colon)
+            )
+            && matches!(
+                self.peek_n(2).map(|token| &token.kind),
+                Some(TokenKind::Frame)
+            )
+    }
+
     /// Parses a typed variable declaration after its leading identifier was found.
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParseError> {
         let start = self.peek().span.start;
         let name = self.expect_identifier("expected variable name")?;
         self.expect_simple(TokenKind::Colon)?;
-        let type_name = self.expect_identifier("expected type name")?;
+        let type_name = self.expect_type_name("expected type name")?;
         self.expect_simple(TokenKind::Equal)?;
         let expression = self.parse_expression(0)?;
         let end = expression.span().end;

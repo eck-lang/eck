@@ -121,3 +121,129 @@ fn rejects_configuration_directives_inside_blocks() {
 
     assert!(error.message.contains("only allowed at the root level"));
 }
+
+/// Verifies structural row types and native non-generic frame declarations.
+#[test]
+fn parses_type_and_frame_declarations() {
+    let program = parse(
+        "type Employee {\n\
+         id: int\n\
+         name: string\n\
+         }\n\
+         employees: frame Employee\n",
+    )
+    .unwrap();
+
+    let Statement::TypeDeclaration { definition, .. } = &program.statements[0] else {
+        panic!("expected a type declaration");
+    };
+    assert_eq!(definition.name, "Employee");
+    assert_eq!(definition.fields.len(), 2);
+    let Statement::FrameDeclaration {
+        name,
+        row_type_name,
+        expression,
+        ..
+    } = &program.statements[1]
+    else {
+        panic!("expected a frame declaration");
+    };
+    assert_eq!(name, "employees");
+    assert_eq!(row_type_name, "Employee");
+    assert!(expression.is_none());
+}
+
+/// Verifies a frame declaration retains hand-written column-oriented literal data.
+#[test]
+fn parses_hand_written_frame_literals() {
+    let program = parse(
+        "employees: frame Employee = frame {\n\
+         id: [1, 2, 3]\n\
+         name: [\"Mario\", \"Anna\", \"Sara\"]\n\
+         }\n",
+    )
+    .unwrap();
+
+    let Statement::FrameDeclaration {
+        expression: Some(Expression::FrameLiteral { columns, .. }),
+        ..
+    } = &program.statements[0]
+    else {
+        panic!("expected an initialized frame declaration");
+    };
+    assert_eq!(columns.len(), 2);
+    assert_eq!(columns[0].name, "id");
+    assert_eq!(columns[0].values.len(), 3);
+}
+
+/// Verifies composite predicates and explicit relation bindings preserve every role.
+#[test]
+fn parses_composite_relation_definitions_and_bindings() {
+    let program = parse(
+        "relation CustomerOrders {\n\
+         customer: Customer one\n\
+         orders: Order many\n\
+         on {\n\
+         orders.customer_id == customer.id\n\
+         orders.company_id == customer.company_id\n\
+         }\n\
+         }\n\
+         relation sales: CustomerOrders {\n\
+         customer = customers\n\
+         orders = orders2026\n\
+         }\n",
+    )
+    .unwrap();
+
+    let Statement::RelationDefinition { definition, .. } = &program.statements[0] else {
+        panic!("expected a relation definition");
+    };
+    assert_eq!(definition.roles.len(), 2);
+    assert_eq!(definition.predicates.len(), 2);
+    assert!(matches!(
+        definition.predicates[0],
+        Expression::Comparison { .. }
+    ));
+    let Statement::RelationBinding { binding, .. } = &program.statements[1] else {
+        panic!("expected a relation binding");
+    };
+    assert_eq!(binding.definition_name, "CustomerOrders");
+    assert_eq!(binding.roles.len(), 2);
+}
+
+/// Verifies relation definitions support more than two independently named participants.
+#[test]
+fn parses_n_ary_relation_definitions() {
+    let program = parse(
+        "relation OrderContext {\n\
+         order: Order many\n\
+         customer: Customer one\n\
+         product: Product one\n\
+         on {\n\
+         order.customer_id == customer.id\n\
+         order.product_id == product.id\n\
+         }\n\
+         }\n",
+    )
+    .unwrap();
+
+    let Statement::RelationDefinition { definition, .. } = &program.statements[0] else {
+        panic!("expected a relation definition");
+    };
+    assert_eq!(definition.roles.len(), 3);
+    assert_eq!(definition.predicates.len(), 2);
+}
+
+/// Verifies invalid cardinality spelling is rejected by the syntax layer.
+#[test]
+fn rejects_invalid_relation_cardinality() {
+    let error = parse(
+        "relation CustomerOrders {\n\
+         customer: Customer optional\n\
+         on { customer.id == customer.id }\n\
+         }\n",
+    )
+    .unwrap_err();
+
+    assert!(error.message.contains("invalid cardinality"));
+}
