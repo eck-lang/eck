@@ -1,13 +1,17 @@
+pub mod data;
 pub mod frequency;
 pub mod linear;
 pub mod mass;
+pub mod time;
 pub mod volume;
 
 mod common;
 
+pub use data::DataMeasureExtension;
 pub use frequency::FrequencyMeasureExtension;
 pub use linear::LinearMeasureExtension;
 pub use mass::MassMeasureExtension;
+pub use time::TimeMeasureExtension;
 pub use volume::VolumeMeasureExtension;
 
 use language_core::{CoreError, Extension, Registry};
@@ -25,6 +29,8 @@ impl Extension for MeasuresExtension {
         VolumeMeasureExtension.register(registry)?;
         MassMeasureExtension.register(registry)?;
         FrequencyMeasureExtension.register(registry)?;
+        TimeMeasureExtension.register(registry)?;
+        DataMeasureExtension.register(registry)?;
         Ok(())
     }
 }
