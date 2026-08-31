@@ -1,11 +1,13 @@
-# Crate Structure
+# Crate and Primitive Module Structure
 
-Primitive and extension crates use the same internal structure. Their parent
-directory describes their role in ECK-Lang, not a different crate format.
+Built-in primitives share the `eck-primitives` crate and each live in a
+dedicated `src/<primitive>/` module. Standalone extensions remain separate
+crates. Primitive modules and extension crates use the same internal separation
+of concerns even though their package boundaries differ.
 
-Use `eck-decimal` as the reference for a crate that defines a value type and
-multiple operation implementations. Include only the modules required by the
-crate's capabilities.
+Use `eck-primitives/src/decimal` as the reference for a primitive that defines
+a value type and multiple operation implementations. Include only the modules
+required by the primitive or extension's capabilities.
 
 ## Cargo manifest
 
@@ -22,12 +24,14 @@ relative path. Do not rely on transitive dependencies.
 
 ## Source structure
 
-`lib.rs` is the crate façade. It declares the internal modules, exposes the
-extension type, implements `language_core::Extension`, and coordinates
-registration.
+`lib.rs` is the crate façade. In `eck-primitives`, it declares the primitive
+modules and re-exports their extension types. Each primitive's `mod.rs`
+implements `language_core::Extension` and coordinates that primitive's
+registration. A standalone extension crate performs those responsibilities in
+its own `lib.rs`.
 
-A crate that defines a runtime value should separate the relevant concerns as
-shown by `eck-decimal`:
+A primitive module or extension crate that defines a runtime value should
+separate the relevant concerns as shown by the decimal module:
 
 - `literal.rs` parses source literals;
 - `formatting.rs` formats runtime values;
@@ -42,9 +46,9 @@ API.
 
 ## Arithmetic operations
 
-Crates that implement or register language operations must have an
-`operations/` directory with a `mod.rs` that coordinates the operation modules
-and their registration.
+Primitive modules and extension crates that implement or register language
+operations must have an `operations/` directory with a `mod.rs` that
+coordinates the operation modules and their registration.
 
 When an operation has one implementation module, place it directly in
 `operations/` and name it `<operation>_<type>.rs`. Integer addition therefore
@@ -80,11 +84,11 @@ Follow [the repository test layout](../tests.md) for all tests.
 
 ## Comparisons
 
-Keep comparisons separate from arithmetic in a crate-level `comparisons/`
-directory. Its `mod.rs` coordinates comparison modules and their registration.
-Comparison modules define the compatibility relation between operand types;
-they do not belong to the `bool` crate merely because their result is a
-boolean.
+Keep comparisons separate from arithmetic in the owning primitive or extension
+`comparisons/` directory. Its `mod.rs` coordinates comparison modules and their
+registration. Comparison modules define the compatibility relation between
+operand types; they do not belong to the boolean primitive merely because their
+result is a boolean.
 
 Use the directory when a crate supports comparisons, even when it currently
 has a single implementation module. Name implementation modules for the
