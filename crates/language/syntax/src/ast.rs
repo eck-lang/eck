@@ -6,11 +6,22 @@ pub struct Program {
 }
 
 #[derive(Clone, Debug)]
+pub struct Block {
+    pub statements: Vec<Statement>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug)]
 pub enum Statement {
     VariableDecl {
         name: String,
         type_name: String,
         expression: Expression,
+        span: Span,
+    },
+    If {
+        condition: Expression,
+        body: Block,
         span: Span,
     },
     Expression(Expression),
