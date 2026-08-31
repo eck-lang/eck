@@ -1,0 +1,18 @@
+[package]
+name = "eck-measures"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+language_core = { package = "eck-core", path = "../language/core" }
+
+[dev-dependencies]
+primitives = { package = "eck-primitives", path = "../primitives" }
+
+[features]
+default = ["linear", "volume", "mass", "frequency"]
+linear = []
+volume = []
+mass = []
+frequency = []
