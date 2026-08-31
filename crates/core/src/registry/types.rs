@@ -126,6 +126,21 @@ impl Registry {
             .ok_or(CoreError::MissingDefault("boolean"))
     }
 
+    /// Configures the type used by null literals.
+    ///
+    /// Returns [`CoreError::UnknownTypeId`] when `id` is not registered, leaving
+    /// the previously configured default unchanged.
+    pub fn set_default_null(&mut self, id: TypeId) -> Result<(), CoreError> {
+        self.type_descriptor(id)?;
+        self.default_null = Some(id);
+        Ok(())
+    }
+
+    /// Returns the configured default null type.
+    pub fn default_null(&self) -> Result<TypeId, CoreError> {
+        self.default_null.ok_or(CoreError::MissingDefault("null"))
+    }
+
     /// Evaluates a plain value of the configured default boolean type.
     ///
     /// The registered type extension owns validation of the opaque payload.
@@ -208,6 +223,28 @@ impl Registry {
                 .ok_or_else(|| CoreError::UnsupportedLiteral {
                     type_name: type_descriptor.name.to_string(),
                     literal_kind: "boolean",
+                })?;
+        parser(raw_text, type_id)
+    }
+
+    /// Parses a null token through its expected or default registered type.
+    ///
+    /// Explicit context takes precedence. Without it, the configured default
+    /// null type is used. Returns [`CoreError::UnsupportedLiteral`] when
+    /// the selected type does not accept null literals.
+    pub fn parse_null(
+        &self,
+        raw_text: &str,
+        expected: Option<TypeId>,
+    ) -> Result<Value, CoreError> {
+        let type_id = expected.unwrap_or(self.default_null()?);
+        let type_descriptor = self.type_descriptor(type_id)?;
+        let parser =
+            type_descriptor
+                .parse_null_literal
+                .ok_or_else(|| CoreError::UnsupportedLiteral {
+                    type_name: type_descriptor.name.to_string(),
+                    literal_kind: "null",
                 })?;
         parser(raw_text, type_id)
     }
