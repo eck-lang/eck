@@ -1,0 +1,19 @@
+use language_core::{CoreError, Value};
+
+use crate::integer::integer8::value::get;
+
+/// Raises an integer to a non-negative integer exponent using checked arithmetic.
+pub(crate) fn power_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreError> {
+    let exponent = get(rhs)?;
+    let exponent = u32::try_from(exponent).map_err(|_| {
+        CoreError::Runtime("integer power exponent must be non-negative and fit in u32".into())
+    })?;
+    let value = get(lhs)?
+        .checked_pow(exponent)
+        .ok_or_else(|| CoreError::Runtime("integer overflow in power".into()))?;
+    Ok(Value::new(lhs.type_id(), value))
+}
+
+#[cfg(test)]
+#[path = "power_integer8.tests.rs"]
+mod tests;

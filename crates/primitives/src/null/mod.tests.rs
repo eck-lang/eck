@@ -12,20 +12,12 @@ fn registers_null_type_and_comparisons() {
     assert_eq!(registry.default_null().unwrap(), null_type);
     assert!(
         registry
-            .resolve_comparison(
-                ComparisonOperator::Equal,
-                null_type,
-                null_type
-            )
+            .resolve_comparison(ComparisonOperator::Equal, null_type, null_type)
             .is_ok()
     );
     assert!(
         registry
-            .resolve_comparison(
-                ComparisonOperator::NotEqual,
-                null_type,
-                null_type
-            )
+            .resolve_comparison(ComparisonOperator::NotEqual, null_type, null_type)
             .is_ok()
     );
 }
