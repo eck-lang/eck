@@ -11,8 +11,10 @@ language_core = { package = "eck-core", path = "../language/core" }
 primitives = { package = "eck-primitives", path = "../primitives" }
 
 [features]
-default = ["linear", "volume", "mass", "frequency"]
+default = ["linear", "volume", "mass", "frequency", "time", "data"]
 linear = []
 volume = []
 mass = []
 frequency = []
+time = []
+data = []
