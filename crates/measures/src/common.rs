@@ -56,14 +56,29 @@ pub(crate) fn register_same_unit_arithmetic(
     Ok(())
 }
 
+/// Returns the greatest common divisor of two values.
+fn greatest_common_divisor(mut first: u64, mut second: u64) -> u64 {
+    while second != 0 {
+        let remainder = first % second;
+        first = second;
+        second = remainder;
+    }
+    first
+}
+
+/// Builds a reduced scale representing `numerator / denominator`.
+fn reduced_scale(numerator: u64, denominator: u64) -> Scale {
+    let divisor = greatest_common_divisor(numerator, denominator);
+    Scale::new(numerator / divisor, denominator / divisor)
+}
+
 /// Registers arithmetic rules between two compatible units.
 pub(crate) fn register_mixed_unit_arithmetic(
     registry: &mut Registry,
     coarser: SubtypeId,
     finer: SubtypeId,
-    conversion_factor: u64,
+    coarser_to_finer: Scale,
 ) -> Result<(), CoreError> {
-    let coarser_to_finer = Scale::integer(conversion_factor);
 
     for operator in [
         BinaryOperator::Addition,
@@ -148,9 +163,8 @@ pub(crate) fn register_mixed_unit_comparisons(
     registry: &mut Registry,
     coarser: SubtypeId,
     finer: SubtypeId,
-    conversion_factor: u64,
+    coarser_to_finer: Scale,
 ) -> Result<(), CoreError> {
-    let coarser_to_finer = Scale::integer(conversion_factor);
     for operator in COMPARISON_OPERATORS {
         registry.register_subtype_comparison_rule(
             *operator,
@@ -184,19 +198,12 @@ pub(crate) fn register_dimension(
 
     for (index, &(coarser, coarser_scale)) in registered.iter().enumerate() {
         for &(finer, finer_scale) in &registered[index + 1..] {
-            let conversion_factor = coarser_scale / finer_scale;
-            register_mixed_unit_arithmetic(registry, coarser, finer, conversion_factor)?;
-            register_mixed_unit_comparisons(registry, coarser, finer, conversion_factor)?;
-            registry.register_subtype_conversion(
-                coarser,
-                finer,
-                Scale::integer(conversion_factor),
-            )?;
-            registry.register_subtype_conversion(
-                finer,
-                coarser,
-                Scale::new(1, conversion_factor),
-            )?;
+            let coarser_to_finer = reduced_scale(coarser_scale, finer_scale);
+            let finer_to_coarser = reduced_scale(finer_scale, coarser_scale);
+            register_mixed_unit_arithmetic(registry, coarser, finer, coarser_to_finer)?;
+            register_mixed_unit_comparisons(registry, coarser, finer, coarser_to_finer)?;
+            registry.register_subtype_conversion(coarser, finer, coarser_to_finer)?;
+            registry.register_subtype_conversion(finer, coarser, finer_to_coarser)?;
         }
     }
 
