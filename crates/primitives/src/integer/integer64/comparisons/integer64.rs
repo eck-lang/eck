@@ -3,14 +3,14 @@ use std::cmp::Ordering;
 use language_core::{ComparisonOperator, CoreError, Registry, Value};
 
 use super::{declare_pair, evaluate};
-use crate::integer::value::get;
+use crate::integer::integer64::value::get;
 
 /// Registers every comparison operator for two integer operands.
 pub(super) fn register(registry: &mut Registry) -> Result<(), CoreError> {
     declare_pair(
         registry,
-        "int",
-        "int",
+        "int64",
+        "int64",
         [
             equal,
             not_equal,
@@ -64,5 +64,5 @@ fn greater_or_equal(left_operand: &Value, right_operand: &Value) -> Result<bool,
 }
 
 #[cfg(test)]
-#[path = "integer.tests.rs"]
+#[path = "integer64.tests.rs"]
 mod tests;

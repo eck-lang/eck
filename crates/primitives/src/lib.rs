@@ -10,6 +10,7 @@ pub use boolean::BoolExtension;
 pub use decimal::DecimalExtension;
 pub use double::DoubleExtension;
 pub use float::FloatExtension;
+pub use integer::Integer64Extension;
 pub use integer::IntegerExtension;
 pub use null::NullExtension;
 pub use string::StringExtension;

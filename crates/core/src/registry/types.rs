@@ -29,6 +29,25 @@ impl Registry {
         Ok(())
     }
 
+    /// Registers an alias that resolves to an existing base type.
+    ///
+    /// The target type must already be registered. The alias must not already
+    /// name a base type or another alias. The alias resolves to the same
+    /// `TypeId` and therefore shares operators, comparisons, and formatting.
+    pub fn register_type_alias(
+        &mut self,
+        alias: &'static str,
+        target: TypeId,
+    ) -> Result<(), CoreError> {
+        self.type_descriptor(target)?;
+        if self.types_by_name.contains_key(alias) {
+            return Err(CoreError::DuplicateType(alias.to_string()));
+        }
+        self.types_by_name.insert(alias, target);
+        self.activate_comparison_declarations_for(alias);
+        Ok(())
+    }
+
     /// Resolves a declared type name to its registered ID.
     ///
     /// Returns `None` when no extension registered that exact name.
@@ -232,11 +251,7 @@ impl Registry {
     /// Explicit context takes precedence. Without it, the configured default
     /// null type is used. Returns [`CoreError::UnsupportedLiteral`] when
     /// the selected type does not accept null literals.
-    pub fn parse_null(
-        &self,
-        raw_text: &str,
-        expected: Option<TypeId>,
-    ) -> Result<Value, CoreError> {
+    pub fn parse_null(&self, raw_text: &str, expected: Option<TypeId>) -> Result<Value, CoreError> {
         let type_id = expected.unwrap_or(self.default_null()?);
         let type_descriptor = self.type_descriptor(type_id)?;
         let parser =

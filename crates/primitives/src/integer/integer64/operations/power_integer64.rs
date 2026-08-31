@@ -1,6 +1,6 @@
 use language_core::{CoreError, Value};
 
-use crate::integer::value::get;
+use crate::integer::integer64::value::get;
 
 /// Raises an integer to a non-negative integer exponent using checked arithmetic.
 pub(crate) fn power_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreError> {
@@ -13,6 +13,7 @@ pub(crate) fn power_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreError
         .ok_or_else(|| CoreError::Runtime("integer overflow in power".into()))?;
     Ok(Value::new(lhs.type_id(), value))
 }
+
 #[cfg(test)]
-#[path = "power_integer.tests.rs"]
+#[path = "power_integer64.tests.rs"]
 mod tests;

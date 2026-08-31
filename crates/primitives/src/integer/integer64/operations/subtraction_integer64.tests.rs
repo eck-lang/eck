@@ -3,10 +3,10 @@ use super::*;
 /// Verifies integer subtraction and checked overflow handling.
 #[test]
 fn subtracts_integers_and_rejects_overflow() {
-    let lhs = Value::new(crate::integer::test_type_id(), 15_i64);
-    let rhs = Value::new(crate::integer::test_type_id(), 27_i64);
-    let minimum = Value::new(crate::integer::test_type_id(), i64::MIN);
-    let one = Value::new(crate::integer::test_type_id(), 1_i64);
+    let lhs = Value::new(crate::integer::integer64::test_type_id(), 15_i64);
+    let rhs = Value::new(crate::integer::integer64::test_type_id(), 27_i64);
+    let minimum = Value::new(crate::integer::integer64::test_type_id(), i64::MIN);
+    let one = Value::new(crate::integer::integer64::test_type_id(), 1_i64);
 
     let result = subtraction_integer(&lhs, &rhs).unwrap();
 
