@@ -1,5 +1,7 @@
 use crate::IntegerExtension;
-use language_core::{BinaryOperator, ComparisonOperator, Extension, Registry, ValueType};
+use language_core::{
+    BinaryOperator, ComparisonOperator, ExecutionContext, Extension, Registry, ValueType,
+};
 
 use super::StringExtension;
 
@@ -73,7 +75,9 @@ fn formats_registered_values_through_the_string_function() {
         .resolve_function("string", &[integer.type_id()])
         .unwrap();
 
-    let result = (registry.function(function).unwrap().execute)(&registry, &[integer])
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let result = (registry.function(function).unwrap().execute)(&context, &[integer])
         .unwrap()
         .unwrap();
 

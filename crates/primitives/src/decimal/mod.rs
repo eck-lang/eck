@@ -1,4 +1,5 @@
 mod comparisons;
+mod configuration;
 mod formatting;
 mod literal;
 pub(crate) mod operations;
@@ -25,9 +26,11 @@ impl Extension for DecimalExtension {
             parse_numeric_literal: Some(literal::parse),
             parse_string_literal: None,
             parse_boolean_literal: None,
+            parse_null_literal: None,
             format: formatting::format,
         })?;
         registry.set_default_fractional(id)?;
+        configuration::register(registry, id)?;
         operations::register(registry, id)?;
         comparisons::register(registry)
     }

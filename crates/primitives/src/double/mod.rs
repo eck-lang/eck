@@ -28,6 +28,7 @@ impl Extension for DoubleExtension {
             parse_numeric_literal: Some(literal::parse),
             parse_string_literal: None,
             parse_boolean_literal: None,
+            parse_null_literal: None,
             format: formatting::format,
         })?;
         operations::register(registry, id)?;

@@ -1,5 +1,5 @@
 use crate::IntegerExtension;
-use language_core::{Extension, Registry};
+use language_core::{ExecutionContext, Extension, Registry};
 
 use super::*;
 use crate::StringExtension;
@@ -12,7 +12,9 @@ fn converts_formatted_values_to_strings() {
     StringExtension.register(&mut registry).unwrap();
     let integer = registry.parse_numeric("125", None).unwrap();
 
-    let result = format_as_string(&registry, &[integer]).unwrap().unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let result = format_as_string(&context, &[integer]).unwrap().unwrap();
 
     assert_eq!(result.downcast_ref::<String>().unwrap(), "125");
 }

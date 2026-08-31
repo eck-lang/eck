@@ -28,6 +28,7 @@ impl Extension for BoolExtension {
             parse_numeric_literal: None,
             parse_string_literal: None,
             parse_boolean_literal: Some(literal::parse),
+            parse_null_literal: None,
             format: formatting::format,
         })?;
         registry.set_default_boolean(id, value::get)?;
