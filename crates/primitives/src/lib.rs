@@ -14,6 +14,7 @@ pub use integer::Integer64Extension;
 pub use integer::Integer8Extension;
 pub use integer::IntegerExtension;
 pub use integer::UnsignedInteger64Extension;
+pub use integer::UnsignedInteger8Extension;
 pub use integer::UnsignedIntegerExtension;
 pub use null::NullExtension;
 pub use string::StringExtension;
