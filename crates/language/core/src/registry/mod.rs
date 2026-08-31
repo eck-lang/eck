@@ -10,13 +10,15 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use crate::configuration::RegisteredTypeConfiguration;
 use crate::{
     BinaryOperator, BinaryOperatorDescriptor, BooleanEvaluator, ComparisonDescriptor, ComparisonId,
-    ComparisonOperator, FunctionDescriptor, FunctionId, OperatorId, Scale, SubtypeBinaryRule,
-    SubtypeComparisonRule, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId,
+    ComparisonOperator, ConfigurationDescriptor, FunctionDescriptor, FunctionId, OperatorId, Scale,
+    SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId,
 };
 
 mod comparisons;
+mod configurations;
 mod functions;
 mod operators;
 mod subtypes;
@@ -85,6 +87,13 @@ pub struct Registry {
     /// Stores executable function descriptors in ID order.
     functions: Vec<FunctionDescriptor>,
 
+    /// Validates and supplies defaults for registered runtime configuration leaves.
+    configurations: HashMap<&'static str, ConfigurationDescriptor>,
+    /// Resolves source object paths that define explicit `None` behavior to their leaves.
+    configuration_none_objects: HashMap<&'static str, &'static str>,
+    /// Associates configuration-aware result and formatting hooks with base types.
+    type_configurations: HashMap<TypeId, RegisteredTypeConfiguration>,
+
     /// Selects the base type for uncontextualized integer literals.
     default_integer: Option<TypeId>,
     /// Selects the base type for uncontextualized fractional literals.
@@ -119,6 +128,9 @@ impl Default for Registry {
             comparison_declarations: Vec::new(),
             functions_by_name: HashMap::new(),
             functions: Vec::new(),
+            configurations: HashMap::new(),
+            configuration_none_objects: HashMap::new(),
+            type_configurations: HashMap::new(),
             default_integer: None,
             default_fractional: None,
             default_string: None,

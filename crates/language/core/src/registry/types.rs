@@ -218,15 +218,7 @@ impl Registry {
     /// the canonical suffix afterwards so every formatter treats qualified and
     /// plain values consistently.
     pub fn format_value(&self, value: &Value) -> Result<String, CoreError> {
-        let type_descriptor = self.type_descriptor(value.type_id())?;
-        let formatted = (type_descriptor.format)(value)?;
-        match value.subtype_id() {
-            Some(id) => Ok(format!(
-                "{formatted}{}",
-                self.subtype_descriptor(id)?.canonical_suffix()
-            )),
-            None => Ok(formatted),
-        }
+        self.format_value_with_configuration(value, &self.default_runtime_configuration())
     }
 
     /// Formats a base type plus an optional subtype for diagnostics.

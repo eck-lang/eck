@@ -5,7 +5,10 @@
 //! deliberately simple: registry tests verify descriptor registration and
 //! lookup, not the concrete execution behaviour owned by an extension.
 
-use crate::{CoreError, Registry, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId, Value};
+use crate::{
+    CoreError, ExecutionContext, Registry, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId,
+    Value,
+};
 
 /// A no-op formatter for descriptors that only need to satisfy registration.
 ///
@@ -41,7 +44,10 @@ pub(super) fn execute_operator(left_operand: &Value, _: &Value) -> Result<Value,
 /// This supplies the required execution function for descriptor tests without
 /// imposing result semantics; function execution is outside the scope of the
 /// registry tests that use it.
-pub(super) fn execute_function(_: &Registry, _: &[Value]) -> Result<Option<Value>, CoreError> {
+pub(super) fn execute_function(
+    _: &ExecutionContext<'_>,
+    _: &[Value],
+) -> Result<Option<Value>, CoreError> {
     Ok(None)
 }
 
