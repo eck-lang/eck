@@ -13,6 +13,10 @@ pub struct Block {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
+    Configuration {
+        entries: Vec<ConfigurationEntry>,
+        span: Span,
+    },
     VariableDecl {
         name: String,
         type_name: String,
@@ -25,6 +29,42 @@ pub enum Statement {
         span: Span,
     },
     Expression(Expression),
+}
+
+/// Stores one named entry inside a source configuration object.
+#[derive(Clone, Debug)]
+pub struct ConfigurationEntry {
+    pub name: String,
+    pub value: ConfigurationValue,
+    pub span: Span,
+}
+
+/// Represents the source forms accepted inside `@config` objects.
+#[derive(Clone, Debug)]
+pub enum ConfigurationValue {
+    Number {
+        raw_text: String,
+        span: Span,
+    },
+    Symbol {
+        name: String,
+        span: Span,
+    },
+    Object {
+        entries: Vec<ConfigurationEntry>,
+        span: Span,
+    },
+}
+
+impl ConfigurationValue {
+    /// Returns the byte range occupied by this configuration value.
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Number { span, .. } | Self::Symbol { span, .. } | Self::Object { span, .. } => {
+                *span
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
