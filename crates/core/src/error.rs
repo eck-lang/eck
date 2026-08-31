@@ -121,6 +121,18 @@ pub enum CoreError {
     UnknownFunction(String),
     #[error("function `{name}` already has overload `{signature}`")]
     DuplicateFunctionSignature { name: String, signature: String },
+    #[error("configuration `{0}` is already registered")]
+    DuplicateConfiguration(String),
+    #[error("configuration object `{0}` already defines `None` behavior")]
+    DuplicateConfigurationNoneObject(String),
+    #[error("unknown configuration `{0}`")]
+    UnknownConfiguration(String),
+    #[error("invalid value for configuration `{path}`: {message}")]
+    InvalidConfiguration { path: String, message: String },
+    #[error("{0}")]
+    InvalidConfigurationValue(String),
+    #[error("configuration-aware behavior is already registered for type `{0}`")]
+    DuplicateTypeConfiguration(String),
     #[error("no overload of `{name}` accepts ({})", .arguments.join(", "))]
     NoMatchingFunction {
         name: String,

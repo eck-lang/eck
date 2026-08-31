@@ -1,3 +1,4 @@
+mod configuration;
 mod descriptor;
 mod error;
 mod extension;
@@ -7,6 +8,11 @@ mod registry;
 mod subtype;
 mod value;
 
+pub use configuration::{
+    ConfigurationDescriptor, ConfigurationNormalizer, ConfigurationOverride, ConfigurationValue,
+    ConfiguredValueFormatter, ConfiguredValueTransformer, ExecutionContext, RuntimeConfiguration,
+    TypeConfigurationDescriptor,
+};
 pub use descriptor::{
     BinaryOperatorDescriptor, BinaryOperatorExecutor, BooleanEvaluator, ComparisonDescriptor,
     ComparisonExecutor, FunctionDescriptor, FunctionSignature, LiteralParser, NativeFunction,

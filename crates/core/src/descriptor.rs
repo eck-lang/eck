@@ -1,6 +1,6 @@
 use crate::{
-    BinaryOperator, ComparisonId, ComparisonOperator, FunctionId, OperatorId, Registry, TypeId,
-    Value,
+    BinaryOperator, ComparisonId, ComparisonOperator, ExecutionContext, FunctionId, OperatorId,
+    TypeId, Value,
 };
 
 pub type LiteralParser = fn(&str, TypeId) -> Result<Value, crate::CoreError>;
@@ -8,7 +8,8 @@ pub type ValueFormatter = fn(&Value) -> Result<String, crate::CoreError>;
 pub type BooleanEvaluator = fn(&Value) -> Result<bool, crate::CoreError>;
 pub type BinaryOperatorExecutor = fn(&Value, &Value) -> Result<Value, crate::CoreError>;
 pub type ComparisonExecutor = fn(&Value, &Value) -> Result<bool, crate::CoreError>;
-pub type NativeFunction = fn(&Registry, &[Value]) -> Result<Option<Value>, crate::CoreError>;
+pub type NativeFunction =
+    for<'a> fn(&ExecutionContext<'a>, &[Value]) -> Result<Option<Value>, crate::CoreError>;
 
 #[derive(Clone)]
 pub struct TypeDescriptor {
