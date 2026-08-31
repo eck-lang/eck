@@ -102,6 +102,8 @@ pub struct Registry {
     default_string: Option<TypeId>,
     /// Selects and evaluates the base type for boolean language semantics.
     default_boolean: Option<(TypeId, BooleanEvaluator)>,
+    /// Selects the base type for null language semantics.
+    default_null: Option<TypeId>,
 }
 
 impl Default for Registry {
@@ -135,6 +137,7 @@ impl Default for Registry {
             default_fractional: None,
             default_string: None,
             default_boolean: None,
+            default_null: None,
         }
     }
 }

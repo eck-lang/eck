@@ -63,6 +63,7 @@ pub(super) fn type_descriptor(id: TypeId, name: &'static str) -> TypeDescriptor 
         parse_numeric_literal: None,
         parse_string_literal: None,
         parse_boolean_literal: None,
+            parse_null_literal: None,
         format: format_value,
     }
 }
