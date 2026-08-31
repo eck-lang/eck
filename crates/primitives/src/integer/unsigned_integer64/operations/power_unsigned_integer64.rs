@@ -12,6 +12,7 @@ pub(crate) fn power_unsigned_integer(lhs: &Value, rhs: &Value) -> Result<Value, 
         .ok_or_else(|| CoreError::Runtime("unsigned integer overflow in power".into()))?;
     Ok(Value::new(lhs.type_id(), value))
 }
+
 #[cfg(test)]
 #[path = "power_unsigned_integer64.tests.rs"]
 mod tests;

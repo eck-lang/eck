@@ -7,6 +7,7 @@ pub(crate) fn get(value: &Value) -> Result<u64, CoreError> {
         .copied()
         .ok_or_else(|| CoreError::InvalidValueRepresentation("uint64".into()))
 }
+
 #[cfg(test)]
 #[path = "value.tests.rs"]
 mod tests;
