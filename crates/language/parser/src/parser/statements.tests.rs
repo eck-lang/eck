@@ -1,6 +1,6 @@
 use super::*;
 use crate::lexer::lex;
-use syntax::{Expression, Program, Statement};
+use syntax::{ConfigurationValue, Expression, Program, Statement};
 
 fn parse(source: &str) -> Result<Program, ParseError> {
     Parser::new(lex(source)?).parse_program()
@@ -72,4 +72,52 @@ fn rejects_missing_condition_parentheses_and_opening_brace() {
             "unexpected error for `{source}`: {error}"
         );
     }
+}
+
+/// Verifies that a root configuration directive preserves its nested object structure.
+#[test]
+fn parses_nested_root_configuration_directives() {
+    let program = parse(
+        "@config {\n\
+         decimal: {\n\
+         precision: 29\n\
+         rounding: HalfEven\n\
+         format: { scale: 4\nrounding: Truncate }\n\
+         }\n\
+         }\n",
+    )
+    .unwrap();
+
+    let Statement::Configuration { entries, .. } = &program.statements[0] else {
+        panic!("expected a configuration directive");
+    };
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].name, "decimal");
+    let ConfigurationValue::Object {
+        entries: decimal_entries,
+        ..
+    } = &entries[0].value
+    else {
+        panic!("expected the decimal configuration object");
+    };
+    assert!(matches!(
+        decimal_entries[0].value,
+        ConfigurationValue::Number { ref raw_text, .. } if raw_text == "29"
+    ));
+    assert!(matches!(
+        decimal_entries[1].value,
+        ConfigurationValue::Symbol { ref name, .. } if name == "HalfEven"
+    ));
+    assert!(matches!(
+        decimal_entries[2].value,
+        ConfigurationValue::Object { .. }
+    ));
+}
+
+/// Verifies that configuration directives cannot be nested in control-flow blocks.
+#[test]
+fn rejects_configuration_directives_inside_blocks() {
+    let error = parse("if (true) {\n@config { decimal: { precision: 4 } }\n}\n").unwrap_err();
+
+    assert!(error.message.contains("only allowed at the root level"));
 }

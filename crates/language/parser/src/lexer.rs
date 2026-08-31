@@ -17,6 +17,9 @@ enum RawTokenKind {
     #[token("\n")]
     Newline,
 
+    #[token("@config")]
+    Config,
+
     #[token(":")]
     Colon,
     #[token("==")]
@@ -109,6 +112,7 @@ pub(crate) enum TokenKind {
     Comma,
     If,
     Newline,
+    Config,
     Eof,
 }
 
@@ -156,6 +160,7 @@ fn convert_raw_token(
     Ok(match raw_kind {
         RawTokenKind::Comment => unreachable!("comments are skipped by Logos"),
         RawTokenKind::Newline => TokenKind::Newline,
+        RawTokenKind::Config => TokenKind::Config,
         RawTokenKind::Colon => TokenKind::Colon,
         RawTokenKind::Equal => TokenKind::Equal,
         RawTokenKind::EqualEqual => TokenKind::EqualEqual,
