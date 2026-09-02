@@ -1,6 +1,7 @@
 mod comparisons;
 mod conversion;
 mod formatting;
+mod functions;
 mod literal;
 mod operations;
 mod value;
@@ -37,6 +38,7 @@ impl Extension for StringExtension {
             Some(string_type),
             conversion::format_as_string,
         )?;
+        functions::register(registry, string_type)?;
         Ok(())
     }
 }
