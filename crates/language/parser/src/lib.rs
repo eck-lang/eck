@@ -3,6 +3,7 @@ mod lexer;
 mod parser;
 
 pub use error::ParseError;
+pub use lexer::ECK_KEYWORDS;
 
 use syntax::Program;
 

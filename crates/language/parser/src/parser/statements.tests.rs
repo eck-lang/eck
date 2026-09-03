@@ -1,6 +1,6 @@
 use super::*;
 use crate::lexer::lex;
-use syntax::{ConfigurationValue, Expression, Program, Statement};
+use syntax::{ConfigurationValue, Expression, Program, Statement, UseClause};
 
 fn parse(source: &str) -> Result<Program, ParseError> {
     Parser::new(lex(source)?).parse_program()
@@ -246,4 +246,88 @@ fn rejects_invalid_relation_cardinality() {
     .unwrap_err();
 
     assert!(error.message.contains("invalid cardinality"));
+}
+
+/// Verifies every supported `use` form maps to its explicit AST clause.
+#[test]
+fn parses_namespace_member_and_wildcard_imports() {
+    let program = parse(
+        "use String\n\
+         use String as Str\n\
+         use { replace, lowercase as lower } from String\n\
+         use * from String\n\
+         use * as Text from String\n",
+    )
+    .unwrap();
+
+    let Statement::Use(first) = &program.statements[0] else {
+        panic!("expected a namespace import");
+    };
+    assert_eq!(first.use_span, syntax::Span { start: 0, end: 3 });
+    assert!(matches!(
+        &first.clause,
+        UseClause::Namespace { namespace, alias: None } if namespace.name == "String"
+    ));
+    assert!(matches!(
+        &program.statements[1],
+        Statement::Use(declaration)
+            if matches!(&declaration.clause, UseClause::Namespace {
+                namespace,
+                alias: Some(alias),
+            } if namespace.name == "String" && alias.name == "Str")
+    ));
+    let Statement::Use(members) = &program.statements[2] else {
+        panic!("expected a member import");
+    };
+    let UseClause::Members { namespace, members } = &members.clause else {
+        panic!("expected the members clause");
+    };
+    assert_eq!(namespace.name, "String");
+    assert_eq!(members.len(), 2);
+    assert_eq!(members[0].name.name, "replace");
+    assert_eq!(members[1].alias.as_ref().unwrap().name, "lower");
+    assert!(matches!(
+        &program.statements[3],
+        Statement::Use(declaration)
+            if matches!(&declaration.clause, UseClause::Wildcard { alias: None, .. })
+    ));
+    assert!(matches!(
+        &program.statements[4],
+        Statement::Use(declaration)
+            if matches!(&declaration.clause, UseClause::Wildcard {
+                alias: Some(alias), ..
+            } if alias.name == "Text")
+    ));
+}
+
+/// Verifies a namespace-qualified call retains separate namespace and member spans.
+#[test]
+fn parses_namespace_qualified_calls() {
+    let program = parse("String.replace('a', 'a', 'b')").unwrap();
+    let Statement::Expression(Expression::Call {
+        namespace: Some(namespace),
+        function,
+        ..
+    }) = &program.statements[0]
+    else {
+        panic!("expected a qualified call");
+    };
+    assert_eq!(namespace.name, "String");
+    assert_eq!(namespace.span, syntax::Span { start: 0, end: 6 });
+    assert_eq!(function.name, "replace");
+    assert_eq!(function.span, syntax::Span { start: 7, end: 14 });
+}
+
+/// Verifies malformed import clauses fail at the syntax layer.
+#[test]
+fn rejects_invalid_use_syntax() {
+    for source in [
+        "use",
+        "use {} from String",
+        "use { replace, } from String",
+        "use * String",
+        "use String as",
+    ] {
+        assert!(parse(source).is_err(), "`{source}` should be rejected");
+    }
 }

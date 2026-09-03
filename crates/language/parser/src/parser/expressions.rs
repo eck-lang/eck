@@ -1,8 +1,8 @@
 //! Pratt parsing for expressions, postfix conversions, and calls.
 
 use syntax::{
-    BinaryOperator, ComparisonOperator, Expression, FrameLiteralColumn, LogicalOperator, Span,
-    UnaryOperator,
+    BinaryOperator, ComparisonOperator, Expression, FrameLiteralColumn, LogicalOperator,
+    SourceIdentifier, Span, UnaryOperator,
 };
 
 use crate::{ParseError, lexer::TokenKind};
@@ -12,7 +12,7 @@ use super::Parser;
 impl Parser {
     /// Parses an expression while preserving the legacy Pratt entry point.
     ///
-    /// A zero binding power parses the complete logical-expression grammar.
+    /// A zero-binding power parses the complete logical-expression grammar.
     /// Recursive arithmetic parsing uses nonzero binding powers internally.
     pub(super) fn parse_expression(&mut self, min_bp: u8) -> Result<Expression, ParseError> {
         if min_bp == 0 {
@@ -95,7 +95,7 @@ impl Parser {
                 continue;
             }
             if matches!(&self.peek().kind, TokenKind::Arrow) {
-                left_operand = self.parse_postfix_conversion(left_operand)?;
+                left_operand = self.parse_postfix_arrow(left_operand)?;
                 continue;
             }
 
@@ -141,28 +141,59 @@ impl Parser {
         })
     }
 
-    /// Parses a postfix `->unit` conversion when the cursor is at an arrow.
-    fn parse_postfix_conversion(
-        &mut self,
-        expression: Expression,
-    ) -> Result<Expression, ParseError> {
+    /// Parses a postfix `->unit` conversion or `->function(args)` pipe.
+    fn parse_postfix_arrow(&mut self, expression: Expression) -> Result<Expression, ParseError> {
         self.advance();
         let target_start = self.peek().span.start;
         let target = self
-            .expect_identifier("expected conversion target after `->`")
+            .expect_identifier("expected target after `->`")
             .map_err(|mut error| {
                 error.span.start = target_start;
                 error
             })?;
-        let span = Span {
-            start: expression.span().start,
-            end: self.previous().span.end,
-        };
-        Ok(Expression::Convert {
-            expression: Box::new(expression),
-            target,
-            span,
-        })
+        if matches!(self.peek().kind, TokenKind::LeftParenthesis) {
+            self.expect_simple(TokenKind::LeftParenthesis)?;
+            let mut arguments = Vec::new();
+            if !matches!(self.peek().kind, TokenKind::RightParenthesis) {
+                loop {
+                    arguments.push(self.parse_expression(0)?);
+                    if !matches!(self.peek().kind, TokenKind::Comma) {
+                        break;
+                    }
+                    self.advance();
+                }
+            }
+            let end = self.expect_simple(TokenKind::RightParenthesis)?.span.end;
+            let span = Span {
+                start: expression.span().start,
+                end,
+            };
+            Ok(Expression::Pipe {
+                expression: Box::new(expression),
+                function: target,
+                arguments,
+                span,
+            })
+        } else {
+            let span = Span {
+                start: expression.span().start,
+                end: self.previous().span.end,
+            };
+            Ok(Expression::Convert {
+                expression: Box::new(expression),
+                target,
+                span,
+            })
+        }
+    }
+
+    /// Parses a postfix `->unit` conversion when the cursor is at an arrow.
+    #[allow(dead_code)]
+    fn parse_postfix_conversion(
+        &mut self,
+        expression: Expression,
+    ) -> Result<Expression, ParseError> {
+        self.parse_postfix_arrow(expression)
     }
 
     /// Returns the binary operator and Pratt binding powers at the cursor.
@@ -186,6 +217,10 @@ impl Parser {
             TokenKind::Minus => self.parse_negation(token.span),
             TokenKind::String(value) => Ok(Expression::String {
                 value,
+                span: token.span,
+            }),
+            TokenKind::Regex(raw_text) => Ok(Expression::Regex {
+                raw_text,
                 span: token.span,
             }),
             TokenKind::Boolean(raw_text) => Ok(Expression::Boolean {
@@ -306,14 +341,48 @@ impl Parser {
         span: Span,
         name: String,
     ) -> Result<Expression, ParseError> {
+        let identifier = SourceIdentifier { name, span };
         if matches!(&self.peek().kind, TokenKind::LeftParenthesis) {
-            return self.parse_call(span.start, name);
+            return self.parse_call(None, identifier);
         }
-        Ok(Expression::Variable { name, span })
+        if matches!(&self.peek().kind, TokenKind::Dot)
+            && matches!(
+                self.peek_n(1).map(|token| &token.kind),
+                Some(TokenKind::Ident(_))
+            )
+            && matches!(
+                self.peek_n(2).map(|token| &token.kind),
+                Some(TokenKind::LeftParenthesis)
+            )
+        {
+            self.advance();
+            let function_token = self.advance().clone();
+            let TokenKind::Ident(function_name) = function_token.kind else {
+                unreachable!("qualified call lookahead validated the member identifier")
+            };
+            return self.parse_call(
+                Some(identifier),
+                SourceIdentifier {
+                    name: function_name,
+                    span: function_token.span,
+                },
+            );
+        }
+        Ok(Expression::Variable {
+            name: identifier.name,
+            span,
+        })
     }
 
     /// Parses a comma-separated argument list following a call name.
-    fn parse_call(&mut self, start: usize, name: String) -> Result<Expression, ParseError> {
+    fn parse_call(
+        &mut self,
+        namespace: Option<SourceIdentifier>,
+        function: SourceIdentifier,
+    ) -> Result<Expression, ParseError> {
+        let start = namespace
+            .as_ref()
+            .map_or(function.span.start, |namespace| namespace.span.start);
         self.expect_simple(TokenKind::LeftParenthesis)?;
         let mut arguments = Vec::new();
         if !matches!(&self.peek().kind, TokenKind::RightParenthesis) {
@@ -327,7 +396,8 @@ impl Parser {
         }
         let end = self.expect_simple(TokenKind::RightParenthesis)?.span.end;
         Ok(Expression::Call {
-            name,
+            namespace,
+            function,
             arguments,
             span: Span { start, end },
         })

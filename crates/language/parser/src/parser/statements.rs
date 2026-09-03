@@ -2,8 +2,8 @@
 
 use syntax::{
     Block, ConfigurationEntry, ConfigurationValue, RelationBinding, RelationCardinality,
-    RelationDefinition, RelationRole, RelationRoleBinding, Span, Statement, TypeDefinition,
-    TypeField,
+    RelationDefinition, RelationRole, RelationRoleBinding, SourceIdentifier, Span, Statement,
+    TypeDefinition, TypeField, UseClause, UseDeclaration, UseMember,
 };
 
 use crate::{ParseError, lexer::TokenKind};
@@ -13,6 +13,9 @@ use super::Parser;
 impl Parser {
     /// Dispatches one declaration, control-flow statement, or expression.
     pub(super) fn parse_statement(&mut self) -> Result<Statement, ParseError> {
+        if matches!(&self.peek().kind, TokenKind::Use) {
+            return self.parse_use_declaration();
+        }
         if matches!(&self.peek().kind, TokenKind::Type) {
             return self.parse_type_declaration();
         }
@@ -32,6 +35,90 @@ impl Parser {
             return self.parse_variable_declaration();
         }
         Ok(Statement::Expression(self.parse_expression(0)?))
+    }
+
+    /// Parses a namespace, selective-member, or wildcard `use` declaration.
+    fn parse_use_declaration(&mut self) -> Result<Statement, ParseError> {
+        let use_span = self.advance().span;
+        let clause = match &self.peek().kind {
+            TokenKind::LeftBrace => self.parse_member_use_clause()?,
+            TokenKind::Star => self.parse_wildcard_use_clause()?,
+            TokenKind::Ident(_) => {
+                let namespace = self.parse_source_identifier("expected namespace after `use`")?;
+                let alias = self.parse_optional_alias()?;
+                UseClause::Namespace { namespace, alias }
+            }
+            _ => return Err(self.error_here("expected namespace, `{`, or `*` after `use`")),
+        };
+        let span = Span {
+            start: use_span.start,
+            end: self.previous().span.end,
+        };
+        Ok(Statement::Use(UseDeclaration {
+            clause,
+            use_span,
+            span,
+        }))
+    }
+
+    /// Parses `{ member [as alias], ... } from Namespace`.
+    fn parse_member_use_clause(&mut self) -> Result<UseClause, ParseError> {
+        self.advance();
+        let mut members = Vec::new();
+        if matches!(&self.peek().kind, TokenKind::RightBrace) {
+            return Err(self.error_here("member imports cannot be empty"));
+        }
+        loop {
+            let name = self.parse_source_identifier("expected imported member name")?;
+            let alias = self.parse_optional_alias()?;
+            let span = Span {
+                start: name.span.start,
+                end: alias.as_ref().map_or(name.span.end, |alias| alias.span.end),
+            };
+            members.push(UseMember { name, alias, span });
+            if !matches!(&self.peek().kind, TokenKind::Comma) {
+                break;
+            }
+            self.advance();
+            if matches!(&self.peek().kind, TokenKind::RightBrace) {
+                return Err(self.error_here("expected imported member after `,`"));
+            }
+        }
+        self.expect_simple(TokenKind::RightBrace)?;
+        self.expect_simple(TokenKind::From)?;
+        let namespace = self.parse_source_identifier("expected namespace after `from`")?;
+        Ok(UseClause::Members { namespace, members })
+    }
+
+    /// Parses `* [as Alias] from Namespace`.
+    fn parse_wildcard_use_clause(&mut self) -> Result<UseClause, ParseError> {
+        self.advance();
+        let alias = self.parse_optional_alias()?;
+        self.expect_simple(TokenKind::From)?;
+        let namespace = self.parse_source_identifier("expected namespace after `from`")?;
+        Ok(UseClause::Wildcard { namespace, alias })
+    }
+
+    /// Parses an optional `as Alias` suffix.
+    fn parse_optional_alias(&mut self) -> Result<Option<SourceIdentifier>, ParseError> {
+        if !matches!(&self.peek().kind, TokenKind::As) {
+            return Ok(None);
+        }
+        self.advance();
+        self.parse_source_identifier("expected alias after `as`")
+            .map(Some)
+    }
+
+    /// Consumes one identifier while retaining its exact source span.
+    fn parse_source_identifier(&mut self, message: &str) -> Result<SourceIdentifier, ParseError> {
+        let token = self.advance().clone();
+        match token.kind {
+            TokenKind::Ident(name) => Ok(SourceIdentifier {
+                name,
+                span: token.span,
+            }),
+            _ => Err(self.error_at(token.span, message)),
+        }
     }
 
     /// Parses a TypeScript-like structural row type declaration.
