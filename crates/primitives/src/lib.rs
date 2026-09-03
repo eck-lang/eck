@@ -11,6 +11,7 @@ pub use boolean::BoolExtension;
 pub use decimal::DecimalExtension;
 pub use double::DoubleExtension;
 pub use float::FloatExtension;
+pub use integer::BigintExtension;
 pub use integer::Integer8Extension;
 pub use integer::Integer64Extension;
 pub use integer::IntegerExtension;
@@ -36,6 +37,7 @@ use language_core::{CoreError, Extension, Registry};
 /// ```
 pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     IntegerExtension::new().register(registry)?;
+    BigintExtension::new().register(registry)?;
     FloatExtension.register(registry)?;
     DoubleExtension.register(registry)?;
     DecimalExtension.register(registry)?;
