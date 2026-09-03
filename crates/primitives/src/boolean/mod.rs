@@ -27,6 +27,7 @@ impl Extension for BoolExtension {
             name: "bool",
             parse_numeric_literal: None,
             parse_string_literal: None,
+            parse_regex_literal: None,
             parse_boolean_literal: Some(literal::parse),
             parse_null_literal: None,
             format: formatting::format,

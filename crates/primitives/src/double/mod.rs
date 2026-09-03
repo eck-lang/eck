@@ -27,6 +27,7 @@ impl Extension for DoubleExtension {
             name: "double",
             parse_numeric_literal: Some(literal::parse),
             parse_string_literal: None,
+            parse_regex_literal: None,
             parse_boolean_literal: None,
             parse_null_literal: None,
             format: formatting::format,
