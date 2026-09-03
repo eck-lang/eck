@@ -8,7 +8,7 @@ members = [
   "crates/extensions/*",
   "crates/std/*",
   "crates/cli",
-  "testing/runner",
+  "crates/test-runner",
 ]
 
 [workspace.package]

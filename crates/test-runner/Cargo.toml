@@ -1,0 +1,5 @@
+[package]
+name = "eck-test-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
