@@ -44,6 +44,11 @@ fn narrower_operand(value: &Value) -> Option<i64> {
                 .downcast_ref::<i16>()
                 .map(|integer| i64::from(*integer))
         })
+        .or_else(|| {
+            value
+                .downcast_ref::<i32>()
+                .map(|integer| i64::from(*integer))
+        })
 }
 
 #[cfg(test)]
