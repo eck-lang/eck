@@ -8,6 +8,44 @@ pub(crate) fn get(value: &Value) -> Result<i64, CoreError> {
         .ok_or_else(|| CoreError::InvalidValueRepresentation("int64".into()))
 }
 
+/// Widens a mixed signed-integer pair to `int64` while preserving operand order.
+///
+/// Exactly one operand must use the `i64` representation and the other must use
+/// a narrower signed fixed-width representation. The returned type identifier
+/// belongs to the wider operand and is therefore the statically registered
+/// result type.
+pub(crate) fn mixed_operands(
+    left_operand: &Value,
+    right_operand: &Value,
+) -> Result<(i64, i64, language_core::TypeId), CoreError> {
+    if let Some(left_integer) = left_operand.downcast_ref::<i64>() {
+        if let Some(right_integer) = narrower_operand(right_operand) {
+            return Ok((*left_integer, right_integer, left_operand.type_id()));
+        }
+    }
+    if let Some(right_integer) = right_operand.downcast_ref::<i64>() {
+        if let Some(left_integer) = narrower_operand(left_operand) {
+            return Ok((left_integer, *right_integer, right_operand.type_id()));
+        }
+    }
+
+    Err(CoreError::InvalidValueRepresentation(
+        "narrower signed integer with int64 operands".into(),
+    ))
+}
+
+/// Converts a signed integer narrower than `int64` without loss.
+fn narrower_operand(value: &Value) -> Option<i64> {
+    value
+        .downcast_ref::<i8>()
+        .map(|integer| i64::from(*integer))
+        .or_else(|| {
+            value
+                .downcast_ref::<i16>()
+                .map(|integer| i64::from(*integer))
+        })
+}
+
 #[cfg(test)]
 #[path = "value.tests.rs"]
 mod tests;
