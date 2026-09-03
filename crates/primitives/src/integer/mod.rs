@@ -1,10 +1,12 @@
 pub mod bigint;
+pub mod integer16;
 pub mod integer64;
 pub mod integer8;
 pub mod unsigned_integer64;
 pub mod unsigned_integer8;
 
 pub use bigint::BigintExtension;
+pub use integer16::Integer16Extension;
 pub use integer8::Integer8Extension;
 pub use integer64::Integer64Extension;
 pub use integer64::IntegerExtension;
