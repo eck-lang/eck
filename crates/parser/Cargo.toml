@@ -6,5 +6,5 @@ license.workspace = true
 
 [dependencies]
 logos = "0.16"
-syntax = { package = "eck-syntax", path = "../syntax" }
+syntax = { package = "eck-syntax", path = "../language/syntax" }
 thiserror.workspace = true
