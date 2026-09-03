@@ -32,6 +32,12 @@ enum RawTokenKind {
     One,
     #[token("many")]
     Many,
+    #[token("use")]
+    Use,
+    #[token("as")]
+    As,
+    #[token("from")]
+    From,
 
     #[token(":")]
     Colon,
@@ -108,13 +114,38 @@ enum RawTokenKind {
     SingleQuotedString,
     #[regex(r"`([^`\\]|\\[\s\S])*`")]
     BacktickString,
+    #[regex(r"/(?:[^/\\\n]|\\.)+/[a-zA-Z]*")]
+    Regex,
 }
+
+/// Canonical ECK keyword list – single source of truth for the language.
+///
+/// This mirrors the `RawTokenKind` keyword tokens above and is re-exported by
+/// `eck-dialect` and `eck-parser` so editor tooling does not hardcode a
+/// divergent list. The list includes `@config` with its leading `@`.
+pub const ECK_KEYWORDS: &[&str] = &[
+    "type",
+    "frame",
+    "relation",
+    "on",
+    "one",
+    "many",
+    "use",
+    "as",
+    "from",
+    "@config",
+    "if",
+    "true",
+    "false",
+    "null",
+];
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TokenKind {
     Ident(String),
     Number(String),
     String(String),
+    Regex(String),
     Boolean(String),
     Null,
     Colon,
@@ -148,6 +179,9 @@ pub(crate) enum TokenKind {
     On,
     One,
     Many,
+    Use,
+    As,
+    From,
     Dot,
     AmpersandAmpersand,
     PipePipe,
@@ -205,6 +239,9 @@ fn convert_raw_token(
         RawTokenKind::On => TokenKind::On,
         RawTokenKind::One => TokenKind::One,
         RawTokenKind::Many => TokenKind::Many,
+        RawTokenKind::Use => TokenKind::Use,
+        RawTokenKind::As => TokenKind::As,
+        RawTokenKind::From => TokenKind::From,
         RawTokenKind::Colon => TokenKind::Colon,
         RawTokenKind::Equal => TokenKind::Equal,
         RawTokenKind::EqualEqual => TokenKind::EqualEqual,
@@ -236,6 +273,7 @@ fn convert_raw_token(
         RawTokenKind::DoubleQuotedString => TokenKind::String(decode_string(raw_text, '"', span)?),
         RawTokenKind::SingleQuotedString => TokenKind::String(decode_string(raw_text, '\'', span)?),
         RawTokenKind::BacktickString => TokenKind::String(decode_string(raw_text, '`', span)?),
+        RawTokenKind::Regex => TokenKind::Regex(raw_text.into()),
         RawTokenKind::Boolean => TokenKind::Boolean(raw_text.into()),
         RawTokenKind::Null => TokenKind::Null,
     })
@@ -333,6 +371,15 @@ fn invalid_token_error(source: &str, span: Span) -> ParseError {
     if source[span.start..].starts_with(['"', '\'', '`']) {
         return ParseError {
             message: "unterminated string literal".into(),
+            span: Span {
+                start: span.start,
+                end: source.len(),
+            },
+        };
+    }
+    if source[span.start..].starts_with('/') {
+        return ParseError {
+            message: "unterminated regex literal".into(),
             span: Span {
                 start: span.start,
                 end: source.len(),
