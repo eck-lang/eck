@@ -79,7 +79,6 @@ pub(crate) fn register_mixed_unit_arithmetic(
     finer: SubtypeId,
     coarser_to_finer: Scale,
 ) -> Result<(), CoreError> {
-
     for operator in [
         BinaryOperator::Addition,
         BinaryOperator::Subtraction,

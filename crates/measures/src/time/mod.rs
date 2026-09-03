@@ -1,6 +1,6 @@
 use language_core::{CoreError, Extension, Registry};
 
-use crate::common::{register_dimension, UnitDefinition};
+use crate::common::{UnitDefinition, register_dimension};
 
 /// Registers time units expressed in durations.
 pub struct TimeMeasureExtension;

@@ -82,10 +82,7 @@ fn conversion_to_a_coarser_unit_promotes_integers_to_decimal() {
         .unwrap();
 
     assert_eq!(conversion.scale, Scale::new(1, 1_000_000_000));
-    assert_eq!(
-        conversion.output,
-        ValueType::qualified(decimal, gigahertz)
-    );
+    assert_eq!(conversion.output, ValueType::qualified(decimal, gigahertz));
 }
 
 /// Verifies arithmetic for same units, mixed units and plain scalars.

@@ -45,7 +45,9 @@ fn registers_the_data_measure_extension_and_canonical_suffixes() {
         }
     }
 
-    for suffix in ["kb", "mb", "gb", "tb", "pb", "kib", "mib", "gib", "tib", "pib", "KBs", "kB"] {
+    for suffix in [
+        "kb", "mb", "gb", "tb", "pb", "kib", "mib", "gib", "tib", "pib", "KBs", "kB",
+    ] {
         assert_eq!(registry.subtype_by_suffix(suffix), None);
     }
 }
@@ -61,10 +63,8 @@ fn every_metric_pair_converts_to_the_finer_unit() {
         for finer in &UNITS[index + 1..] {
             let coarser_id = registry.subtype_by_suffix(coarser.suffixes[0]).unwrap();
             let finer_id = registry.subtype_by_suffix(finer.suffixes[0]).unwrap();
-            let divisor = greatest_common_divisor(
-                coarser.units_per_smallest,
-                finer.units_per_smallest,
-            );
+            let divisor =
+                greatest_common_divisor(coarser.units_per_smallest, finer.units_per_smallest);
             let expected_scale = Scale::new(
                 coarser.units_per_smallest / divisor,
                 finer.units_per_smallest / divisor,
