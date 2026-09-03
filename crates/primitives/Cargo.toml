@@ -6,4 +6,5 @@ license.workspace = true
 
 [dependencies]
 language_core = { package = "eck-core", path = "../language/core" }
+regex.workspace = true
 rust_decimal.workspace = true

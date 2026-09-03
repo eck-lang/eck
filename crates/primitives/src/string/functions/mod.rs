@@ -9,96 +9,141 @@ use language_core::{CoreError, FunctionSignature, Registry, TypeId};
 use self::{
     case::{capitalize, lowercase, title, uppercase},
     padding::{pad_end, pad_start},
-    replace::{remove, replace},
+    replace::{remove, replace, replace_regex},
     transform::repeat,
     whitespace::{normalize_space, trim, trim_end, trim_start},
 };
 
-/// Registers string transformation functions that are invoked via the `->` pipe.
+/// Registers String namespace transformations used by imports, calls, and pipes.
 pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(), CoreError> {
-    registry.register_function(
-        "uppercase",
+    register_function(
+        registry,
+        "String.uppercase",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         uppercase,
     )?;
-    registry.register_function(
-        "lowercase",
+    register_function(
+        registry,
+        "String.lowercase",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         lowercase,
     )?;
-    registry.register_function(
-        "trim",
+    register_function(
+        registry,
+        "String.trim",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         trim,
     )?;
-    registry.register_function(
-        "trim_start",
+    register_function(
+        registry,
+        "String.trim_start",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         trim_start,
     )?;
-    registry.register_function(
-        "trim_end",
+    register_function(
+        registry,
+        "String.trim_end",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         trim_end,
     )?;
 
-    registry.register_function(
-        "capitalize",
+    register_function(
+        registry,
+        "String.capitalize",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         capitalize,
     )?;
-    registry.register_function(
-        "title",
+    register_function(
+        registry,
+        "String.title",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         title,
     )?;
-    registry.register_function(
-        "normalize_space",
+    register_function(
+        registry,
+        "String.normalize_space",
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         normalize_space,
     )?;
-    registry.register_function(
-        "replace",
+    register_function(
+        registry,
+        "String.replace",
         FunctionSignature::Exact(vec![string_type, string_type, string_type]),
         Some(string_type),
         replace,
     )?;
-    registry.register_function(
-        "remove",
+    register_function(
+        registry,
+        "String.remove",
         FunctionSignature::Exact(vec![string_type, string_type]),
         Some(string_type),
         remove,
     )?;
 
+    if let Some(regex_type) = registry.type_by_name("regex") {
+        register_function(
+            registry,
+            "String.replace",
+            FunctionSignature::Exact(vec![string_type, regex_type, string_type]),
+            Some(string_type),
+            replace_regex,
+        )?;
+    }
+
     if let Some(integer_type) = registry.type_by_name("int") {
-        registry.register_function(
-            "pad_start",
+        register_function(
+            registry,
+            "String.pad_start",
             FunctionSignature::Exact(vec![string_type, integer_type, string_type]),
             Some(string_type),
             pad_start,
         )?;
-        registry.register_function(
-            "pad_end",
+        register_function(
+            registry,
+            "String.pad_end",
             FunctionSignature::Exact(vec![string_type, integer_type, string_type]),
             Some(string_type),
             pad_end,
         )?;
-        registry.register_function(
-            "repeat",
+        register_function(
+            registry,
+            "String.repeat",
             FunctionSignature::Exact(vec![string_type, integer_type]),
             Some(string_type),
             repeat,
         )?;
     }
 
+    Ok(())
+}
+
+/// Registers one canonical native function and exports its family from `String`.
+fn register_function(
+    registry: &mut Registry,
+    function_name: &'static str,
+    signature: FunctionSignature,
+    output: Option<TypeId>,
+    execute: language_core::NativeFunction,
+) -> Result<(), CoreError> {
+    let member = function_name
+        .strip_prefix("String.")
+        .expect("String function names must use their canonical namespace prefix");
+    registry.register_function(function_name, signature, output, execute)?;
+    match registry.namespace_symbol("String", member) {
+        Ok(_) => {}
+        Err(CoreError::UnknownNamespaceMember { .. }) => {
+            registry.export_namespace_function("String", member, function_name)?;
+        }
+        Err(error) => return Err(error),
+    }
     Ok(())
 }
 

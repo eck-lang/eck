@@ -22,6 +22,7 @@ impl Extension for NullExtension {
             name: "null",
             parse_numeric_literal: None,
             parse_string_literal: None,
+            parse_regex_literal: None,
             parse_boolean_literal: None,
             parse_null_literal: Some(literal::parse),
             format: formatting::format,

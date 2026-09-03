@@ -25,6 +25,7 @@ impl Extension for StringExtension {
             name: "string",
             parse_numeric_literal: None,
             parse_string_literal: Some(literal::parse),
+            parse_regex_literal: None,
             parse_boolean_literal: None,
             parse_null_literal: None,
             format: formatting::format,
@@ -32,12 +33,13 @@ impl Extension for StringExtension {
         registry.set_default_string(string_type)?;
         operations::register(registry, string_type)?;
         comparisons::register(registry)?;
-        registry.register_function(
+        registry.register_global_function(
             "string",
             FunctionSignature::AnySingle,
             Some(string_type),
             conversion::format_as_string,
         )?;
+        registry.register_namespace("String", Some(string_type))?;
         functions::register(registry, string_type)?;
         Ok(())
     }

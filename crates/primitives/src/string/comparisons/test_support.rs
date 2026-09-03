@@ -9,6 +9,7 @@ pub(super) fn register_string_type(registry: &mut Registry) {
             name: "string",
             parse_numeric_literal: None,
             parse_string_literal: None,
+            parse_regex_literal: None,
             parse_boolean_literal: None,
             parse_null_literal: None,
             format: format_value,
