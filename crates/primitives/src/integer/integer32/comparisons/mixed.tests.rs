@@ -2,12 +2,11 @@ use super::*;
 
 /// Verifies every narrower representation compares exactly in both source orders.
 #[test]
-fn compares_promoted_integer64_operands() {
-    let wide = Value::new(crate::integer::integer64::test_type_id(), i64::MAX);
+fn compares_promoted_integer32_operands() {
+    let wide = Value::new(crate::integer::integer32::test_type_id(), i32::MAX);
     for narrow in [
         Value::new(crate::integer::integer8::test_type_id(), i8::MIN),
         Value::new(crate::integer::integer16::test_type_id(), i16::MIN),
-        Value::new(crate::integer::integer32::test_type_id(), i32::MIN),
     ] {
         assert!(less(&narrow, &wide).unwrap());
         assert!(greater(&wide, &narrow).unwrap());

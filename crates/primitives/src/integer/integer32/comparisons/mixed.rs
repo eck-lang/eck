@@ -3,14 +3,14 @@ use std::cmp::Ordering;
 use language_core::{ComparisonExecutor, ComparisonOperator, CoreError, Registry, Value};
 
 use super::{declare_pair, evaluate};
-use crate::integer::integer64::value::mixed_operands;
+use crate::integer::integer32::value::mixed_operands;
 
-/// Declares mixed comparisons with an `int64` operand in both operand orders.
+/// Declares mixed comparisons with an `int32` operand in both operand orders.
 pub(super) fn register(registry: &mut Registry) -> Result<(), CoreError> {
-    for narrower_type_name in ["int8", "int16", "int32"] {
+    for narrower_type_name in ["int8", "int16"] {
         let executors = executors();
-        declare_pair(registry, narrower_type_name, "int64", executors)?;
-        declare_pair(registry, "int64", narrower_type_name, executors)?;
+        declare_pair(registry, narrower_type_name, "int32", executors)?;
+        declare_pair(registry, "int32", narrower_type_name, executors)?;
     }
     Ok(())
 }
@@ -27,7 +27,7 @@ fn executors() -> [ComparisonExecutor; 6] {
     ]
 }
 
-/// Produces the exact ordering after promoting the narrower integer to `int64`.
+/// Produces the exact ordering after promoting the narrower integer to `int32`.
 fn compare(left_operand: &Value, right_operand: &Value) -> Result<Ordering, CoreError> {
     let (left_operand, right_operand, _) = mixed_operands(left_operand, right_operand)?;
     Ok(left_operand.cmp(&right_operand))
