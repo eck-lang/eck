@@ -1,0 +1,16 @@
+# Float power with a float exponent
+
+Raises 2.0 to the 2.0 power with both operands annotated as float to
+verify same-type exponentiation, producing 4.
+
+>>> source
+base: float = 2.0
+exponent: float = 2.0
+
+power: float = base ** exponent
+print(power)
+
+<<< stdout
+4
+
+<<< stderr

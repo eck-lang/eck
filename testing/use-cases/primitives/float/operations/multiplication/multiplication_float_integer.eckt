@@ -1,0 +1,22 @@
+# Float multiplication with integer operands
+
+Multiplies 7 by 1.5 in both operand orders to verify the integer is
+promoted and the result stays a float, producing 10.5 either way.
+
+>>> source
+integer_left: int = 7
+float_left: float = 1.5
+
+// Verifies the Int-to-Float promotion.
+integer_times_float: float = integer_left * float_left
+print(integer_times_float)
+
+// Verifies the same promotion with the operand order reversed.
+float_times_integer: float = float_left * integer_left
+print(float_times_integer)
+
+<<< stdout
+10.5
+10.5
+
+<<< stderr

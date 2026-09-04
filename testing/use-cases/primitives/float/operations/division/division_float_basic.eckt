@@ -1,0 +1,16 @@
+# Float division of exactly representable values
+
+Divides 3.0 by 1.5 to verify native single-precision division for values
+exactly representable in f32, producing 2.
+
+>>> source
+float_left: float = 1.5
+float_right: float = 3.0
+
+float_quotient: float = float_right / float_left
+print(float_quotient)
+
+<<< stdout
+2
+
+<<< stderr

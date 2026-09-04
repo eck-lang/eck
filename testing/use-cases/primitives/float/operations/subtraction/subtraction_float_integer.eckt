@@ -1,0 +1,23 @@
+# Float subtraction with integer operands
+
+Subtracts 1.5 from 7 in both operand orders to verify the integer is
+promoted and the result stays a float whose sign follows the operand
+order, producing 5.5 and -5.5.
+
+>>> source
+integer_left: int = 7
+float_left: float = 1.5
+
+// Verifies the Int-to-Float promotion.
+integer_minus_float: float = integer_left - float_left
+print(integer_minus_float)
+
+// Verifies the same promotion with the operand order reversed.
+float_minus_integer: float = float_left - integer_left
+print(float_minus_integer)
+
+<<< stdout
+5.5
+-5.5
+
+<<< stderr

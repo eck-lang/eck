@@ -1,0 +1,16 @@
+# Float multiplication of exactly representable values
+
+Multiplies 2.25 by 1.5 to verify native single-precision multiplication
+for values exactly representable in f32, producing 3.375.
+
+>>> source
+float_left: float = 1.5
+float_right: float = 2.25
+
+float_product: float = float_right * float_left
+print(float_product)
+
+<<< stdout
+3.375
+
+<<< stderr
