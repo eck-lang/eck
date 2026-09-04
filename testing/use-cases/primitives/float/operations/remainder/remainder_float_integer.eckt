@@ -1,0 +1,25 @@
+# Float remainder with integer operands
+
+Takes 10.5 modulo 3 in both operand orders to verify the integer is
+promoted and the result stays a float, producing 1.5 when the float is
+the dividend and 1 when the integer is the dividend.
+
+>>> source
+float_value: float = 10.5
+integer_divisor: int = 3
+integer_dividend: int = 10
+float_divisor: float = 3
+
+// Verifies the Int-to-Float promotion with the float dividend first.
+float_remainder: float = float_value % integer_divisor
+print(float_remainder)
+
+// Verifies the same promotion with the operand order reversed.
+integer_remainder: float = integer_dividend % float_divisor
+print(integer_remainder)
+
+<<< stdout
+1.5
+1
+
+<<< stderr

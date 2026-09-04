@@ -1,0 +1,25 @@
+# Float power with integer operands
+
+Raises a float 2.0 to the integer 10th power to verify the integer
+exponent keeps a float result, producing 1024, then raises an integer 2
+to a float 2.0 power to verify the base is promoted and still returns a
+float, producing 4.
+
+>>> source
+integer_base: int = 2
+integer_exponent: int = 10
+float_base: float = 2.0
+
+// Verifies a Float base with an Int exponent.
+float_power: float = float_base ** integer_exponent
+print(float_power)
+
+// Verifies an Int base with a Float exponent promotes the base and returns Float.
+integer_power: float = integer_base ** float_base
+print(integer_power)
+
+<<< stdout
+1024
+4
+
+<<< stderr

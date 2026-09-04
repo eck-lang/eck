@@ -1,0 +1,22 @@
+# Float addition with integer operands
+
+Adds 7 to 1.5 in both operand orders to verify the integer is promoted
+and the result stays a float, producing 8.5 either way.
+
+>>> source
+integer_left: int = 7
+float_left: float = 1.5
+
+// Verifies the Int-to-Float promotion.
+integer_plus_float: float = integer_left + float_left
+print(integer_plus_float)
+
+// Verifies the same promotion with the operand order reversed.
+float_plus_integer: float = float_left + integer_left
+print(float_plus_integer)
+
+<<< stdout
+8.5
+8.5
+
+<<< stderr

@@ -1,0 +1,26 @@
+# Float division with integer operands
+
+Divides 7 by 1.5 and 3.0 by 2 to verify the integer is promoted and the
+result keeps single-precision representation in both operand orders,
+producing 4.6666665 and 1.5.
+
+>>> source
+integer_left: int = 7
+integer_right: int = 2
+float_left: float = 1.5
+float_right: float = 3.0
+
+// Verifies the Int-to-Float promotion. The f32 result carries the expected
+// single-precision representation.
+integer_divided_by_float: float = integer_left / float_left
+print(integer_divided_by_float)
+
+// Verifies the same promotion with the operand order reversed.
+float_divided_by_integer: float = float_right / integer_right
+print(float_divided_by_integer)
+
+<<< stdout
+4.6666665
+1.5
+
+<<< stderr
