@@ -1,0 +1,18 @@
+# Bigint addition of large values
+
+Adds two 30-digit values to verify arbitrary precision addition far beyond
+64 bits, producing 1111111110111111111011111111100 without any overflow
+limit.
+
+>>> source
+first: bigint = 123456789012345678901234567890
+second: bigint = 987654321098765432109876543210
+
+// Verifies addition of two very large positive values.
+total: bigint = first + second
+print(total)
+
+<<< stdout
+1111111110111111111011111111100
+
+<<< stderr

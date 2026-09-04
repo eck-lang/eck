@@ -1,0 +1,17 @@
+# Bigint multiplication of large values
+
+Multiplies two 30-digit values to verify arbitrary precision
+multiplication far beyond 64 bits, producing the full 60-digit product
+without any overflow limit.
+
+>>> source
+first: bigint = 123456789012345678901234567890
+second: bigint = 987654321098765432109876543210
+
+product: bigint = first * second
+print(product)
+
+<<< stdout
+121932631137021795226185032733622923332237463801111263526900
+
+<<< stderr

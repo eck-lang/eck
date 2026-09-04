@@ -1,0 +1,21 @@
+# Bigint values beyond 128 bits
+
+Binds the values one past `i128::MAX` and `i128::MIN` to verify bigint
+literals have no 128-bit size limit. Both parse directly into arbitrary
+precision without an intermediate fixed-width conversion.
+
+>>> source
+above: bigint = 170141183460469231731687303715884105728
+below: bigint = -170141183460469231731687303715884105729
+
+// Verifies a positive value one past the 128-bit maximum.
+print(above)
+
+// Verifies a negative value one past the 128-bit minimum.
+print(below)
+
+<<< stdout
+170141183460469231731687303715884105728
+-170141183460469231731687303715884105729
+
+<<< stderr

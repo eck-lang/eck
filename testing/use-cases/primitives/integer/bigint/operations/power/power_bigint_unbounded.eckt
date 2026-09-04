@@ -1,0 +1,17 @@
+# Bigint power without overflow limit
+
+Raises 2 to the 130th power to verify exponentiation produces a 40-digit
+result far beyond 128 bits. The exponent is bigint as well: the type has
+no mixed-type operations.
+
+>>> source
+base: bigint = 2
+exponent: bigint = 130
+
+power: bigint = base ** exponent
+print(power)
+
+<<< stdout
+1361129467683753853853498429727072845824
+
+<<< stderr

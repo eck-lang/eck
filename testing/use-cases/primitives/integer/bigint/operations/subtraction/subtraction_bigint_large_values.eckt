@@ -1,0 +1,19 @@
+# Bigint subtraction of large values
+
+Subtracts the smaller 30-digit value from the larger one to verify
+arbitrary precision subtraction far beyond 64 bits, producing the full
+positive difference 864197532086419753208641975320 without any overflow
+limit.
+
+>>> source
+first: bigint = 123456789012345678901234567890
+second: bigint = 987654321098765432109876543210
+
+// Verifies subtraction reaching a very large positive difference.
+difference: bigint = second - first
+print(difference)
+
+<<< stdout
+864197532086419753208641975320
+
+<<< stderr
