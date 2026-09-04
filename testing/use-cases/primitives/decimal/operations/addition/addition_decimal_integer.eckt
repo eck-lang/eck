@@ -1,0 +1,22 @@
+# Decimal addition with integer operands
+
+Adds 1.20 and 5 in both operand orders to verify the integer is promoted
+and the result stays an exact decimal, producing 6.20 either way.
+
+>>> source
+decimal_left: decimal = 1.20
+integer_right: int = 5
+
+// Verifies the Decimal/Int promotion with the decimal operand first.
+decimal_plus_integer: decimal = decimal_left + integer_right
+print(decimal_plus_integer)
+
+// Verifies the same promotion with the operand order reversed.
+integer_plus_decimal: decimal = integer_right + decimal_left
+print(integer_plus_decimal)
+
+<<< stdout
+6.20
+6.20
+
+<<< stderr

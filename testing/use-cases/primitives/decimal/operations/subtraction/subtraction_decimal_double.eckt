@@ -1,0 +1,23 @@
+# Decimal subtraction with double operands
+
+Subtracts 2.25 from 2.30 in both operand orders to verify the f64 value
+converts into an exact decimal result whose sign follows the operand
+order, producing 0.05 and -0.05.
+
+>>> source
+double_right: double = 2.25
+decimal_left: decimal = 2.30
+
+// Verifies the Decimal/Double conversion.
+decimal_minus_double: decimal = decimal_left - double_right
+print(decimal_minus_double)
+
+// Verifies the same conversion with the operand order reversed.
+double_minus_decimal: decimal = double_right - decimal_left
+print(double_minus_decimal)
+
+<<< stdout
+0.05
+-0.05
+
+<<< stderr

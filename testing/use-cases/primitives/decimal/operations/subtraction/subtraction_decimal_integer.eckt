@@ -1,0 +1,23 @@
+# Decimal subtraction with integer operands
+
+Subtracts 5 from 2.30 in both operand orders to verify the integer is
+promoted and the result stays an exact decimal whose sign follows the
+operand order, producing -2.70 and 2.70.
+
+>>> source
+integer_right: int = 5
+decimal_left: decimal = 2.30
+
+// Verifies the Decimal/Int promotion.
+decimal_minus_integer: decimal = decimal_left - integer_right
+print(decimal_minus_integer)
+
+// Verifies the same promotion with the operand order reversed.
+integer_minus_decimal: decimal = integer_right - decimal_left
+print(integer_minus_decimal)
+
+<<< stdout
+-2.70
+2.70
+
+<<< stderr

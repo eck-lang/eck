@@ -1,0 +1,16 @@
+# Decimal power with a decimal exponent
+
+Raises 2 to the 10th power with both operands annotated as decimal to
+verify same-type exponentiation stays exact, producing 1024.
+
+>>> source
+base: decimal = 2
+exponent: decimal = 10
+
+power: decimal = base ** exponent
+print(power)
+
+<<< stdout
+1024
+
+<<< stderr

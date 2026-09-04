@@ -1,0 +1,22 @@
+# Decimal multiplication with float operands
+
+Multiplies 1.20 by 1.5 in both operand orders to verify the f32 value
+converts into an exact decimal result, producing 1.800 either way.
+
+>>> source
+float_left: float = 1.5
+decimal_left: decimal = 1.20
+
+// Verifies the Decimal/Float conversion.
+decimal_times_float: decimal = decimal_left * float_left
+print(decimal_times_float)
+
+// Verifies the same conversion with the operand order reversed.
+float_times_decimal: decimal = float_left * decimal_left
+print(float_times_decimal)
+
+<<< stdout
+1.800
+1.800
+
+<<< stderr

@@ -1,0 +1,22 @@
+# Decimal division with double operands
+
+Divides 7 by 2.25 in both operand orders to verify the f64 value converts
+into a decimal result. Both quotients display truncated to four fractional
+digits, producing 3.1111 and 0.3214.
+
+>>> source
+double_value: double = 2.25
+dividend: decimal = 7
+
+decimal_divided_by_double: decimal = dividend / double_value
+print(decimal_divided_by_double)
+
+// Verifies the same conversion with the operand order reversed.
+double_divided_by_decimal: decimal = double_value / dividend
+print(double_divided_by_decimal)
+
+<<< stdout
+3.1111
+0.3214
+
+<<< stderr

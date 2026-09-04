@@ -1,0 +1,13 @@
+# Exact decimal multiplication of tenths
+
+Multiplies 0.1 by 0.2 to verify fractions that binary floating-point
+cannot represent multiply exactly in decimal, producing 0.02.
+
+>>> source
+exact_product: decimal = 0.1 * 0.2
+print(exact_product)
+
+<<< stdout
+0.02
+
+<<< stderr

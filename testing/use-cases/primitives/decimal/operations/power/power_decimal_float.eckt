@@ -1,0 +1,25 @@
+# Decimal power with float operands
+
+Raises 2 to the 2nd power with the exponent and base swapped between
+decimal and float to verify the f32 value converts into an exact decimal
+result in both operand orders, producing 4 either way.
+
+>>> source
+float_base: float = 2.0
+decimal_base: decimal = 2
+float_exponent: float = 2.0
+decimal_exponent: decimal = 2
+
+// Verifies a Decimal base with a Float exponent.
+decimal_power: decimal = decimal_base ** float_exponent
+print(decimal_power)
+
+// Verifies a Float base with a Decimal exponent promotes the base and returns Decimal.
+float_power: decimal = float_base ** decimal_exponent
+print(float_power)
+
+<<< stdout
+4
+4
+
+<<< stderr
