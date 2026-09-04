@@ -54,7 +54,10 @@ impl Drop for TemporaryCaseDirectory {
 }
 
 /// Discovers, parses, and executes the `.eckt` test cases below the given
-/// roots, returning true when every test passes.
+/// roots, returning true when every executed test passes.
+///
+/// Stops after the first failure so a broken case interrupts the run instead
+/// of letting later cases continue.
 pub(crate) fn execute_language_tests(
     search_roots: &[PathBuf],
     eck_binary: &Path,
@@ -65,23 +68,26 @@ pub(crate) fn execute_language_tests(
     }
 
     let project_root = project_root();
+    let mut passed_count = 0;
     let mut failure_count = 0;
 
     for (case_number, test_path) in test_paths.iter().enumerate() {
         let display_path = test_path.strip_prefix(&project_root).unwrap_or(test_path);
         match execute_test_path(test_path, eck_binary, case_number) {
-            Ok(title) => println!("[PASS] {} — {title}", display_path.display()),
+            Ok(title) => {
+                println!("[PASS] {} — {title}", display_path.display());
+                passed_count += 1;
+            }
             Err(failure) => {
                 eprintln!("[FAIL] {}", display_path.display());
                 for line in failure.lines() {
                     eprintln!("  {line}");
                 }
                 failure_count += 1;
+                break;
             }
         }
     }
-
-    let passed_count = test_paths.len() - failure_count;
     println!(
         "\n{passed_count} passed; {failure_count} failed; {} total",
         test_paths.len()
