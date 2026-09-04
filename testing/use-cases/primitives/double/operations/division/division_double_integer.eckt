@@ -1,0 +1,24 @@
+# Double division with integer operands
+
+Divides 7 by 2.25 in both operand orders to verify the integer is
+promoted and the result keeps full double-precision representation,
+producing 3.111111111111111 and 0.32142857142857145.
+
+>>> source
+integer_left: int = 7
+double_value: double = 2.25
+
+// Verifies the Int-to-Double promotion. The f64 result carries the expected
+// double-precision representation.
+integer_divided_by_double: double = integer_left / double_value
+print(integer_divided_by_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_divided_by_integer: double = double_value / integer_left
+print(double_divided_by_integer)
+
+<<< stdout
+3.111111111111111
+0.32142857142857145
+
+<<< stderr

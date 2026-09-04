@@ -1,0 +1,25 @@
+# Double power with integer operands
+
+Raises a double 2.0 to the integer 10th power to verify the integer
+exponent keeps a double result, producing 1024, then raises an integer 2
+to a double 2.0 power to verify the base is promoted and still returns a
+double, producing 4.
+
+>>> source
+integer_base: int = 2
+integer_exponent: int = 10
+double_base: double = 2.0
+
+// Verifies a Double base with an Int exponent.
+double_power: double = double_base ** integer_exponent
+print(double_power)
+
+// Verifies an Int base with a Double exponent promotes the base and returns Double.
+integer_power: double = integer_base ** double_base
+print(integer_power)
+
+<<< stdout
+1024
+4
+
+<<< stderr

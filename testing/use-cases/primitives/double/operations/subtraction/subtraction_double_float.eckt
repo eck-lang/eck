@@ -1,0 +1,24 @@
+# Double subtraction with float operands
+
+Subtracts 1.5 from 2.25 in both operand orders with the types swapped
+between float and double to verify the float operand is promoted and the
+result stays a double whose sign follows the operand order, producing
+0.75 and -0.75.
+
+>>> source
+float_value: float = 2.25
+double_value: double = 1.5
+
+// Verifies the Float-to-Double promotion.
+float_minus_double: double = float_value - double_value
+print(float_minus_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_minus_float: double = double_value - float_value
+print(double_minus_float)
+
+<<< stdout
+0.75
+-0.75
+
+<<< stderr

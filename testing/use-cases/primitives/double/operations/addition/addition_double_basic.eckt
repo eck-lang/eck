@@ -1,0 +1,16 @@
+# Double addition of exactly representable values
+
+Adds 1.5 and 2.25 to verify native double-precision addition for values
+exactly representable in f64, producing 3.75.
+
+>>> source
+double_left: double = 1.5
+double_right: double = 2.25
+
+double_sum: double = double_left + double_right
+print(double_sum)
+
+<<< stdout
+3.75
+
+<<< stderr

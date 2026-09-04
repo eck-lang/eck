@@ -1,0 +1,16 @@
+# Double power with a double exponent
+
+Raises 2.0 to the 2.0 power with both operands annotated as double to
+verify same-type exponentiation, producing 4.
+
+>>> source
+base: double = 2.0
+exponent: double = 2.0
+
+power: double = base ** exponent
+print(power)
+
+<<< stdout
+4
+
+<<< stderr
