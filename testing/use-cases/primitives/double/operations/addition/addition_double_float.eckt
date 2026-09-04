@@ -1,0 +1,25 @@
+# Double addition with float operands
+
+Adds 1.5 and 2.25 in both operand orders with the types swapped between
+float and double to verify the float operand is promoted and the result
+stays a double, producing 3.75 either way.
+
+>>> source
+float_left: float = 1.5
+double_right: double = 2.25
+double_left: double = 1.5
+float_right: float = 2.25
+
+// Verifies the Float-to-Double promotion.
+float_plus_double: double = float_left + double_right
+print(float_plus_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_plus_float: double = double_left + float_right
+print(double_plus_float)
+
+<<< stdout
+3.75
+3.75
+
+<<< stderr

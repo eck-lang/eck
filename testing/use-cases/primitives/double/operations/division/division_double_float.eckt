@@ -1,0 +1,24 @@
+# Double division with float operands
+
+Divides 3.0 by 1.5 and 2.25 by 3.0 with the types swapped between float
+and double to verify the float operand is promoted and the result stays
+a double, producing 2 and 0.75.
+
+>>> source
+float_value: float = 3.0
+double_value: double = 1.5
+double_dividend: double = 2.25
+float_divisor: float = 3.0
+
+float_divided_by_double: double = float_value / double_value
+print(float_divided_by_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_divided_by_float: double = double_dividend / float_divisor
+print(double_divided_by_float)
+
+<<< stdout
+2
+0.75
+
+<<< stderr

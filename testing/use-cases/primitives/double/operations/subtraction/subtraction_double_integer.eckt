@@ -1,0 +1,23 @@
+# Double subtraction with integer operands
+
+Subtracts 2.25 from 7 in both operand orders to verify the integer is
+promoted and the result stays a double whose sign follows the operand
+order, producing 4.75 and -4.75.
+
+>>> source
+integer_left: int = 7
+double_value: double = 2.25
+
+// Verifies the Int-to-Double promotion.
+integer_minus_double: double = integer_left - double_value
+print(integer_minus_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_minus_integer: double = double_value - integer_left
+print(double_minus_integer)
+
+<<< stdout
+4.75
+-4.75
+
+<<< stderr

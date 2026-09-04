@@ -1,0 +1,24 @@
+# Double addition with integer operands
+
+Adds 7 to a double in both operand orders to verify the integer is
+promoted and the result stays a double, producing 9.25 when the integer
+comes first and 8.5 when the double comes first.
+
+>>> source
+integer_left: int = 7
+double_right: double = 2.25
+double_left: double = 1.5
+
+// Verifies the Int-to-Double promotion.
+integer_plus_double: double = integer_left + double_right
+print(integer_plus_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_plus_integer: double = double_left + integer_left
+print(double_plus_integer)
+
+<<< stdout
+9.25
+8.5
+
+<<< stderr

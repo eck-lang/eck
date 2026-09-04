@@ -1,0 +1,24 @@
+# Double remainder of double operands
+
+Takes 10.5 modulo 3 to verify the fractional remainder, producing 1.5.
+A negative dividend verifies the remainder keeps the dividend sign,
+producing -1.5.
+
+>>> source
+dividend: double = 10.5
+divisor: double = 3
+negative_dividend: double = -10.5
+
+// Verifies the remainder of two positive doubles.
+positive_remainder: double = dividend % divisor
+print(positive_remainder)
+
+// Verifies the remainder takes the dividend sign.
+negative_remainder: double = negative_dividend % divisor
+print(negative_remainder)
+
+<<< stdout
+1.5
+-1.5
+
+<<< stderr

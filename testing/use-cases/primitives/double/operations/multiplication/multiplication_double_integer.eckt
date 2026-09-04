@@ -1,0 +1,22 @@
+# Double multiplication with integer operands
+
+Multiplies 7 by 2.25 in both operand orders to verify the integer is
+promoted and the result stays a double, producing 15.75 either way.
+
+>>> source
+integer_left: int = 7
+double_value: double = 2.25
+
+// Verifies the Int-to-Double promotion.
+integer_times_double: double = integer_left * double_value
+print(integer_times_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_times_integer: double = double_value * integer_left
+print(double_times_integer)
+
+<<< stdout
+15.75
+15.75
+
+<<< stderr

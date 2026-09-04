@@ -1,0 +1,24 @@
+# Double multiplication with float operands
+
+Multiplies 2.25 by 1.5 in both operand orders with the types swapped
+between float and double to verify the float operand is promoted and the
+result stays a double, producing 3.375 either way.
+
+>>> source
+float_value: float = 2.25
+double_value: double = 1.5
+double_first: double = 2.25
+float_second: float = 1.5
+
+float_times_double: double = float_value * double_value
+print(float_times_double)
+
+// Verifies the same promotion with the operand order reversed.
+double_times_float: double = double_first * float_second
+print(double_times_float)
+
+<<< stdout
+3.375
+3.375
+
+<<< stderr

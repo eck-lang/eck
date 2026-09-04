@@ -1,0 +1,25 @@
+# Double remainder with float operands
+
+Takes 10.5 modulo 3 in both operand orders with the types swapped between
+float and double to verify the float operand is promoted and the result
+stays a double, producing 1.5 either way.
+
+>>> source
+double_dividend: double = 10.5
+float_divisor: float = 3
+float_dividend: float = 10.5
+double_divisor: double = 3
+
+// Verifies the Float-to-Double promotion.
+double_remainder: double = double_dividend % float_divisor
+print(double_remainder)
+
+// Verifies the same promotion with the operand order reversed.
+float_remainder: double = float_dividend % double_divisor
+print(float_remainder)
+
+<<< stdout
+1.5
+1.5
+
+<<< stderr

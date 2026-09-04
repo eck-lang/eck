@@ -1,0 +1,16 @@
+# Double division of exactly representable values
+
+Divides 2.25 by 1.5 to verify native double-precision division for values
+exactly representable in f64, producing 1.5.
+
+>>> source
+double_left: double = 2.25
+double_right: double = 1.5
+
+double_quotient: double = double_left / double_right
+print(double_quotient)
+
+<<< stdout
+1.5
+
+<<< stderr
