@@ -1,0 +1,23 @@
+# Decimal subtraction with float operands
+
+Subtracts 1.5 from 2.30 in both operand orders to verify the f32 value
+converts into an exact decimal result whose sign follows the operand
+order, producing 0.80 and -0.80.
+
+>>> source
+float_left: float = 1.5
+decimal_left: decimal = 2.30
+
+// Verifies the Decimal/Float conversion.
+decimal_minus_float: decimal = decimal_left - float_left
+print(decimal_minus_float)
+
+// Verifies the same conversion with the operand order reversed.
+float_minus_decimal: decimal = float_left - decimal_left
+print(float_minus_decimal)
+
+<<< stdout
+0.80
+-0.80
+
+<<< stderr

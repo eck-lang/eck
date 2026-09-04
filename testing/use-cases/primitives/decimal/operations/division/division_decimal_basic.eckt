@@ -1,0 +1,16 @@
+# Decimal division preserves display precision
+
+Divides 7 by 2 as decimals to verify that a fractional quotient is formatted
+to the default two-decimal display scale, producing 3.50.
+
+>>> source
+dividend: decimal = 7
+divisor: decimal = 2
+
+decimal_quotient: decimal = dividend / divisor
+print(decimal_quotient)
+
+<<< stdout
+3.50
+
+<<< stderr

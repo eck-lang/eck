@@ -1,0 +1,22 @@
+# Decimal multiplication with double operands
+
+Multiplies 1.20 by 2.25 in both operand orders to verify the f64 value
+converts into an exact decimal result, producing 2.7000 either way.
+
+>>> source
+double_value: double = 2.25
+decimal_left: decimal = 1.20
+
+// Verifies the Decimal/Double conversion with the double operand first.
+double_times_decimal: decimal = double_value * decimal_left
+print(double_times_decimal)
+
+// Verifies the same conversion with the operand order reversed.
+decimal_times_double: decimal = decimal_left * double_value
+print(decimal_times_double)
+
+<<< stdout
+2.7000
+2.7000
+
+<<< stderr

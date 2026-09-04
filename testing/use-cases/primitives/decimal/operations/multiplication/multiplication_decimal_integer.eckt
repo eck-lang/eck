@@ -1,0 +1,22 @@
+# Decimal multiplication with integer operands
+
+Multiplies 1.20 by 5 in both operand orders to verify the integer is
+promoted and the result stays an exact decimal, producing 6.00 either way.
+
+>>> source
+integer_right: int = 5
+decimal_left: decimal = 1.20
+
+// Verifies the Decimal/Int promotion.
+decimal_times_integer: decimal = decimal_left * integer_right
+print(decimal_times_integer)
+
+// Verifies the same promotion with the operand order reversed.
+integer_times_decimal: decimal = integer_right * decimal_left
+print(integer_times_decimal)
+
+<<< stdout
+6.00
+6.00
+
+<<< stderr

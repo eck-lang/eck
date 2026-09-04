@@ -1,0 +1,16 @@
+# Decimal addition preserves operand scale
+
+Adds 1.20 and 2.30 to verify the sum keeps the two-digit fractional scale
+shared by its operands, producing 3.50 rather than a trimmed 3.5.
+
+>>> source
+decimal_left: decimal = 1.20
+decimal_right: decimal = 2.30
+
+decimal_sum: decimal = decimal_left + decimal_right
+print(decimal_sum)
+
+<<< stdout
+3.50
+
+<<< stderr

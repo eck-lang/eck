@@ -1,0 +1,31 @@
+# Decimal addition with float operands
+
+Adds 1.20 and 1.5 in both operand orders to verify the f32 value converts
+into an exact decimal result, producing 2.70 either way. A further case
+adds an f32 hundredth to 0.02 to verify the inexact binary value still
+converts exactly, producing 0.03.
+
+>>> source
+decimal_left: decimal = 1.20
+float_left: float = 1.5
+
+// Verifies the Decimal/Float conversion.
+decimal_plus_float: decimal = decimal_left + float_left
+print(decimal_plus_float)
+
+// Verifies the same conversion with the operand order reversed.
+float_plus_decimal: decimal = float_left + decimal_left
+print(float_plus_decimal)
+
+hundredth_float: float = 0.01
+
+// Verifies an f32 hundredth converts exactly when added to a decimal.
+mixed_hundredth: decimal = hundredth_float + 0.02
+print(mixed_hundredth)
+
+<<< stdout
+2.70
+2.70
+0.03
+
+<<< stderr

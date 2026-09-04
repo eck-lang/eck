@@ -1,0 +1,19 @@
+# Decimal remainder by zero is rejected
+
+Takes 10.5 modulo zero to verify a zero divisor fails with a
+language-level division-by-zero error instead of producing a value.
+
+>>> source
+dividend: decimal = 10.5
+divisor: decimal = 0
+
+remainder: decimal = dividend % divisor
+print(remainder)
+
+<<< stdout
+
+<<< stderr
+eck: division by zero
+
+<<< exit
+1

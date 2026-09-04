@@ -1,0 +1,18 @@
+# Exact decimal addition of tenths and hundredths
+
+Adds 0.1 and 0.2, then 0.01 and 0.02, to verify fractions that binary
+floating-point cannot represent sum exactly in decimal, producing 0.3 and
+0.03 instead of 0.30000000000000004 and 0.030000000000000002.
+
+>>> source
+tenths: decimal = 0.1 + 0.2
+print(tenths)
+
+hundredths: decimal = 0.01 + 0.02
+print(hundredths)
+
+<<< stdout
+0.3
+0.03
+
+<<< stderr

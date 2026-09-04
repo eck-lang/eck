@@ -1,0 +1,13 @@
+# Exact decimal subtraction of tenths
+
+Subtracts 0.1 from 0.3 to verify fractions that binary floating-point
+cannot represent subtract exactly in decimal, producing 0.2.
+
+>>> source
+exact_diff: decimal = 0.3 - 0.1
+print(exact_diff)
+
+<<< stdout
+0.2
+
+<<< stderr

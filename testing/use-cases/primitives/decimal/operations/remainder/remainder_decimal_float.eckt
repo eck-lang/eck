@@ -1,0 +1,25 @@
+# Decimal remainder with float operands
+
+Takes 10.5 modulo 1.5 in both operand orders to verify the f32 value
+converts into a decimal remainder, producing 0.0 when the decimal is the
+dividend and 1.5 when the float is the dividend.
+
+>>> source
+decimal_value: decimal = 10.5
+float_divisor: float = 1.5
+float_dividend: float = 10.5
+decimal_divisor: decimal = 3
+
+// Verifies the Decimal/Float conversion.
+decimal_remainder: decimal = decimal_value % float_divisor
+print(decimal_remainder)
+
+// Verifies the same conversion with the operand order reversed.
+float_remainder: decimal = float_dividend % decimal_divisor
+print(float_remainder)
+
+<<< stdout
+0.0
+1.5
+
+<<< stderr

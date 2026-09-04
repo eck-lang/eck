@@ -1,0 +1,25 @@
+# Decimal remainder with double operands
+
+Takes 10.5 modulo 2.25 in both operand orders to verify the f64 value
+converts into a decimal remainder, producing 1.50 when the decimal is the
+dividend and 1.5 when the double is the dividend.
+
+>>> source
+decimal_value: decimal = 10.5
+double_divisor: double = 2.25
+double_dividend: double = 10.5
+decimal_divisor: decimal = 3
+
+// Verifies the Decimal/Double conversion.
+decimal_remainder: decimal = decimal_value % double_divisor
+print(decimal_remainder)
+
+// Verifies the same conversion with the operand order reversed.
+double_remainder: decimal = double_dividend % decimal_divisor
+print(double_remainder)
+
+<<< stdout
+1.50
+1.5
+
+<<< stderr

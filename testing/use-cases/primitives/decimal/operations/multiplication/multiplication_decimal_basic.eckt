@@ -1,0 +1,16 @@
+# Decimal multiplication preserves operand scale
+
+Multiplies 1.20 by 2.30 to verify the product combines the two-digit
+fractional scales of its operands, producing 2.7600.
+
+>>> source
+decimal_left: decimal = 1.20
+decimal_right: decimal = 2.30
+
+decimal_product: decimal = decimal_left * decimal_right
+print(decimal_product)
+
+<<< stdout
+2.7600
+
+<<< stderr
