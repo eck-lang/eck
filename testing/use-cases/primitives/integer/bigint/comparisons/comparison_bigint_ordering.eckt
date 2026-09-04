@@ -1,0 +1,31 @@
+# Bigint comparison ordering
+
+Compares values one past the 128-bit boundaries to verify the equality
+and ordering relations hold at magnitudes beyond fixed-width integers.
+Every operand is bigint: comparisons are only defined between equal
+types.
+
+>>> source
+low: bigint = -170141183460469231731687303715884105729
+high: bigint = 170141183460469231731687303715884105728
+same: bigint = 170141183460469231731687303715884105728
+
+// Verifies the equality family on equal and distinct operands.
+print(high == same)
+print(low == high)
+
+// Verifies the ordering family across the 128-bit boundaries.
+print(low < high)
+print(high < low)
+print(high >= same)
+print(low >= high)
+
+<<< stdout
+true
+false
+true
+false
+true
+false
+
+<<< stderr

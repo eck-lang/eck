@@ -1,0 +1,23 @@
+# Bigint remainder keeps the dividend sign
+
+Takes a 31-digit value and its negation modulo 7 to verify the remainder
+keeps the dividend sign in both cases, producing 1 and -1.
+
+>>> source
+dividend: bigint = 1000000000000000000000000000000
+neg_dividend: bigint = -1000000000000000000000000000000
+divisor: bigint = 7
+
+// Verifies the remainder of a positive dividend.
+positive_remainder: bigint = dividend % divisor
+print(positive_remainder)
+
+// Verifies the remainder takes the dividend sign for a negative dividend.
+neg_remainder: bigint = neg_dividend % divisor
+print(neg_remainder)
+
+<<< stdout
+1
+-1
+
+<<< stderr

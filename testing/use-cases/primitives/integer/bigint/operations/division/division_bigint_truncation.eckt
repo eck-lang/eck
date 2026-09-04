@@ -1,0 +1,24 @@
+# Bigint division with truncation
+
+Divides a 31-digit value and its negation by 7 to verify the quotient
+truncates toward zero in both signs, producing 142857142857142857142857142857
+and -142857142857142857142857142857.
+
+>>> source
+dividend: bigint = 1000000000000000000000000000000
+neg_dividend: bigint = -1000000000000000000000000000000
+divisor: bigint = 7
+
+// Verifies the quotient truncates the fractional part.
+truncated_quotient: bigint = dividend / divisor
+print(truncated_quotient)
+
+// Verifies truncation of a negative dividend toward zero.
+neg_quotient: bigint = neg_dividend / divisor
+print(neg_quotient)
+
+<<< stdout
+142857142857142857142857142857
+-142857142857142857142857142857
+
+<<< stderr
