@@ -1,0 +1,22 @@
+# Integer32 addition promotes overflow to int64
+
+Adds 1 to the int32 maximum to verify the result promotes to int64 instead
+of failing, then adds 1 again to verify chained arithmetic keeps using the
+promoted representation. Both declarations keep the static int32 type while
+the runtime values use the wider precision.
+
+>>> source
+maximum: int32 = 2147483647
+unit: int32 = 1
+
+overflow: int32 = maximum + unit
+print(overflow)
+
+chained: int32 = overflow + unit
+print(chained)
+
+<<< stdout
+2147483648
+2147483649
+
+<<< stderr
