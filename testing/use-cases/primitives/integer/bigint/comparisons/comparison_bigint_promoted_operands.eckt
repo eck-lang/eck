@@ -1,0 +1,29 @@
+# Bigint comparisons promote mixed operands
+
+Verifies all comparison operators accept every narrower signed integer
+width with bigint while preserving exact ordering.
+
+>>> source
+narrow8: int8 = 5
+narrow16: int16 = 5
+narrow32: int32 = 5
+narrow64: int64 = 5
+narrow128: int128 = 5
+wide: bigint = 10
+
+print(narrow8 < wide)
+print(wide <= narrow16)
+print(narrow32 > wide)
+print(wide >= narrow64)
+print(narrow128 == wide)
+print(wide != narrow128)
+
+<<< stdout
+true
+false
+false
+true
+false
+true
+
+<<< stderr
