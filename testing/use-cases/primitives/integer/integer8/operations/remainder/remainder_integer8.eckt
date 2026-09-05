@@ -1,0 +1,23 @@
+# Integer8 remainder sign
+
+Verifies int8 remainder keeps the sign of the dividend through the complete
+CLI pipeline.
+
+>>> source
+dividend: int8 = 100
+neg_dividend: int8 = -100
+divisor: int8 = 27
+
+// Verifies the remainder of two positive operands.
+pos_remainder: int8 = dividend % divisor
+print(pos_remainder)
+
+// Verifies the remainder takes the dividend sign for a negative dividend.
+neg_remainder: int8 = neg_dividend % divisor
+print(neg_remainder)
+
+<<< stdout
+19
+-19
+
+<<< stderr
