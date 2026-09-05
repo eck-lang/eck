@@ -1,0 +1,23 @@
+# Boolean multiplication zero
+
+Verifies `false` annihilates numeric operands in both operand orders: an
+integer product becomes `0`, and decimal and float products likewise collapse
+to zero rather than keeping their magnitude.
+
+>>> source
+flag: bool = false
+count: int = 5
+print(count * flag)
+print(flag * count)
+price: decimal = 12.5
+print(price * flag)
+measure: float = 2.5
+print(measure * flag)
+
+<<< stdout
+0
+0
+0
+0
+
+<<< stderr

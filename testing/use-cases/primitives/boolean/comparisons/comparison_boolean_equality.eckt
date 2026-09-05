@@ -1,0 +1,14 @@
+# Boolean equality comparison
+
+Verifies `==` reports whether two boolean operands hold the same value:
+identical operands compare true while mixed operands compare false.
+
+>>> source
+print(true == true)
+print(true == false)
+
+<<< stdout
+true
+false
+
+<<< stderr
