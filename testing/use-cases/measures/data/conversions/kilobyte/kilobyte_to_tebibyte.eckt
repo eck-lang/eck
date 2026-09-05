@@ -1,0 +1,21 @@
+# Data conversion between kilobyte and tebibyte
+
+Verifies direct data conversion between kilobyte and tebibyte in both directions. Forward, converting 1KB to 0.0000TiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KB yields 0.0000TiB; backward, converting 1TiB to 1099511627.776KB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5TiB yields 1649267441.664KB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1KB
+print(forward_whole->to(TiB))
+forward_fractional: decimal = 1.5KB
+print(forward_fractional->to(TiB))
+backward_whole: int = 1TiB
+print(backward_whole->to(KB))
+backward_fractional: decimal = 1.5TiB
+print(backward_fractional->to(KB))
+
+<<< stdout
+0.0000TiB
+0.0000TiB
+1099511627.776KB
+1649267441.664KB
+
+<<< stderr

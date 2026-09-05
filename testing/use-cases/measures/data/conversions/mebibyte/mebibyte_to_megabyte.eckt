@@ -1,0 +1,21 @@
+# Data conversion between mebibyte and megabyte
+
+Verifies direct data conversion between mebibyte and megabyte in both directions. Forward, converting 1MiB to 1.0485MB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5MiB yields 1.5728MB; backward, converting 1MB to 0.9536MiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MB yields 1.4305MiB.
+
+>>> source
+forward_whole: int = 1MiB
+print(forward_whole->to(MB))
+forward_fractional: decimal = 1.5MiB
+print(forward_fractional->to(MB))
+backward_whole: int = 1MB
+print(backward_whole->to(MiB))
+backward_fractional: decimal = 1.5MB
+print(backward_fractional->to(MiB))
+
+<<< stdout
+1.0485MB
+1.5728MB
+0.9536MiB
+1.4305MiB
+
+<<< stderr

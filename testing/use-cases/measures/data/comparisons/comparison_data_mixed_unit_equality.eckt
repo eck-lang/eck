@@ -1,0 +1,24 @@
+# Data comparison across units
+
+Verifies mixed-unit comparisons scale the coarser operand to the finer unit before comparing. 1KB equals 1000B exactly, so `==`, `<=`, and `>=` hold while `!=` does not; likewise 1MB is not greater than 1000KB because both magnitudes coincide after scaling.
+
+>>> source
+kilo: int = 1KB
+thousand: int = 1000B
+print(kilo == thousand)
+print(kilo != thousand)
+print(kilo <= thousand)
+print(kilo >= thousand)
+mega: int = 1MB
+print(mega > 1000KB)
+print(mega == 1000KB)
+
+<<< stdout
+true
+false
+true
+true
+false
+true
+
+<<< stderr

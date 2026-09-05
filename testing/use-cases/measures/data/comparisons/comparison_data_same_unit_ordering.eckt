@@ -1,0 +1,23 @@
+# Data comparison within one unit
+
+Verifies equality and ordering between two byte measures without any unit scaling. Comparing 512B against 1024B exercises `==`, `!=`, `<`, and `>`, while the reflexive `<=` and `>=` cases pin the boundary where both operands are equal.
+
+>>> source
+small: int = 512B
+large: int = 1024B
+print(small == large)
+print(small != large)
+print(small < large)
+print(large > small)
+print(small <= small)
+print(large >= large)
+
+<<< stdout
+false
+true
+true
+true
+true
+true
+
+<<< stderr

@@ -1,0 +1,21 @@
+# Data conversion between petabyte and tebibyte
+
+Verifies direct data conversion between petabyte and tebibyte in both directions. Forward, converting 1PB to 909.4947TiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5PB yields 1364.2420TiB; backward, converting 1TiB to 0.0010PB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5TiB yields 0.0016PB.
+
+>>> source
+forward_whole: int = 1PB
+print(forward_whole->to(TiB))
+forward_fractional: decimal = 1.5PB
+print(forward_fractional->to(TiB))
+backward_whole: int = 1TiB
+print(backward_whole->to(PB))
+backward_fractional: decimal = 1.5TiB
+print(backward_fractional->to(PB))
+
+<<< stdout
+909.4947TiB
+1364.2420TiB
+0.0010PB
+0.0016PB
+
+<<< stderr

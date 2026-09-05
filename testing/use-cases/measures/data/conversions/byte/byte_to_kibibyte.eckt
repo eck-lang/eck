@@ -1,0 +1,21 @@
+# Data conversion between byte and kibibyte
+
+Verifies direct data conversion between byte and kibibyte in both directions. Forward, converting 1B to 0.0009KiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5B yields 0.0014KiB; backward, converting 1KiB to 1024B preserves the integer representation across the integer coarser-to-finer scale, while 1.5KiB yields 1536.0B.
+
+>>> source
+forward_whole: int = 1B
+print(forward_whole->to(KiB))
+forward_fractional: decimal = 1.5B
+print(forward_fractional->to(KiB))
+backward_whole: int = 1KiB
+print(backward_whole->to(B))
+backward_fractional: decimal = 1.5KiB
+print(backward_fractional->to(B))
+
+<<< stdout
+0.0009KiB
+0.0014KiB
+1024B
+1536.0B
+
+<<< stderr

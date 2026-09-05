@@ -1,0 +1,21 @@
+# Data conversion between pebibyte and terabyte
+
+Verifies direct data conversion between pebibyte and terabyte in both directions. Forward, converting 1PiB to 1125.8999TB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5PiB yields 1688.8498TB; backward, converting 1TB to 0.0008PiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5TB yields 0.0013PiB.
+
+>>> source
+forward_whole: int = 1PiB
+print(forward_whole->to(TB))
+forward_fractional: decimal = 1.5PiB
+print(forward_fractional->to(TB))
+backward_whole: int = 1TB
+print(backward_whole->to(PiB))
+backward_fractional: decimal = 1.5TB
+print(backward_fractional->to(PiB))
+
+<<< stdout
+1125.8999TB
+1688.8498TB
+0.0008PiB
+0.0013PiB
+
+<<< stderr

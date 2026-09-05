@@ -1,0 +1,21 @@
+# Data conversion between mebibyte and terabyte
+
+Verifies direct data conversion between mebibyte and terabyte in both directions. Forward, converting 1MiB to 0.0000TB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MiB yields 0.0000TB; backward, converting 1TB to 953674.3164MiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5TB yields 1430511.4746MiB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1MiB
+print(forward_whole->to(TB))
+forward_fractional: decimal = 1.5MiB
+print(forward_fractional->to(TB))
+backward_whole: int = 1TB
+print(backward_whole->to(MiB))
+backward_fractional: decimal = 1.5TB
+print(backward_fractional->to(MiB))
+
+<<< stdout
+0.0000TB
+0.0000TB
+953674.3164MiB
+1430511.4746MiB
+
+<<< stderr

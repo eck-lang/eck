@@ -1,0 +1,21 @@
+# Data conversion between gigabyte and terabyte
+
+Verifies direct data conversion between gigabyte and terabyte in both directions. Forward, converting 1GB to 0.001TB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GB yields 0.0015TB; backward, converting 1TB to 1000GB preserves the integer representation across the integer coarser-to-finer scale, while 1.5TB yields 1500.0GB.
+
+>>> source
+forward_whole: int = 1GB
+print(forward_whole->to(TB))
+forward_fractional: decimal = 1.5GB
+print(forward_fractional->to(TB))
+backward_whole: int = 1TB
+print(backward_whole->to(GB))
+backward_fractional: decimal = 1.5TB
+print(backward_fractional->to(GB))
+
+<<< stdout
+0.001TB
+0.0015TB
+1000GB
+1500.0GB
+
+<<< stderr

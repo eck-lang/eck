@@ -1,0 +1,21 @@
+# Data conversion between petabyte and terabyte
+
+Verifies direct data conversion between petabyte and terabyte in both directions. Forward, converting 1PB to 1000TB preserves the integer representation across the integer coarser-to-finer scale, while 1.5PB yields 1500.0TB; backward, converting 1TB to 0.001PB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5TB yields 0.0015PB.
+
+>>> source
+forward_whole: int = 1PB
+print(forward_whole->to(TB))
+forward_fractional: decimal = 1.5PB
+print(forward_fractional->to(TB))
+backward_whole: int = 1TB
+print(backward_whole->to(PB))
+backward_fractional: decimal = 1.5TB
+print(backward_fractional->to(PB))
+
+<<< stdout
+1000TB
+1500.0TB
+0.001PB
+0.0015PB
+
+<<< stderr

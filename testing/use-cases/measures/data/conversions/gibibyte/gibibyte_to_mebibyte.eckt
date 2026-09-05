@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and mebibyte
+
+Verifies direct data conversion between gibibyte and mebibyte in both directions. Forward, converting 1GiB to 1024MiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5GiB yields 1536.0MiB; backward, converting 1MiB to 0.0009GiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MiB yields 0.0014GiB.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(MiB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(MiB))
+backward_whole: int = 1MiB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5MiB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+1024MiB
+1536.0MiB
+0.0009GiB
+0.0014GiB
+
+<<< stderr

@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and gigabyte
+
+Verifies direct data conversion between gibibyte and gigabyte in both directions. Forward, converting 1GiB to 1.0737GB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5GiB yields 1.6106GB; backward, converting 1GB to 0.9313GiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GB yields 1.3969GiB.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(GB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(GB))
+backward_whole: int = 1GB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5GB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+1.0737GB
+1.6106GB
+0.9313GiB
+1.3969GiB
+
+<<< stderr

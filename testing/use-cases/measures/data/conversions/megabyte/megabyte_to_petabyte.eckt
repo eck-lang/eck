@@ -1,0 +1,21 @@
+# Data conversion between megabyte and petabyte
+
+Verifies direct data conversion between megabyte and petabyte in both directions. Forward, converting 1MB to 0.0000PB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MB yields 0.0000PB; backward, converting 1PB to 1000000000MB preserves the integer representation across the integer coarser-to-finer scale, while 1.5PB yields 1500000000.0MB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1MB
+print(forward_whole->to(PB))
+forward_fractional: decimal = 1.5MB
+print(forward_fractional->to(PB))
+backward_whole: int = 1PB
+print(backward_whole->to(MB))
+backward_fractional: decimal = 1.5PB
+print(backward_fractional->to(MB))
+
+<<< stdout
+0.0000PB
+0.0000PB
+1000000000MB
+1500000000.0MB
+
+<<< stderr

@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and petabyte
+
+Verifies direct data conversion between gibibyte and petabyte in both directions. Forward, converting 1GiB to 0.0000PB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GiB yields 0.0000PB; backward, converting 1PB to 931322.5746GiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5PB yields 1396983.8619GiB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(PB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(PB))
+backward_whole: int = 1PB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5PB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+0.0000PB
+0.0000PB
+931322.5746GiB
+1396983.8619GiB
+
+<<< stderr

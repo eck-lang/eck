@@ -1,0 +1,18 @@
+# Data conversion with explicit representation and unit
+
+Verifies `->to(type, unit)` changes both the numeric representation and the unit of a data measure. Forward, converting 1B to 0.001KB and 1.5B to 0.0015KB scales the magnitude and casts it to decimal; backward, converting 1.5KB to 1500B scales by the integer coarser-to-finer ratio and casts the whole decimal magnitude back to integer.
+
+>>> source
+forward_whole: int = 1B
+print(forward_whole->to(decimal, KB))
+forward_fractional: decimal = 1.5B
+print(forward_fractional->to(decimal, KB))
+backward_whole: decimal = 1.5KB
+print(backward_whole->to(int, B))
+
+<<< stdout
+0.001KB
+0.0015KB
+1500B
+
+<<< stderr

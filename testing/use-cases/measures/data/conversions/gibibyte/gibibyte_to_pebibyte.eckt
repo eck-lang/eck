@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and pebibyte
+
+Verifies direct data conversion between gibibyte and pebibyte in both directions. Forward, converting 1GiB to 0.0000PiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GiB yields 0.0000PiB; backward, converting 1PiB to 1048576GiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5PiB yields 1572864.0GiB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(PiB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(PiB))
+backward_whole: int = 1PiB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5PiB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+0.0000PiB
+0.0000PiB
+1048576GiB
+1572864.0GiB
+
+<<< stderr

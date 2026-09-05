@@ -1,0 +1,21 @@
+# Data conversion between byte and mebibyte
+
+Verifies direct data conversion between byte and mebibyte in both directions. Forward, converting 1B to 0.0000MiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5B yields 0.0000MiB; backward, converting 1MiB to 1048576B preserves the integer representation across the integer coarser-to-finer scale, while 1.5MiB yields 1572864.0B. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1B
+print(forward_whole->to(MiB))
+forward_fractional: decimal = 1.5B
+print(forward_fractional->to(MiB))
+backward_whole: int = 1MiB
+print(backward_whole->to(B))
+backward_fractional: decimal = 1.5MiB
+print(backward_fractional->to(B))
+
+<<< stdout
+0.0000MiB
+0.0000MiB
+1048576B
+1572864.0B
+
+<<< stderr

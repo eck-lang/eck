@@ -1,0 +1,21 @@
+# Data conversion between gigabyte and megabyte
+
+Verifies direct data conversion between gigabyte and megabyte in both directions. Forward, converting 1GB to 1000MB preserves the integer representation across the integer coarser-to-finer scale, while 1.5GB yields 1500.0MB; backward, converting 1MB to 0.001GB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MB yields 0.0015GB.
+
+>>> source
+forward_whole: int = 1GB
+print(forward_whole->to(MB))
+forward_fractional: decimal = 1.5GB
+print(forward_fractional->to(MB))
+backward_whole: int = 1MB
+print(backward_whole->to(GB))
+backward_fractional: decimal = 1.5MB
+print(backward_fractional->to(GB))
+
+<<< stdout
+1000MB
+1500.0MB
+0.001GB
+0.0015GB
+
+<<< stderr

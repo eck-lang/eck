@@ -1,0 +1,21 @@
+# Data conversion between gigabyte and mebibyte
+
+Verifies direct data conversion between gigabyte and mebibyte in both directions. Forward, converting 1GB to 953.6743MiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5GB yields 1430.5114MiB; backward, converting 1MiB to 0.0010GB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MiB yields 0.0015GB.
+
+>>> source
+forward_whole: int = 1GB
+print(forward_whole->to(MiB))
+forward_fractional: decimal = 1.5GB
+print(forward_fractional->to(MiB))
+backward_whole: int = 1MiB
+print(backward_whole->to(GB))
+backward_fractional: decimal = 1.5MiB
+print(backward_fractional->to(GB))
+
+<<< stdout
+953.6743MiB
+1430.5114MiB
+0.0010GB
+0.0015GB
+
+<<< stderr

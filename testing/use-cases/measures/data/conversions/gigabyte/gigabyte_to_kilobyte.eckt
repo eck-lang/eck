@@ -1,0 +1,21 @@
+# Data conversion between gigabyte and kilobyte
+
+Verifies direct data conversion between gigabyte and kilobyte in both directions. Forward, converting 1GB to 1000000KB preserves the integer representation across the integer coarser-to-finer scale, while 1.5GB yields 1500000.0KB; backward, converting 1KB to 0.0000GB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KB yields 0.0000GB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1GB
+print(forward_whole->to(KB))
+forward_fractional: decimal = 1.5GB
+print(forward_fractional->to(KB))
+backward_whole: int = 1KB
+print(backward_whole->to(GB))
+backward_fractional: decimal = 1.5KB
+print(backward_fractional->to(GB))
+
+<<< stdout
+1000000KB
+1500000.0KB
+0.0000GB
+0.0000GB
+
+<<< stderr

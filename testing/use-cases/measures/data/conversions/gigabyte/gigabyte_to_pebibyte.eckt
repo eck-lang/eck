@@ -1,0 +1,21 @@
+# Data conversion between gigabyte and pebibyte
+
+Verifies direct data conversion between gigabyte and pebibyte in both directions. Forward, converting 1GB to 0.0000PiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GB yields 0.0000PiB; backward, converting 1PiB to 1125899.9068GB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5PiB yields 1688849.8602GB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1GB
+print(forward_whole->to(PiB))
+forward_fractional: decimal = 1.5GB
+print(forward_fractional->to(PiB))
+backward_whole: int = 1PiB
+print(backward_whole->to(GB))
+backward_fractional: decimal = 1.5PiB
+print(backward_fractional->to(GB))
+
+<<< stdout
+0.0000PiB
+0.0000PiB
+1125899.9068GB
+1688849.8602GB
+
+<<< stderr

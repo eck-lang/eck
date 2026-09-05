@@ -1,0 +1,21 @@
+# Data conversion between pebibyte and tebibyte
+
+Verifies direct data conversion between pebibyte and tebibyte in both directions. Forward, converting 1PiB to 1024TiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5PiB yields 1536.0TiB; backward, converting 1TiB to 0.0009PiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5TiB yields 0.0014PiB.
+
+>>> source
+forward_whole: int = 1PiB
+print(forward_whole->to(TiB))
+forward_fractional: decimal = 1.5PiB
+print(forward_fractional->to(TiB))
+backward_whole: int = 1TiB
+print(backward_whole->to(PiB))
+backward_fractional: decimal = 1.5TiB
+print(backward_fractional->to(PiB))
+
+<<< stdout
+1024TiB
+1536.0TiB
+0.0009PiB
+0.0014PiB
+
+<<< stderr
