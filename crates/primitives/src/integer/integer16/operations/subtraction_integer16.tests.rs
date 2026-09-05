@@ -1,5 +1,7 @@
 use super::*;
 
+use language_core::Registry;
+
 /// Verifies integer subtraction and checked overflow handling.
 #[test]
 fn subtracts_integers_and_rejects_overflow() {
@@ -41,4 +43,26 @@ fn subtracts_promoted_integer8_operands_as_integer16() {
         subtraction_mixed_integer(&invalid, &minimum),
         Err(CoreError::InvalidValueRepresentation(_))
     ));
+}
+
+/// Verifies context-aware subtraction promotes `int16` overflow to `int32`.
+#[test]
+fn promotes_overflowed_context_subtraction_to_int32() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer16_id = registry.type_by_name("int16").unwrap();
+    let int32_id = registry.type_by_name("int32").unwrap();
+    let minimum = Value::new(integer16_id, i16::MIN);
+    let one = Value::new(integer16_id, 1_i16);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Subtraction, integer16_id, integer16_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &one).unwrap();
+
+    assert_eq!(promoted.type_id(), int32_id);
+    assert_eq!(*promoted.downcast_ref::<i32>().unwrap(), -32_769);
 }

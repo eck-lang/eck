@@ -1,5 +1,7 @@
 use super::*;
 
+use language_core::Registry;
+
 /// Verifies integer remainder, zero-divisor rejection, and checked overflow.
 #[test]
 fn calculates_integer_remainder_and_rejects_zero_and_overflow() {
@@ -62,4 +64,26 @@ fn calculates_promoted_integer8_remainder_as_integer16() {
         remainder_mixed_integer(&invalid, &wide),
         Err(CoreError::InvalidValueRepresentation(_))
     ));
+}
+
+/// Verifies context-aware remainder promotes the `MIN % -1` overflow to `int32`.
+#[test]
+fn promotes_overflowed_context_remainder_to_int32() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer16_id = registry.type_by_name("int16").unwrap();
+    let int32_id = registry.type_by_name("int32").unwrap();
+    let minimum = Value::new(integer16_id, i16::MIN);
+    let negative_one = Value::new(integer16_id, -1_i16);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Remainder, integer16_id, integer16_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &negative_one).unwrap();
+
+    assert_eq!(promoted.type_id(), int32_id);
+    assert_eq!(*promoted.downcast_ref::<i32>().unwrap(), 0);
 }
