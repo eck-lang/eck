@@ -1,0 +1,22 @@
+# Integer16 addition promotes overflow to int32
+
+Adds 1 to the int16 maximum to verify the result promotes to int32 instead
+of failing, then adds 1 again to verify chained arithmetic keeps using the
+promoted representation. Both declarations keep the static int16 type while
+the runtime values use the wider precision.
+
+>>> source
+maximum: int16 = 32767
+unit: int16 = 1
+
+overflow: int16 = maximum + unit
+print(overflow)
+
+chained: int16 = overflow + unit
+print(chained)
+
+<<< stdout
+32768
+32769
+
+<<< stderr

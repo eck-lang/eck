@@ -1,5 +1,7 @@
 use super::*;
 
+use language_core::Registry;
+
 /// Verifies integer power, exponent validation, and checked overflow handling.
 #[test]
 fn raises_integers_to_non_negative_powers_and_rejects_invalid_exponents() {
@@ -51,5 +53,48 @@ fn powers_promoted_integer8_operands_as_integer16() {
     assert!(matches!(
         power_mixed_integer(&invalid, &wide_two),
         Err(CoreError::InvalidValueRepresentation(_))
+    ));
+}
+
+/// Verifies context-aware power promotes `int16` overflow to `int32`.
+#[test]
+fn promotes_overflowed_context_power_to_int32() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer16_id = registry.type_by_name("int16").unwrap();
+    let int32_id = registry.type_by_name("int32").unwrap();
+    let base = Value::new(integer16_id, 2_i16);
+    let exponent = Value::new(integer16_id, 15_i16);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Power, integer16_id, integer16_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &base, &exponent).unwrap();
+
+    assert_eq!(promoted.type_id(), int32_id);
+    assert_eq!(*promoted.downcast_ref::<i32>().unwrap(), 32_768);
+}
+
+/// Verifies context-aware power still reports overflow beyond `int32`.
+#[test]
+fn keeps_context_power_overflow_beyond_int32_as_error() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer16_id = registry.type_by_name("int16").unwrap();
+    let base = Value::new(integer16_id, 100_i16);
+    let exponent = Value::new(integer16_id, 10_i16);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Power, integer16_id, integer16_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    assert!(matches!(
+        descriptor.context_execute.unwrap()(&context, &base, &exponent),
+        Err(CoreError::Runtime(message)) if message.contains("overflow")
     ));
 }
