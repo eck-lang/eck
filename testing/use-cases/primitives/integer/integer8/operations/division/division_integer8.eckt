@@ -1,0 +1,23 @@
+# Integer8 division with truncation
+
+Verifies int8 division truncates toward zero through the complete CLI
+pipeline.
+
+>>> source
+dividend: int8 = 100
+neg_dividend: int8 = -100
+divisor: int8 = 27
+
+// Verifies the quotient truncates the fractional part.
+truncated_quotient: int8 = dividend / divisor
+print(truncated_quotient)
+
+// Verifies truncation of a negative dividend toward zero.
+neg_quotient: int8 = neg_dividend / divisor
+print(neg_quotient)
+
+<<< stdout
+3
+-3
+
+<<< stderr

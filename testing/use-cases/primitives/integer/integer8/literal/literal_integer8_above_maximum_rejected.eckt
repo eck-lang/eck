@@ -1,0 +1,16 @@
+# Integer8 literal above the maximum
+
+Verifies an int8 literal one past the 8-bit maximum is rejected with a
+compile-time diagnostic through the complete CLI pipeline.
+
+>>> source
+too_large: int8 = 128
+print(too_large)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `128` for type `int8`: number too large to fit in target type at Span { start: 18, end: 21 }
+
+<<< exit
+1

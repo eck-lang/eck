@@ -1,0 +1,30 @@
+# Integer8 comparison ordering
+
+Verifies the int8 equality and ordering relations through the complete CLI
+pipeline. Every operand is int8: comparisons are only defined between equal
+types.
+
+>>> source
+low: int8 = -100
+high: int8 = 100
+same: int8 = 100
+
+// Verifies the equality family on equal and distinct operands.
+print(high == same)
+print(low == high)
+
+// Verifies the ordering family on distinct operands.
+print(low < high)
+print(high < low)
+print(high >= same)
+print(low >= high)
+
+<<< stdout
+true
+false
+true
+false
+true
+false
+
+<<< stderr

@@ -1,0 +1,17 @@
+# Integer8 power within range
+
+Verifies int8 exponentiation with base and exponent chosen to stay inside
+the 8-bit range through the complete CLI pipeline. Both operands are int8 to
+keep this case focused on same-type power semantics.
+
+>>> source
+base: int8 = 2
+exponent: int8 = 6
+
+power: int8 = base ** exponent
+print(power)
+
+<<< stdout
+64
+
+<<< stderr

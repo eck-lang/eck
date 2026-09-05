@@ -1,0 +1,24 @@
+# Integer8 addition at the type boundary
+
+Verifies int8 addition at the upper boundary of the 8-bit range through the
+complete CLI pipeline. Every operand is int8 to keep this case focused on
+same-type boundary semantics.
+
+>>> source
+left: int8 = 100
+right: int8 = 27
+neg_left: int8 = -100
+
+// Verifies addition reaching exactly the int8 maximum.
+boundary_sum: int8 = left + right
+print(boundary_sum)
+
+// Verifies addition of a negative operand staying in range.
+negative_sum: int8 = neg_left + right
+print(negative_sum)
+
+<<< stdout
+127
+-73
+
+<<< stderr

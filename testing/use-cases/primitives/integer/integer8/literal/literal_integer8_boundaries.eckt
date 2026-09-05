@@ -1,0 +1,24 @@
+# Integer8 minimum and maximum values
+
+Verifies the int8 boundary values through the complete CLI pipeline. The
+maximum is expressible as a literal; the minimum is derived by subtracting
+one from the largest negative literal because a negated minimum-magnitude
+literal is validated unsigned first, consistent with int16 and int64.
+
+>>> source
+ceiling: int8 = 127
+floor: int8 = -127
+unit: int8 = 1
+
+// Verifies the largest int8 literal prints unchanged.
+print(ceiling)
+
+// Verifies the int8 minimum is reachable through checked arithmetic.
+minimum: int8 = floor - unit
+print(minimum)
+
+<<< stdout
+127
+-128
+
+<<< stderr
