@@ -1,0 +1,19 @@
+# Integer128 addition overflow
+
+Adds 1 to the int128 maximum to verify the overflow fails with a runtime
+error instead of wrapping.
+
+>>> source
+maximum: int128 = 170141183460469231731687303715884105727
+unit: int128 = 1
+
+overflow: int128 = maximum + unit
+print(overflow)
+
+<<< stdout
+
+<<< stderr
+eck: runtime error: integer overflow in addition
+
+<<< exit
+1

@@ -1,0 +1,17 @@
+# Integer128 literal above the maximum
+
+Binds 170141183460469231731687303715884105728, one past the 128-bit
+maximum, to verify the literal is rejected with a compile-time diagnostic
+instead of wrapping.
+
+>>> source
+too_large: int128 = 170141183460469231731687303715884105728
+print(too_large)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `170141183460469231731687303715884105728` for type `int128`: number too large to fit in target type at Span { start: 20, end: 59 }
+
+<<< exit
+1

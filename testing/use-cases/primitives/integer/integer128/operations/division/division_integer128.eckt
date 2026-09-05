@@ -1,0 +1,24 @@
+# Integer128 division with truncation
+
+Divides a 30-digit value and its negation by 7 to verify the quotient
+truncates toward zero in both signs, producing 14285714285714285714285714285
+and -14285714285714285714285714285.
+
+>>> source
+dividend: int128 = 100000000000000000000000000000
+neg_dividend: int128 = -100000000000000000000000000000
+divisor: int128 = 7
+
+// Verifies the quotient truncates the fractional part.
+truncated_quotient: int128 = dividend / divisor
+print(truncated_quotient)
+
+// Verifies truncation of a negative dividend toward zero.
+neg_quotient: int128 = neg_dividend / divisor
+print(neg_quotient)
+
+<<< stdout
+14285714285714285714285714285
+-14285714285714285714285714285
+
+<<< stderr

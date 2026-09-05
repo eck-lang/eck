@@ -1,0 +1,17 @@
+# Integer128 literal below the minimum
+
+Binds -170141183460469231731687303715884105728, whose unsigned part exceeds
+the 128-bit range, to verify the literal is rejected with a compile-time
+diagnostic, consistent with int8 and int64.
+
+>>> source
+too_small: int128 = -170141183460469231731687303715884105728
+print(too_small)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `170141183460469231731687303715884105728` for type `int128`: number too large to fit in target type at Span { start: 21, end: 60 }
+
+<<< exit
+1

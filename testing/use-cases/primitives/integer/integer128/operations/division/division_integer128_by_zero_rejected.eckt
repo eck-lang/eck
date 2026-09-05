@@ -1,0 +1,19 @@
+# Integer128 division by zero
+
+Divides 100 by zero to verify the failure surfaces as a language-level
+division-by-zero error with exit code 1 instead of producing a value.
+
+>>> source
+dividend: int128 = 100
+divisor: int128 = 0
+
+quotient: int128 = dividend / divisor
+print(quotient)
+
+<<< stdout
+
+<<< stderr
+eck: division by zero
+
+<<< exit
+1
