@@ -1,0 +1,18 @@
+# Integer8 narrowing assignment rejected
+
+Verifies arithmetic promotion does not introduce implicit conversion for plain
+assignments, so assigning an int16 value to an int8 variable remains a
+compile-time type mismatch.
+
+>>> source
+wide: int16 = 127
+narrow: int8 = wide
+print(narrow)
+
+<<< stdout
+
+<<< stderr
+eck: type mismatch: variable `narrow` expects `int8`, expression produces `int16` at Span { start: 33, end: 37 }
+
+<<< exit
+1
