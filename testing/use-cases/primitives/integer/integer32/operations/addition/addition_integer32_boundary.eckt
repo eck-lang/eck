@@ -1,0 +1,24 @@
+# Integer32 addition at the type boundary
+
+Verifies int32 addition at the upper boundary of the 32-bit range through the
+complete CLI pipeline. Every operand is int32 to keep this case focused on
+same-type boundary semantics.
+
+>>> source
+left: int32 = 2147483640
+right: int32 = 7
+neg_left: int32 = -2147483640
+
+// Verifies addition reaching exactly the int32 maximum.
+boundary_sum: int32 = left + right
+print(boundary_sum)
+
+// Verifies addition of a negative operand staying in range.
+negative_sum: int32 = neg_left + right
+print(negative_sum)
+
+<<< stdout
+2147483647
+-2147483633
+
+<<< stderr

@@ -1,0 +1,26 @@
+# Integer32 subtraction promotes mixed operands
+
+Verifies every narrower signed integer width subtracts with int32 in both
+operand orders, producing int32 while preserving order.
+
+>>> source
+narrow8: int8 = 5
+narrow16: int16 = 5
+wide: int32 = 10
+
+result8_left: int32 = narrow8 - wide
+result8_right: int32 = wide - narrow8
+result16_left: int32 = narrow16 - wide
+result16_right: int32 = wide - narrow16
+print(result8_left)
+print(result8_right)
+print(result16_left)
+print(result16_right)
+
+<<< stdout
+-5
+5
+-5
+5
+
+<<< stderr

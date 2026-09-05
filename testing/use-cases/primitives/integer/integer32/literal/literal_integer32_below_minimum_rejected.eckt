@@ -1,0 +1,17 @@
+# Integer32 literal below the minimum
+
+Verifies a negated int32 literal whose unsigned part exceeds the 32-bit
+range is rejected with a compile-time diagnostic through the complete CLI
+pipeline, consistent with int8 and int64.
+
+>>> source
+too_small: int32 = -2147483648
+print(too_small)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `2147483648` for type `int32`: number too large to fit in target type at Span { start: 20, end: 30 }
+
+<<< exit
+1
