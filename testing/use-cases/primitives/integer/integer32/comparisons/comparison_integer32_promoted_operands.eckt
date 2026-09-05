@@ -1,0 +1,26 @@
+# Integer32 comparisons promote mixed operands
+
+Verifies all comparison operators accept every narrower signed integer width
+with int32 while preserving exact ordering.
+
+>>> source
+narrow8: int8 = 5
+narrow16: int16 = 5
+wide: int32 = 10
+
+print(narrow8 < wide)
+print(wide <= narrow16)
+print(narrow16 > wide)
+print(wide >= narrow8)
+print(narrow8 == wide)
+print(wide != narrow16)
+
+<<< stdout
+true
+false
+false
+true
+false
+true
+
+<<< stderr

@@ -1,0 +1,22 @@
+# Integer32 subtraction in both operand orders
+
+Verifies int32 subtraction in both operand orders through the complete CLI
+pipeline.
+
+>>> source
+left: int32 = 2000000000
+right: int32 = 123456789
+
+// Verifies subtraction with the larger operand first.
+forward_diff: int32 = left - right
+print(forward_diff)
+
+// Verifies subtraction with the smaller operand first.
+reversed_diff: int32 = right - left
+print(reversed_diff)
+
+<<< stdout
+1876543211
+-1876543211
+
+<<< stderr

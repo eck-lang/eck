@@ -1,0 +1,30 @@
+# Integer32 comparison ordering
+
+Verifies the int32 equality and ordering relations through the complete CLI
+pipeline. Every operand is int32: comparisons are only defined between equal
+types.
+
+>>> source
+low: int32 = -2000000000
+high: int32 = 2000000000
+same: int32 = 2000000000
+
+// Verifies the equality family on equal and distinct operands.
+print(high == same)
+print(low == high)
+
+// Verifies the ordering family on distinct operands.
+print(low < high)
+print(high < low)
+print(high >= same)
+print(low >= high)
+
+<<< stdout
+true
+false
+true
+false
+true
+false
+
+<<< stderr

@@ -1,0 +1,26 @@
+# Integer32 remainder promotes mixed operands
+
+Verifies every narrower signed integer width computes remainder with int32 in
+both operand orders and produces an int32 result.
+
+>>> source
+narrow8: int8 = 20
+narrow16: int16 = 20
+wide: int32 = 5
+
+result8_left: int32 = narrow8 % wide
+result8_right: int32 = wide % narrow8
+result16_left: int32 = narrow16 % wide
+result16_right: int32 = wide % narrow16
+print(result8_left)
+print(result8_right)
+print(result16_left)
+print(result16_right)
+
+<<< stdout
+0
+5
+0
+5
+
+<<< stderr

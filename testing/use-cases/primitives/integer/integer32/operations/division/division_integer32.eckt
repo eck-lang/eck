@@ -1,0 +1,23 @@
+# Integer32 division with truncation
+
+Verifies int32 division truncates toward zero through the complete CLI
+pipeline.
+
+>>> source
+dividend: int32 = 2000000000
+neg_dividend: int32 = -2000000000
+divisor: int32 = 1000003
+
+// Verifies the quotient truncates the fractional part.
+truncated_quotient: int32 = dividend / divisor
+print(truncated_quotient)
+
+// Verifies truncation of a negative dividend toward zero.
+neg_quotient: int32 = neg_dividend / divisor
+print(neg_quotient)
+
+<<< stdout
+1999
+-1999
+
+<<< stderr

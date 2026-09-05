@@ -1,0 +1,26 @@
+# Integer32 power promotes mixed operands
+
+Verifies every narrower signed integer width participates in int32 power in
+both operand orders and produces an int32 result.
+
+>>> source
+narrow8: int8 = 2
+narrow16: int16 = 2
+wide: int32 = 3
+
+result8_base: int32 = narrow8 ** wide
+result8_exponent: int32 = wide ** narrow8
+result16_base: int32 = narrow16 ** wide
+result16_exponent: int32 = wide ** narrow16
+print(result8_base)
+print(result8_exponent)
+print(result16_base)
+print(result16_exponent)
+
+<<< stdout
+8
+9
+8
+9
+
+<<< stderr

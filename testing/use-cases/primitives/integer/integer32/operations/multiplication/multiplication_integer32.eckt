@@ -1,0 +1,23 @@
+# Integer32 multiplication within range
+
+Verifies int32 multiplication with operands chosen to stay inside the 32-bit
+range through the complete CLI pipeline.
+
+>>> source
+left: int32 = 40000
+right: int32 = 50000
+neg_left: int32 = -40000
+
+// Verifies multiplication of two positive operands.
+pos_product: int32 = left * right
+print(pos_product)
+
+// Verifies multiplication with opposite signs.
+mixed_product: int32 = neg_left * right
+print(mixed_product)
+
+<<< stdout
+2000000000
+-2000000000
+
+<<< stderr

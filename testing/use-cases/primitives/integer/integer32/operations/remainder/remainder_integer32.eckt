@@ -1,0 +1,23 @@
+# Integer32 remainder sign
+
+Verifies int32 remainder keeps the sign of the dividend through the complete
+CLI pipeline.
+
+>>> source
+dividend: int32 = 2000000000
+neg_dividend: int32 = -2000000000
+divisor: int32 = 1000003
+
+// Verifies the remainder of two positive operands.
+pos_remainder: int32 = dividend % divisor
+print(pos_remainder)
+
+// Verifies the remainder takes the dividend sign for a negative dividend.
+neg_remainder: int32 = neg_dividend % divisor
+print(neg_remainder)
+
+<<< stdout
+994003
+-994003
+
+<<< stderr
