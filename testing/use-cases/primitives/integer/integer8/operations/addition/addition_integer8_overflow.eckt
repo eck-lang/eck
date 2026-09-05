@@ -1,0 +1,22 @@
+# Integer8 addition promotes overflow to int16
+
+Adds 1 to the int8 maximum to verify the result promotes to int16 instead
+of failing, then adds 1 again to verify chained arithmetic keeps using the
+promoted representation. Both declarations keep the static int8 type while
+the runtime values use the wider precision.
+
+>>> source
+maximum: int8 = 127
+unit: int8 = 1
+
+overflow: int8 = maximum + unit
+print(overflow)
+
+chained: int8 = overflow + unit
+print(chained)
+
+<<< stdout
+128
+129
+
+<<< stderr
