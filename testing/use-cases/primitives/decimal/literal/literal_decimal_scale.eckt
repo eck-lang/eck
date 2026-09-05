@@ -1,0 +1,23 @@
+# Decimal literal scale preservation
+
+Verifies decimal literals keep their source scale and accept exponent
+notation through the complete CLI pipeline.
+
+>>> source
+scaled: decimal = 1.50
+plain: decimal = 2.5
+big: decimal = 1e3
+
+// Verifies a trailing zero survives parsing and printing.
+print(scaled)
+print(plain)
+
+// Verifies exponent notation denotes the same decimal value.
+print(big)
+
+<<< stdout
+1.50
+2.5
+1000
+
+<<< stderr

@@ -1,0 +1,30 @@
+# Decimal comparison ordering
+
+Verifies the decimal equality and ordering relations through the complete
+CLI pipeline. Every operand is decimal: comparisons are only defined between
+equal types.
+
+>>> source
+low: decimal = 1.25
+high: decimal = 2.5
+same: decimal = 2.5
+
+// Verifies the equality family on equal and distinct operands.
+print(high == same)
+print(low == high)
+
+// Verifies the ordering family on distinct operands.
+print(low < high)
+print(high < low)
+print(high >= same)
+print(low >= high)
+
+<<< stdout
+true
+false
+true
+false
+true
+false
+
+<<< stderr
