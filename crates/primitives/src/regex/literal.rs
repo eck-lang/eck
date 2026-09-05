@@ -15,14 +15,15 @@ pub(crate) fn parse(raw_text: &str, regex_type: TypeId) -> Result<Value, CoreErr
             message: "regex literal must start with `/`".into(),
         });
     }
-    let last_slash = raw_text[1..]
-        .rfind('/')
-        .map(|pos| pos + 1)
-        .ok_or_else(|| CoreError::InvalidLiteral {
-            raw_text: raw_text.to_owned(),
-            type_name: "regex".into(),
-            message: "regex literal must contain a closing `/`".into(),
-        })?;
+    let last_slash =
+        raw_text[1..]
+            .rfind('/')
+            .map(|pos| pos + 1)
+            .ok_or_else(|| CoreError::InvalidLiteral {
+                raw_text: raw_text.to_owned(),
+                type_name: "regex".into(),
+                message: "regex literal must contain a closing `/`".into(),
+            })?;
     let pattern_raw = &raw_text[1..last_slash];
     let flags_str = &raw_text[last_slash + 1..];
 
