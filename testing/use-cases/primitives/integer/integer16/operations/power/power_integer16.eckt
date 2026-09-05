@@ -1,0 +1,17 @@
+# Integer16 power within range
+
+Verifies int16 exponentiation with base and exponent chosen to stay inside
+the 16-bit range through the complete CLI pipeline. Both operands are int16
+to keep this case focused on same-type power semantics.
+
+>>> source
+base: int16 = 2
+exponent: int16 = 14
+
+power: int16 = base ** exponent
+print(power)
+
+<<< stdout
+16384
+
+<<< stderr

@@ -1,0 +1,23 @@
+# Integer16 remainder sign
+
+Verifies int16 remainder keeps the sign of the dividend through the complete
+CLI pipeline.
+
+>>> source
+dividend: int16 = 30000
+neg_dividend: int16 = -30000
+divisor: int16 = 119
+
+// Verifies the remainder of two positive operands.
+pos_remainder: int16 = dividend % divisor
+print(pos_remainder)
+
+// Verifies the remainder takes the dividend sign for a negative dividend.
+neg_remainder: int16 = neg_dividend % divisor
+print(neg_remainder)
+
+<<< stdout
+12
+-12
+
+<<< stderr

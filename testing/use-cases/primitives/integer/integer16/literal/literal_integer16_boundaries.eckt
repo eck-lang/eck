@@ -1,0 +1,24 @@
+# Integer16 minimum and maximum values
+
+Verifies the int16 boundary values through the complete CLI pipeline. The
+maximum is expressible as a literal; the minimum is derived by subtracting
+one from the largest negative literal because a negated minimum-magnitude
+literal is validated unsigned first, consistent with int8 and int64.
+
+>>> source
+ceiling: int16 = 32767
+floor: int16 = -32767
+unit: int16 = 1
+
+// Verifies the largest int16 literal prints unchanged.
+print(ceiling)
+
+// Verifies the int16 minimum is reachable through checked arithmetic.
+minimum: int16 = floor - unit
+print(minimum)
+
+<<< stdout
+32767
+-32768
+
+<<< stderr

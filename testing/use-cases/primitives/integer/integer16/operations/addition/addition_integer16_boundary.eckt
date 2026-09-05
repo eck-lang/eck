@@ -1,0 +1,24 @@
+# Integer16 addition at the type boundary
+
+Verifies int16 addition at the upper boundary of the 16-bit range through the
+complete CLI pipeline. Every operand is int16 to keep this case focused on
+same-type boundary semantics.
+
+>>> source
+left: int16 = 32760
+right: int16 = 7
+neg_left: int16 = -32760
+
+// Verifies addition reaching exactly the int16 maximum.
+boundary_sum: int16 = left + right
+print(boundary_sum)
+
+// Verifies addition of a negative operand staying in range.
+negative_sum: int16 = neg_left + right
+print(negative_sum)
+
+<<< stdout
+32767
+-32753
+
+<<< stderr

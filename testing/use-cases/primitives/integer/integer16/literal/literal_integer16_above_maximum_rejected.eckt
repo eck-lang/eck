@@ -1,0 +1,16 @@
+# Integer16 literal above the maximum
+
+Verifies an int16 literal one past the 16-bit maximum is rejected with a
+compile-time diagnostic through the complete CLI pipeline.
+
+>>> source
+too_large: int16 = 32768
+print(too_large)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `32768` for type `int16`: number too large to fit in target type at Span { start: 19, end: 24 }
+
+<<< exit
+1

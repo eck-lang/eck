@@ -1,0 +1,25 @@
+# Integer16 comparisons promote mixed operands
+
+Verifies every comparison operator accepts int8 and int16 operands without
+losing integer precision and preserves operand order.
+
+>>> source
+narrow: int8 = 5
+wide: int16 = 10
+
+print(narrow < wide)
+print(wide <= narrow)
+print(narrow > wide)
+print(wide >= narrow)
+print(narrow == wide)
+print(wide != narrow)
+
+<<< stdout
+true
+false
+false
+true
+false
+true
+
+<<< stderr
