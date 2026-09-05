@@ -1,0 +1,16 @@
+# Regex literal flags roundtrip
+
+Verifies the `i` case-insensitive flag and the `g` global flag survive parsing
+and print back verbatim as part of the literal text.
+
+>>> source
+insensitive: regex = /hello/i
+print(insensitive)
+combined: regex = /hello/gi
+print(combined)
+
+<<< stdout
+/hello/i
+/hello/gi
+
+<<< stderr

@@ -1,0 +1,17 @@
+# Regex basic literal roundtrip
+
+Verifies plain regex literals keep their source text through parsing and
+printing: `/hello/` denotes a literal match and `/cat|dog/` an alternation,
+and both print back verbatim.
+
+>>> source
+word: regex = /hello/
+print(word)
+alternation: regex = /cat|dog/
+print(alternation)
+
+<<< stdout
+/hello/
+/cat|dog/
+
+<<< stderr

@@ -1,0 +1,16 @@
+# Regex literal duplicate flag rejected
+
+Verifies a repeated `g` flag is rejected at compile time: no regex value is
+produced and the diagnostic names the duplicated flag with its source span.
+
+>>> source
+bad: regex = /abc/gg
+print(bad)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `/abc/gg` for type `regex`: duplicate `g` flag in regex literal at Span { start: 13, end: 20 }
+
+<<< exit
+1

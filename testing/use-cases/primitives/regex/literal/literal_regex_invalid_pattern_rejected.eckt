@@ -1,0 +1,20 @@
+# Regex literal invalid pattern rejected
+
+Verifies a pattern the regex engine cannot compile is rejected at compile
+time: the unclosed character class surfaces the engine error with its source
+span instead of producing a value.
+
+>>> source
+bad: regex = /[unclosed/
+print(bad)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `/[unclosed/` for type `regex`: regex parse error:
+    [unclosed
+    ^
+error: unclosed character class at Span { start: 13, end: 24 }
+
+<<< exit
+1
