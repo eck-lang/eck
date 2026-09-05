@@ -1,0 +1,40 @@
+# Integer128 division promotes mixed operands
+
+Verifies every narrower signed integer width divides with int128 in both
+operand orders, producing int128 with integer truncation.
+
+>>> source
+narrow8: int8 = 20
+narrow16: int16 = 20
+narrow32: int32 = 20
+narrow64: int64 = 20
+wide: int128 = 5
+
+result8_left: int128 = narrow8 / wide
+result8_right: int128 = wide / narrow8
+result16_left: int128 = narrow16 / wide
+result16_right: int128 = wide / narrow16
+result32_left: int128 = narrow32 / wide
+result32_right: int128 = wide / narrow32
+result64_left: int128 = narrow64 / wide
+result64_right: int128 = wide / narrow64
+print(result8_left)
+print(result8_right)
+print(result16_left)
+print(result16_right)
+print(result32_left)
+print(result32_right)
+print(result64_left)
+print(result64_right)
+
+<<< stdout
+4
+0
+4
+0
+4
+0
+4
+0
+
+<<< stderr

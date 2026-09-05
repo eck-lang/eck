@@ -1,0 +1,40 @@
+# Integer128 power promotes mixed operands
+
+Verifies every narrower signed integer width participates in int128 power in
+both operand orders and produces an int128 result.
+
+>>> source
+narrow8: int8 = 2
+narrow16: int16 = 2
+narrow32: int32 = 2
+narrow64: int64 = 2
+wide: int128 = 3
+
+result8_base: int128 = narrow8 ** wide
+result8_exponent: int128 = wide ** narrow8
+result16_base: int128 = narrow16 ** wide
+result16_exponent: int128 = wide ** narrow16
+result32_base: int128 = narrow32 ** wide
+result32_exponent: int128 = wide ** narrow32
+result64_base: int128 = narrow64 ** wide
+result64_exponent: int128 = wide ** narrow64
+print(result8_base)
+print(result8_exponent)
+print(result16_base)
+print(result16_exponent)
+print(result32_base)
+print(result32_exponent)
+print(result64_base)
+print(result64_exponent)
+
+<<< stdout
+8
+9
+8
+9
+8
+9
+8
+9
+
+<<< stderr

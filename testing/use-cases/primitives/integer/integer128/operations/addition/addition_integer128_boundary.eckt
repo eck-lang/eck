@@ -1,0 +1,25 @@
+# Integer128 addition at the type boundary
+
+Adds 7 at the upper boundary of the 128-bit range to verify the sum lands
+exactly on the int128 maximum, then adds 7 to the mirrored negative value
+to verify it stays in range. Every operand carries an int128 annotation so
+both cases exercise same-type addition.
+
+>>> source
+left: int128 = 170141183460469231731687303715884105720
+right: int128 = 7
+neg_left: int128 = -170141183460469231731687303715884105720
+
+// Verifies addition reaching exactly the int128 maximum.
+boundary_sum: int128 = left + right
+print(boundary_sum)
+
+// Verifies addition of a negative operand staying in range.
+negative_sum: int128 = neg_left + right
+print(negative_sum)
+
+<<< stdout
+170141183460469231731687303715884105727
+-170141183460469231731687303715884105713
+
+<<< stderr

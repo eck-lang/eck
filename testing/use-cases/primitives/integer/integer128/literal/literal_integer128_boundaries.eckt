@@ -1,0 +1,24 @@
+# Integer128 minimum and maximum values
+
+Binds the int128 maximum as a literal and derives the minimum by
+subtracting one from the largest negative literal, because a negated
+minimum-magnitude literal is validated unsigned first, consistent with
+int8 and int64.
+
+>>> source
+ceiling: int128 = 170141183460469231731687303715884105727
+floor: int128 = -170141183460469231731687303715884105727
+unit: int128 = 1
+
+// Verifies the largest int128 literal prints unchanged.
+print(ceiling)
+
+// Verifies the int128 minimum is reachable through checked arithmetic.
+minimum: int128 = floor - unit
+print(minimum)
+
+<<< stdout
+170141183460469231731687303715884105727
+-170141183460469231731687303715884105728
+
+<<< stderr

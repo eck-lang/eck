@@ -1,0 +1,30 @@
+# Integer128 comparison ordering
+
+Compares ±10^29 values to verify the equality and ordering relations on
+magnitudes far beyond 64 bits. Every operand is int128, keeping this case
+focused on same-type relations; mixed widths are covered separately.
+
+>>> source
+low: int128 = -100000000000000000000000000000
+high: int128 = 100000000000000000000000000000
+same: int128 = 100000000000000000000000000000
+
+// Verifies the equality family on equal and distinct operands.
+print(high == same)
+print(low == high)
+
+// Verifies the ordering family on distinct operands.
+print(low < high)
+print(high < low)
+print(high >= same)
+print(low >= high)
+
+<<< stdout
+true
+false
+true
+false
+true
+false
+
+<<< stderr

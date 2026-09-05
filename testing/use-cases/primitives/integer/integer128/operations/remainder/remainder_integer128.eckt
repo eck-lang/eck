@@ -1,0 +1,23 @@
+# Integer128 remainder sign
+
+Takes a 30-digit value and its negation modulo 7 to verify the remainder
+keeps the dividend sign in both cases, producing 5 and -5.
+
+>>> source
+dividend: int128 = 100000000000000000000000000000
+neg_dividend: int128 = -100000000000000000000000000000
+divisor: int128 = 7
+
+// Verifies the remainder of two positive operands.
+pos_remainder: int128 = dividend % divisor
+print(pos_remainder)
+
+// Verifies the remainder takes the dividend sign for a negative dividend.
+neg_remainder: int128 = neg_dividend % divisor
+print(neg_remainder)
+
+<<< stdout
+5
+-5
+
+<<< stderr

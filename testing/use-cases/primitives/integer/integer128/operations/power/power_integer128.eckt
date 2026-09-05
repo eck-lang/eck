@@ -1,0 +1,17 @@
+# Integer128 power within range
+
+Raises 2 to the 100th power with both operands annotated as int128 to
+verify same-type exponentiation stays inside the 128-bit range,
+producing 1267650600228229401496703205376.
+
+>>> source
+base: int128 = 2
+exponent: int128 = 100
+
+power: int128 = base ** exponent
+print(power)
+
+<<< stdout
+1267650600228229401496703205376
+
+<<< stderr
