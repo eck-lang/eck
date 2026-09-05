@@ -1,0 +1,16 @@
+# Regex literal unknown flag rejected
+
+Verifies the `z` flag is rejected at compile time: no regex value is produced
+and the diagnostic names the offending flag with its source span.
+
+>>> source
+bad: regex = /abc/z
+print(bad)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `/abc/z` for type `regex`: unknown flag `z` in regex literal at Span { start: 13, end: 19 }
+
+<<< exit
+1
