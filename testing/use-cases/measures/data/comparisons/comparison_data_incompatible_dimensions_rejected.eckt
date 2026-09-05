@@ -1,0 +1,15 @@
+# Data comparison across dimensions rejected
+
+Verifies a comparison between incompatible measure dimensions is rejected at compile time. A kilobyte and a meter belong to separate dimensions with no registered comparison rule, so the compiler reports the undefined operand pair instead of scaling across dimensions.
+
+>>> source
+size: int = 1KB
+print(size == 1m)
+
+<<< stdout
+
+<<< stderr
+eck: comparison `==` is not defined for `int64[KB]` and `int64[m]` at Span { start: 22, end: 32 }
+
+<<< exit
+1

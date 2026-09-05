@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and tebibyte
+
+Verifies direct data conversion between gibibyte and tebibyte in both directions. Forward, converting 1GiB to 0.0009TiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GiB yields 0.0014TiB; backward, converting 1TiB to 1024GiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5TiB yields 1536.0GiB.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(TiB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(TiB))
+backward_whole: int = 1TiB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5TiB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+0.0009TiB
+0.0014TiB
+1024GiB
+1536.0GiB
+
+<<< stderr

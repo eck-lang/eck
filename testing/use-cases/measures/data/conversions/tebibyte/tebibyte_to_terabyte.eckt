@@ -1,0 +1,21 @@
+# Data conversion between tebibyte and terabyte
+
+Verifies direct data conversion between tebibyte and terabyte in both directions. Forward, converting 1TiB to 1.0995TB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5TiB yields 1.6492TB; backward, converting 1TB to 0.9094TiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5TB yields 1.3642TiB.
+
+>>> source
+forward_whole: int = 1TiB
+print(forward_whole->to(TB))
+forward_fractional: decimal = 1.5TiB
+print(forward_fractional->to(TB))
+backward_whole: int = 1TB
+print(backward_whole->to(TiB))
+backward_fractional: decimal = 1.5TB
+print(backward_fractional->to(TiB))
+
+<<< stdout
+1.0995TB
+1.6492TB
+0.9094TiB
+1.3642TiB
+
+<<< stderr

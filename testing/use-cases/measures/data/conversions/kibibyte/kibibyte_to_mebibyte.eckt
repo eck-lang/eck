@@ -1,0 +1,21 @@
+# Data conversion between kibibyte and mebibyte
+
+Verifies direct data conversion between kibibyte and mebibyte in both directions. Forward, converting 1KiB to 0.0009MiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KiB yields 0.0014MiB; backward, converting 1MiB to 1024KiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5MiB yields 1536.0KiB.
+
+>>> source
+forward_whole: int = 1KiB
+print(forward_whole->to(MiB))
+forward_fractional: decimal = 1.5KiB
+print(forward_fractional->to(MiB))
+backward_whole: int = 1MiB
+print(backward_whole->to(KiB))
+backward_fractional: decimal = 1.5MiB
+print(backward_fractional->to(KiB))
+
+<<< stdout
+0.0009MiB
+0.0014MiB
+1024KiB
+1536.0KiB
+
+<<< stderr

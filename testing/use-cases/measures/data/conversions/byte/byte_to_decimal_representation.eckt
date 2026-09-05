@@ -1,0 +1,21 @@
+# Data representation conversion keeps the unit
+
+Verifies `->to(type)` changes only the numeric representation of a data measure while preserving its unit. An integer byte becomes a decimal byte, a float kilobyte becomes a decimal kilobyte, and a whole decimal byte becomes an integer byte. Each assignment to an explicitly typed variable proves the representation changed, since a mismatched base type would fail compilation.
+
+>>> source
+whole: int = 1B
+as_decimal: decimal = whole->to(decimal)
+print(as_decimal)
+float_val: float = 1.5KB
+float_as_decimal: decimal = float_val->to(decimal)
+print(float_as_decimal)
+whole_decimal: decimal = 2B
+back_to_int: int = whole_decimal->to(int)
+print(back_to_int)
+
+<<< stdout
+1B
+1.5KB
+2B
+
+<<< stderr

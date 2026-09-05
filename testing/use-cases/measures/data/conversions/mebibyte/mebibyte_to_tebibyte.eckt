@@ -1,0 +1,21 @@
+# Data conversion between mebibyte and tebibyte
+
+Verifies direct data conversion between mebibyte and tebibyte in both directions. Forward, converting 1MiB to 0.0000TiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MiB yields 0.0000TiB; backward, converting 1TiB to 1048576MiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5TiB yields 1572864.0MiB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1MiB
+print(forward_whole->to(TiB))
+forward_fractional: decimal = 1.5MiB
+print(forward_fractional->to(TiB))
+backward_whole: int = 1TiB
+print(backward_whole->to(MiB))
+backward_fractional: decimal = 1.5TiB
+print(backward_fractional->to(MiB))
+
+<<< stdout
+0.0000TiB
+0.0000TiB
+1048576MiB
+1572864.0MiB
+
+<<< stderr

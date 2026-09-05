@@ -1,0 +1,21 @@
+# Data conversion between kibibyte and petabyte
+
+Verifies direct data conversion between kibibyte and petabyte in both directions. Forward, converting 1KiB to 0.0000PB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KiB yields 0.0000PB; backward, converting 1PB to 976562500000KiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5PB yields 1464843750000.0KiB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1KiB
+print(forward_whole->to(PB))
+forward_fractional: decimal = 1.5KiB
+print(forward_fractional->to(PB))
+backward_whole: int = 1PB
+print(backward_whole->to(KiB))
+backward_fractional: decimal = 1.5PB
+print(backward_fractional->to(KiB))
+
+<<< stdout
+0.0000PB
+0.0000PB
+976562500000KiB
+1464843750000.0KiB
+
+<<< stderr

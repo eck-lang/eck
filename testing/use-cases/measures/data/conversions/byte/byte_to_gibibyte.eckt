@@ -1,0 +1,21 @@
+# Data conversion between byte and gibibyte
+
+Verifies direct data conversion between byte and gibibyte in both directions. Forward, converting 1B to 0.0000GiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5B yields 0.0000GiB; backward, converting 1GiB to 1073741824B preserves the integer representation across the integer coarser-to-finer scale, while 1.5GiB yields 1610612736.0B. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1B
+print(forward_whole->to(GiB))
+forward_fractional: decimal = 1.5B
+print(forward_fractional->to(GiB))
+backward_whole: int = 1GiB
+print(backward_whole->to(B))
+backward_fractional: decimal = 1.5GiB
+print(backward_fractional->to(B))
+
+<<< stdout
+0.0000GiB
+0.0000GiB
+1073741824B
+1610612736.0B
+
+<<< stderr

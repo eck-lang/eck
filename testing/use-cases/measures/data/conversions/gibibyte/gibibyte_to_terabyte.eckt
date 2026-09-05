@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and terabyte
+
+Verifies direct data conversion between gibibyte and terabyte in both directions. Forward, converting 1GiB to 0.0010TB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GiB yields 0.0016TB; backward, converting 1TB to 931.3225GiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5TB yields 1396.9838GiB.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(TB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(TB))
+backward_whole: int = 1TB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5TB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+0.0010TB
+0.0016TB
+931.3225GiB
+1396.9838GiB
+
+<<< stderr

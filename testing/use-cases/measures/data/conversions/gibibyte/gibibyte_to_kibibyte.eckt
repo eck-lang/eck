@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and kibibyte
+
+Verifies direct data conversion between gibibyte and kibibyte in both directions. Forward, converting 1GiB to 1048576KiB preserves the integer representation across the integer coarser-to-finer scale, while 1.5GiB yields 1572864.0KiB; backward, converting 1KiB to 0.0000GiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KiB yields 0.0000GiB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(KiB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(KiB))
+backward_whole: int = 1KiB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5KiB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+1048576KiB
+1572864.0KiB
+0.0000GiB
+0.0000GiB
+
+<<< stderr

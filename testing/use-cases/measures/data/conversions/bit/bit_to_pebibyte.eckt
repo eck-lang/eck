@@ -1,0 +1,21 @@
+# Data conversion between bit and pebibyte
+
+Verifies direct data conversion between bit and pebibyte in both directions. Forward, converting 1b to 0.0000PiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5b yields 0.0000PiB; backward, converting 1PiB to 9007199254740992b preserves the integer representation across the integer coarser-to-finer scale, while 1.5PiB yields 13510798882111488.0b. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1b
+print(forward_whole->to(PiB))
+forward_fractional: decimal = 1.5b
+print(forward_fractional->to(PiB))
+backward_whole: int = 1PiB
+print(backward_whole->to(b))
+backward_fractional: decimal = 1.5PiB
+print(backward_fractional->to(b))
+
+<<< stdout
+0.0000PiB
+0.0000PiB
+9007199254740992b
+13510798882111488.0b
+
+<<< stderr

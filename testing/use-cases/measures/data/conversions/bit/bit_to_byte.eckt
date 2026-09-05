@@ -1,0 +1,21 @@
+# Data conversion between bit and byte
+
+Verifies direct data conversion between bit and byte in both directions. Forward, converting 1b to 0.125B with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5b yields 0.1875B; backward, converting 1B to 8b preserves the integer representation across the integer coarser-to-finer scale, while 1.5B yields 12.0b.
+
+>>> source
+forward_whole: int = 1b
+print(forward_whole->to(B))
+forward_fractional: decimal = 1.5b
+print(forward_fractional->to(B))
+backward_whole: int = 1B
+print(backward_whole->to(b))
+backward_fractional: decimal = 1.5B
+print(backward_fractional->to(b))
+
+<<< stdout
+0.125B
+0.1875B
+8b
+12.0b
+
+<<< stderr

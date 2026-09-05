@@ -1,0 +1,21 @@
+# Data conversion between bit and kilobyte
+
+Verifies direct data conversion between bit and kilobyte in both directions. Forward, converting 1b to 0.0001KB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5b yields 0.0001KB; backward, converting 1KB to 8000b preserves the integer representation across the integer coarser-to-finer scale, while 1.5KB yields 12000.0b.
+
+>>> source
+forward_whole: int = 1b
+print(forward_whole->to(KB))
+forward_fractional: decimal = 1.5b
+print(forward_fractional->to(KB))
+backward_whole: int = 1KB
+print(backward_whole->to(b))
+backward_fractional: decimal = 1.5KB
+print(backward_fractional->to(b))
+
+<<< stdout
+0.0001KB
+0.0001KB
+8000b
+12000.0b
+
+<<< stderr

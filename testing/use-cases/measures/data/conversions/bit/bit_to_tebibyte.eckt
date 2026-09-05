@@ -1,0 +1,21 @@
+# Data conversion between bit and tebibyte
+
+Verifies direct data conversion between bit and tebibyte in both directions. Forward, converting 1b to 0.0000TiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5b yields 0.0000TiB; backward, converting 1TiB to 8796093022208b preserves the integer representation across the integer coarser-to-finer scale, while 1.5TiB yields 13194139533312.0b. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1b
+print(forward_whole->to(TiB))
+forward_fractional: decimal = 1.5b
+print(forward_fractional->to(TiB))
+backward_whole: int = 1TiB
+print(backward_whole->to(b))
+backward_fractional: decimal = 1.5TiB
+print(backward_fractional->to(b))
+
+<<< stdout
+0.0000TiB
+0.0000TiB
+8796093022208b
+13194139533312.0b
+
+<<< stderr

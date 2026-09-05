@@ -1,0 +1,21 @@
+# Data conversion between kilobyte and pebibyte
+
+Verifies direct data conversion between kilobyte and pebibyte in both directions. Forward, converting 1KB to 0.0000PiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KB yields 0.0000PiB; backward, converting 1PiB to 1125899906842.624KB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5PiB yields 1688849860263.936KB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1KB
+print(forward_whole->to(PiB))
+forward_fractional: decimal = 1.5KB
+print(forward_fractional->to(PiB))
+backward_whole: int = 1PiB
+print(backward_whole->to(KB))
+backward_fractional: decimal = 1.5PiB
+print(backward_fractional->to(KB))
+
+<<< stdout
+0.0000PiB
+0.0000PiB
+1125899906842.624KB
+1688849860263.936KB
+
+<<< stderr

@@ -1,0 +1,21 @@
+# Data conversion between kilobyte and terabyte
+
+Verifies direct data conversion between kilobyte and terabyte in both directions. Forward, converting 1KB to 0.0000TB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KB yields 0.0000TB; backward, converting 1TB to 1000000000KB preserves the integer representation across the integer coarser-to-finer scale, while 1.5TB yields 1500000000.0KB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1KB
+print(forward_whole->to(TB))
+forward_fractional: decimal = 1.5KB
+print(forward_fractional->to(TB))
+backward_whole: int = 1TB
+print(backward_whole->to(KB))
+backward_fractional: decimal = 1.5TB
+print(backward_fractional->to(KB))
+
+<<< stdout
+0.0000TB
+0.0000TB
+1000000000KB
+1500000000.0KB
+
+<<< stderr

@@ -1,0 +1,21 @@
+# Data conversion between mebibyte and petabyte
+
+Verifies direct data conversion between mebibyte and petabyte in both directions. Forward, converting 1MiB to 0.0000PB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MiB yields 0.0000PB; backward, converting 1PB to 953674316.4062MiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5PB yields 1430511474.6093MiB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1MiB
+print(forward_whole->to(PB))
+forward_fractional: decimal = 1.5MiB
+print(forward_fractional->to(PB))
+backward_whole: int = 1PB
+print(backward_whole->to(MiB))
+backward_fractional: decimal = 1.5PB
+print(backward_fractional->to(MiB))
+
+<<< stdout
+0.0000PB
+0.0000PB
+953674316.4062MiB
+1430511474.6093MiB
+
+<<< stderr

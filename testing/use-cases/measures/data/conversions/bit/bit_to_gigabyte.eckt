@@ -1,0 +1,21 @@
+# Data conversion between bit and gigabyte
+
+Verifies direct data conversion between bit and gigabyte in both directions. Forward, converting 1b to 0.0000GB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5b yields 0.0000GB; backward, converting 1GB to 8000000000b preserves the integer representation across the integer coarser-to-finer scale, while 1.5GB yields 12000000000.0b. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1b
+print(forward_whole->to(GB))
+forward_fractional: decimal = 1.5b
+print(forward_fractional->to(GB))
+backward_whole: int = 1GB
+print(backward_whole->to(b))
+backward_fractional: decimal = 1.5GB
+print(backward_fractional->to(b))
+
+<<< stdout
+0.0000GB
+0.0000GB
+8000000000b
+12000000000.0b
+
+<<< stderr

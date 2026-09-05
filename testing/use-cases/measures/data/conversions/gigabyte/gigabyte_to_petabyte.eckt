@@ -1,0 +1,21 @@
+# Data conversion between gigabyte and petabyte
+
+Verifies direct data conversion between gigabyte and petabyte in both directions. Forward, converting 1GB to 0.0000PB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5GB yields 0.0000PB; backward, converting 1PB to 1000000GB preserves the integer representation across the integer coarser-to-finer scale, while 1.5PB yields 1500000.0GB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1GB
+print(forward_whole->to(PB))
+forward_fractional: decimal = 1.5GB
+print(forward_fractional->to(PB))
+backward_whole: int = 1PB
+print(backward_whole->to(GB))
+backward_fractional: decimal = 1.5PB
+print(backward_fractional->to(GB))
+
+<<< stdout
+0.0000PB
+0.0000PB
+1000000GB
+1500000.0GB
+
+<<< stderr

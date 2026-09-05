@@ -1,0 +1,21 @@
+# Data comparison across representations
+
+Verifies comparisons between integer and decimal measures combine unit scaling with representation promotion. A decimal 1.5KB exceeds an integer 1000B and equals 1500B exactly, and a decimal mebibyte still exceeds a decimal megabyte since the binary unit carries more bits than its decimal namesake.
+
+>>> source
+whole: int = 1000B
+fractional: decimal = 1.5KB
+print(fractional > whole)
+print(fractional == 1500B)
+print(whole < fractional)
+binary: decimal = 1MiB
+decimal_unit: decimal = 1MB
+print(binary > decimal_unit)
+
+<<< stdout
+true
+true
+true
+true
+
+<<< stderr

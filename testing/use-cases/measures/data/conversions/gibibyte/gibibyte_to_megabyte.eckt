@@ -1,0 +1,21 @@
+# Data conversion between gibibyte and megabyte
+
+Verifies direct data conversion between gibibyte and megabyte in both directions. Forward, converting 1GiB to 1073.7418MB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5GiB yields 1610.6127MB; backward, converting 1MB to 0.0009GiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5MB yields 0.0013GiB.
+
+>>> source
+forward_whole: int = 1GiB
+print(forward_whole->to(MB))
+forward_fractional: decimal = 1.5GiB
+print(forward_fractional->to(MB))
+backward_whole: int = 1MB
+print(backward_whole->to(GiB))
+backward_fractional: decimal = 1.5MB
+print(backward_fractional->to(GiB))
+
+<<< stdout
+1073.7418MB
+1610.6127MB
+0.0009GiB
+0.0013GiB
+
+<<< stderr

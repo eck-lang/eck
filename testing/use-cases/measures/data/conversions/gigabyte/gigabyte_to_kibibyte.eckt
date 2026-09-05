@@ -1,0 +1,21 @@
+# Data conversion between gigabyte and kibibyte
+
+Verifies direct data conversion between gigabyte and kibibyte in both directions. Forward, converting 1GB to 976562.50KiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5GB yields 1464843.750KiB; backward, converting 1KiB to 0.0000GB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KiB yields 0.0000GB. Tiny magnitudes round to four fractional digits.
+
+>>> source
+forward_whole: int = 1GB
+print(forward_whole->to(KiB))
+forward_fractional: decimal = 1.5GB
+print(forward_fractional->to(KiB))
+backward_whole: int = 1KiB
+print(backward_whole->to(GB))
+backward_fractional: decimal = 1.5KiB
+print(backward_fractional->to(GB))
+
+<<< stdout
+976562.50KiB
+1464843.750KiB
+0.0000GB
+0.0000GB
+
+<<< stderr

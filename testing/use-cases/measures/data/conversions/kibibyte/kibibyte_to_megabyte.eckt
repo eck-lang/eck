@@ -1,0 +1,21 @@
+# Data conversion between kibibyte and megabyte
+
+Verifies direct data conversion between kibibyte and megabyte in both directions. Forward, converting 1KiB to 0.0010MB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5KiB yields 0.0015MB; backward, converting 1MB to 976.5625KiB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5MB yields 1464.8437KiB.
+
+>>> source
+forward_whole: int = 1KiB
+print(forward_whole->to(MB))
+forward_fractional: decimal = 1.5KiB
+print(forward_fractional->to(MB))
+backward_whole: int = 1MB
+print(backward_whole->to(KiB))
+backward_fractional: decimal = 1.5MB
+print(backward_fractional->to(KiB))
+
+<<< stdout
+0.0010MB
+0.0015MB
+976.5625KiB
+1464.8437KiB
+
+<<< stderr

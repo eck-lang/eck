@@ -1,0 +1,21 @@
+# Data conversion between pebibyte and petabyte
+
+Verifies direct data conversion between pebibyte and petabyte in both directions. Forward, converting 1PiB to 1.1258PB with a fractional coarser-to-finer scale promotes the integer result to decimal, while 1.5PiB yields 1.6888PB; backward, converting 1PB to 0.8881PiB with a fractional finer-to-coarser scale promotes the integer result to decimal, while 1.5PB yields 1.3322PiB.
+
+>>> source
+forward_whole: int = 1PiB
+print(forward_whole->to(PB))
+forward_fractional: decimal = 1.5PiB
+print(forward_fractional->to(PB))
+backward_whole: int = 1PB
+print(backward_whole->to(PiB))
+backward_fractional: decimal = 1.5PB
+print(backward_fractional->to(PiB))
+
+<<< stdout
+1.1258PB
+1.6888PB
+0.8881PiB
+1.3322PiB
+
+<<< stderr
