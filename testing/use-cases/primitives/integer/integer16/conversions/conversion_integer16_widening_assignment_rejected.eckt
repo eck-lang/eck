@@ -1,0 +1,18 @@
+# Integer16 widening assignment rejected
+
+Verifies arithmetic promotion remains local to registered operators and does
+not introduce implicit widening when assigning an int8 value directly to an
+int16 variable.
+
+>>> source
+narrow: int8 = 127
+wide: int16 = narrow
+print(wide)
+
+<<< stdout
+
+<<< stderr
+eck: type mismatch: variable `wide` expects `int16`, expression produces `int8` at Span { start: 33, end: 39 }
+
+<<< exit
+1

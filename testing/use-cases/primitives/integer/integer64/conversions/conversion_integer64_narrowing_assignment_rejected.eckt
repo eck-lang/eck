@@ -1,0 +1,19 @@
+# Integer64 narrowing assignment rejected
+
+Verifies assigning a bigint value to an int64 variable is rejected at compile
+time through the complete CLI pipeline. The language defines no implicit
+narrowing conversion, so the assignment fails instead of silently truncating
+a value that may not fit.
+
+>>> source
+wide: bigint = 170141183460469231731687303715884105728
+narrow: int64 = wide
+print(narrow)
+
+<<< stdout
+
+<<< stderr
+eck: type mismatch: variable `narrow` expects `int64`, expression produces `bigint` at Span { start: 71, end: 75 }
+
+<<< exit
+1
