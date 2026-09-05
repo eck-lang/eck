@@ -1,0 +1,14 @@
+# Boolean inequality comparison
+
+Verifies `!=` reports whether two boolean operands hold different values:
+mixed operands compare true while identical operands compare false.
+
+>>> source
+print(true != false)
+print(false != false)
+
+<<< stdout
+true
+false
+
+<<< stderr

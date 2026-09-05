@@ -1,0 +1,16 @@
+# Boolean basic literal roundtrip
+
+Verifies the `true` and `false` literals parse into boolean values and print
+back in their canonical lowercase representation.
+
+>>> source
+enabled: bool = true
+print(enabled)
+disabled: bool = false
+print(disabled)
+
+<<< stdout
+true
+false
+
+<<< stderr

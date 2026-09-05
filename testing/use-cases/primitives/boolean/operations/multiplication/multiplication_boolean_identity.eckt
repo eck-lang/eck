@@ -1,0 +1,20 @@
+# Boolean multiplication identity
+
+Verifies `true` acts as the multiplicative identity in both operand orders:
+an integer keeps its value whether the flag appears on the left or the right,
+and a decimal operand likewise survives unchanged.
+
+>>> source
+flag: bool = true
+count: int = 5
+print(count * flag)
+print(flag * count)
+price: decimal = 12.5
+print(price * flag)
+
+<<< stdout
+5
+5
+12.5
+
+<<< stderr
