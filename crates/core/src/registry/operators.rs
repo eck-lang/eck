@@ -1,7 +1,8 @@
 //! Base-type binary operator registration and dispatch.
 
 use crate::{
-    BinaryOperator, BinaryOperatorDescriptor, BinaryOperatorExecutor, CoreError, OperatorId, TypeId,
+    BinaryOperator, BinaryOperatorDescriptor, BinaryOperatorExecutor,
+    ContextBinaryOperatorExecutor, CoreError, OperatorId, TypeId,
 };
 
 use super::Registry;
@@ -46,6 +47,56 @@ impl Registry {
             right_operand_type,
             result_type,
             execute,
+            context_execute: None,
+        });
+        self.operator_index.insert(key, id);
+        Ok(id)
+    }
+
+    /// Registers one binary operator with a registry-aware execution override.
+    ///
+    /// Validation matches [`Registry::register_binary_operator`]: all input
+    /// and result type IDs must already be registered, and the exact operand
+    /// signature must be unique. The plain `execute` callback remains the
+    /// context-free implementation while `context_execute` is the override the
+    /// runtime prefers, which lets an extension resolve related types (such as
+    /// an overflow promotion target) at execution time. Returns
+    /// [`CoreError::UnknownTypeId`] for an unknown type or
+    /// [`CoreError::DuplicateOperator`] for an existing signature.
+    pub fn register_context_binary_operator(
+        &mut self,
+        operator: BinaryOperator,
+        left_operand_type: TypeId,
+        right_operand_type: TypeId,
+        result_type: TypeId,
+        execute: BinaryOperatorExecutor,
+        context_execute: ContextBinaryOperatorExecutor,
+    ) -> Result<OperatorId, CoreError> {
+        self.type_descriptor(left_operand_type)?;
+        self.type_descriptor(right_operand_type)?;
+        self.type_descriptor(result_type)?;
+
+        let key = (operator, left_operand_type, right_operand_type);
+        if self.operator_index.contains_key(&key) {
+            return Err(CoreError::DuplicateOperator {
+                operator,
+                left_operand_type: self.type_name(left_operand_type).to_string(),
+                right_operand_type: self.type_name(right_operand_type).to_string(),
+            });
+        }
+
+        let id = OperatorId {
+            registry_id: self.registry_id,
+            index: self.operators.len(),
+        };
+        self.operators.push(BinaryOperatorDescriptor {
+            id,
+            operator,
+            left_operand_type,
+            right_operand_type,
+            result_type,
+            execute,
+            context_execute: Some(context_execute),
         });
         self.operator_index.insert(key, id);
         Ok(id)

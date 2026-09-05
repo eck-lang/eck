@@ -1,5 +1,8 @@
 use super::*;
 
+use language_core::Registry;
+use num_bigint::BigInt;
+
 /// Verifies integer power, exponent validation, and checked overflow handling.
 #[test]
 fn raises_integers_to_non_negative_powers_and_rejects_invalid_exponents() {
@@ -52,4 +55,29 @@ fn powers_promoted_integer64_operands_as_integer128() {
         power_mixed_integer(&invalid, &wide_two),
         Err(CoreError::InvalidValueRepresentation(_))
     ));
+}
+
+/// Verifies context-aware power promotes `int128` overflow to `bigint`.
+#[test]
+fn promotes_overflowed_context_power_to_bigint() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer128_id = registry.type_by_name("int128").unwrap();
+    let bigint_id = registry.type_by_name("bigint").unwrap();
+    let base = Value::new(integer128_id, 2_i128);
+    let exponent = Value::new(integer128_id, 127_i128);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Power, integer128_id, integer128_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &base, &exponent).unwrap();
+
+    assert_eq!(promoted.type_id(), bigint_id);
+    assert_eq!(
+        promoted.downcast_ref::<BigInt>().unwrap(),
+        &BigInt::from(2).pow(127)
+    );
 }

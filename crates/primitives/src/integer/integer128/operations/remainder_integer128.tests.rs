@@ -1,5 +1,8 @@
 use super::*;
 
+use language_core::Registry;
+use num_bigint::BigInt;
+
 /// Verifies integer remainder, zero-divisor rejection, and checked overflow.
 #[test]
 fn calculates_integer_remainder_and_rejects_zero_and_overflow() {
@@ -62,4 +65,29 @@ fn calculates_promoted_integer64_remainder_as_integer128() {
         remainder_mixed_integer(&invalid, &wide),
         Err(CoreError::InvalidValueRepresentation(_))
     ));
+}
+
+/// Verifies context-aware remainder promotes the `MIN % -1` overflow to `bigint`.
+#[test]
+fn promotes_overflowed_context_remainder_to_bigint() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer128_id = registry.type_by_name("int128").unwrap();
+    let bigint_id = registry.type_by_name("bigint").unwrap();
+    let minimum = Value::new(integer128_id, i128::MIN);
+    let negative_one = Value::new(integer128_id, -1_i128);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Remainder, integer128_id, integer128_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &negative_one).unwrap();
+
+    assert_eq!(promoted.type_id(), bigint_id);
+    assert_eq!(
+        promoted.downcast_ref::<BigInt>().unwrap(),
+        &(BigInt::from(i128::MIN) % -1)
+    );
 }

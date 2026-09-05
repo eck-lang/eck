@@ -1,5 +1,8 @@
 use super::*;
 
+use language_core::Registry;
+use num_bigint::BigInt;
+
 /// Verifies integer subtraction and checked overflow handling.
 #[test]
 fn subtracts_integers_and_rejects_overflow() {
@@ -41,4 +44,29 @@ fn subtracts_promoted_integer64_operands_as_integer128() {
         subtraction_mixed_integer(&invalid, &minimum),
         Err(CoreError::InvalidValueRepresentation(_))
     ));
+}
+
+/// Verifies context-aware subtraction promotes `int128` overflow to `bigint`.
+#[test]
+fn promotes_overflowed_context_subtraction_to_bigint() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer128_id = registry.type_by_name("int128").unwrap();
+    let bigint_id = registry.type_by_name("bigint").unwrap();
+    let minimum = Value::new(integer128_id, i128::MIN);
+    let one = Value::new(integer128_id, 1_i128);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Subtraction, integer128_id, integer128_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &one).unwrap();
+
+    assert_eq!(promoted.type_id(), bigint_id);
+    assert_eq!(
+        promoted.downcast_ref::<BigInt>().unwrap(),
+        &(BigInt::from(i128::MIN) - 1)
+    );
 }
