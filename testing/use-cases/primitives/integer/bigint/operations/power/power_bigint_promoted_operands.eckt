@@ -1,0 +1,55 @@
+# Bigint power promotes mixed operands
+
+Verifies every narrower signed integer width exponentiates with bigint in
+both operand orders and produces a bigint result. Raising 2 to the 10th
+power yields 1024 whether the base or the exponent is the narrower
+operand.
+
+>>> source
+narrow8_base: int8 = 2
+narrow16_base: int16 = 2
+narrow32_base: int32 = 2
+narrow64_base: int64 = 2
+narrow128_base: int128 = 2
+wide_base: bigint = 2
+narrow8_exponent: int8 = 10
+narrow16_exponent: int16 = 10
+narrow32_exponent: int32 = 10
+narrow64_exponent: int64 = 10
+narrow128_exponent: int128 = 10
+wide_exponent: bigint = 10
+
+result8_left: bigint = narrow8_base ** wide_exponent
+result8_right: bigint = wide_base ** narrow8_exponent
+result16_left: bigint = narrow16_base ** wide_exponent
+result16_right: bigint = wide_base ** narrow16_exponent
+result32_left: bigint = narrow32_base ** wide_exponent
+result32_right: bigint = wide_base ** narrow32_exponent
+result64_left: bigint = narrow64_base ** wide_exponent
+result64_right: bigint = wide_base ** narrow64_exponent
+result128_left: bigint = narrow128_base ** wide_exponent
+result128_right: bigint = wide_base ** narrow128_exponent
+print(result8_left)
+print(result8_right)
+print(result16_left)
+print(result16_right)
+print(result32_left)
+print(result32_right)
+print(result64_left)
+print(result64_right)
+print(result128_left)
+print(result128_right)
+
+<<< stdout
+1024
+1024
+1024
+1024
+1024
+1024
+1024
+1024
+1024
+1024
+
+<<< stderr

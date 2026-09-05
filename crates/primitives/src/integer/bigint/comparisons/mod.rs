@@ -1,4 +1,5 @@
 mod bigint;
+mod mixed;
 
 use std::cmp::Ordering;
 
@@ -16,6 +17,11 @@ const OPERATORS: [ComparisonOperator; 6] = [
 /// Registers the integer comparison relation.
 pub(crate) fn register(registry: &mut Registry) -> Result<(), CoreError> {
     bigint::register(registry)
+}
+
+/// Declares every mixed-width comparison whose wider operand is `bigint`.
+pub(crate) fn register_promotions(registry: &mut Registry) -> Result<(), CoreError> {
+    mixed::register(registry)
 }
 
 /// Declares all comparison operators for one ordered pair of operand types.

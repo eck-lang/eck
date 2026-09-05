@@ -30,3 +30,26 @@ fn divides_integers_and_rejects_zero_divisors() {
         Err(CoreError::DivisionByZero)
     ));
 }
+
+/// Verifies mixed division promotes both orders and rejects zero divisors.
+#[test]
+fn divides_promoted_narrower_operands_as_bigint() {
+    let wider_id = crate::integer::bigint::test_type_id();
+    let narrower_id = crate::integer::integer8::test_type_id();
+    let wide = Value::new(wider_id, BigInt::from(43));
+    let narrow = Value::new(narrower_id, 5_i8);
+    let zero = Value::new(narrower_id, 0_i8);
+
+    for (left_operand, right_operand, expected) in [
+        (&wide, &narrow, BigInt::from(8)),
+        (&narrow, &wide, BigInt::from(0)),
+    ] {
+        let result = division_mixed_integer(left_operand, right_operand).unwrap();
+        assert_eq!(result.type_id(), wider_id);
+        assert_eq!(*result.downcast_ref::<BigInt>().unwrap(), expected);
+    }
+    assert!(matches!(
+        division_mixed_integer(&wide, &zero),
+        Err(CoreError::DivisionByZero)
+    ));
+}

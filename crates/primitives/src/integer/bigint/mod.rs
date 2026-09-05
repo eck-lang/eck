@@ -1,4 +1,4 @@
-mod comparisons;
+pub(crate) mod comparisons;
 mod formatting;
 mod literal;
 pub(crate) mod operations;
