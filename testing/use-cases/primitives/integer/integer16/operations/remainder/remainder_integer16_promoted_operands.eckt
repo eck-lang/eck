@@ -1,0 +1,19 @@
+# Integer16 remainder promotes mixed operands
+
+Verifies int8 and int16 remainder promotes to int16 while preserving the
+source operand order.
+
+>>> source
+narrow: int8 = 20
+wide: int16 = 5
+
+narrow_left: int16 = narrow % wide
+wide_left: int16 = wide % narrow
+print(narrow_left)
+print(wide_left)
+
+<<< stdout
+0
+5
+
+<<< stderr

@@ -1,0 +1,19 @@
+# Integer16 power promotes mixed operands
+
+Verifies int8 and int16 power promotes the base and exponent to int16 while
+preserving the source operand order.
+
+>>> source
+narrow: int8 = 2
+wide: int16 = 3
+
+narrow_base: int16 = narrow ** wide
+wide_base: int16 = wide ** narrow
+print(narrow_base)
+print(wide_base)
+
+<<< stdout
+8
+9
+
+<<< stderr

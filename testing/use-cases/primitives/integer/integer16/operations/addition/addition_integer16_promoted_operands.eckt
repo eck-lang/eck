@@ -1,0 +1,19 @@
+# Integer16 addition promotes mixed operands
+
+Verifies int8 and int16 addition in both operand orders produces int16 without
+changing the represented values.
+
+>>> source
+narrow: int8 = 5
+wide: int16 = 10
+
+narrow_left: int16 = narrow + wide
+wide_left: int16 = wide + narrow
+print(narrow_left)
+print(wide_left)
+
+<<< stdout
+15
+15
+
+<<< stderr

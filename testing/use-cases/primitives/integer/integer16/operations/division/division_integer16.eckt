@@ -1,0 +1,23 @@
+# Integer16 division with truncation
+
+Verifies int16 division truncates toward zero through the complete CLI
+pipeline.
+
+>>> source
+dividend: int16 = 30000
+neg_dividend: int16 = -30000
+divisor: int16 = 119
+
+// Verifies the quotient truncates the fractional part.
+truncated_quotient: int16 = dividend / divisor
+print(truncated_quotient)
+
+// Verifies truncation of a negative dividend toward zero.
+neg_quotient: int16 = neg_dividend / divisor
+print(neg_quotient)
+
+<<< stdout
+252
+-252
+
+<<< stderr

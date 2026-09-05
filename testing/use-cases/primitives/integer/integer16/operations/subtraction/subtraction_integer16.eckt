@@ -1,0 +1,22 @@
+# Integer16 subtraction in both operand orders
+
+Verifies int16 subtraction in both operand orders through the complete CLI
+pipeline.
+
+>>> source
+left: int16 = 30000
+right: int16 = 12345
+
+// Verifies subtraction with the larger operand first.
+forward_diff: int16 = left - right
+print(forward_diff)
+
+// Verifies subtraction with the smaller operand first.
+reversed_diff: int16 = right - left
+print(reversed_diff)
+
+<<< stdout
+17655
+-17655
+
+<<< stderr
