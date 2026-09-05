@@ -1,6 +1,6 @@
-use language_core::{CoreError, Value};
+use language_core::{BinaryOperator, CoreError, ExecutionContext, Value};
 
-use crate::integer::integer8::value::get;
+use crate::integer::integer8::value::{get, is_overflow_error, promote_overflow_to_int16};
 
 /// Adds two integers and reports overflow as a language error.
 pub(crate) fn addition_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreError> {
@@ -8,6 +8,25 @@ pub(crate) fn addition_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreEr
         .checked_add(get(rhs)?)
         .ok_or_else(|| CoreError::Runtime("integer overflow in addition".into()))?;
     Ok(Value::new(lhs.type_id(), value))
+}
+
+/// Adds two integers, promoting overflowed results to `int16`.
+///
+/// The runtime prefers this registry-aware implementation over
+/// `addition_integer`; overflow recomputes with wider precision while invalid
+/// representations still report errors.
+pub(crate) fn addition_integer_with_context(
+    context: &ExecutionContext<'_>,
+    lhs: &Value,
+    rhs: &Value,
+) -> Result<Value, CoreError> {
+    match addition_integer(lhs, rhs) {
+        Ok(value) => Ok(value),
+        Err(error) if is_overflow_error(&error) => {
+            promote_overflow_to_int16(context, get(lhs)?, get(rhs)?, BinaryOperator::Addition)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[cfg(test)]
