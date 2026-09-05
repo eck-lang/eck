@@ -1,0 +1,16 @@
+# Decimal literal above the maximum precision
+
+Verifies a decimal literal beyond the 28-digit precision limit is rejected
+with a compile-time diagnostic through the complete CLI pipeline.
+
+>>> source
+too_large: decimal = 1e100
+print(too_large)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `1e100` for type `decimal`: Scale exceeds the maximum precision allowed: 100 > 28 at Span { start: 21, end: 26 }
+
+<<< exit
+1
