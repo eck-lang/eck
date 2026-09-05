@@ -39,6 +39,19 @@ pub(super) fn execute_operator(left_operand: &Value, _: &Value) -> Result<Value,
     Ok(left_operand.clone())
 }
 
+/// A registry-aware operator callback that returns its left operand unchanged.
+///
+/// Tests use this as the context override when their subject is context-aware
+/// operator registration. Like [`execute_operator`], the identity result is
+/// intentional and carries no arithmetic semantics.
+pub(super) fn execute_context_operator(
+    _: &ExecutionContext<'_>,
+    left_operand: &Value,
+    _: &Value,
+) -> Result<Value, CoreError> {
+    Ok(left_operand.clone())
+}
+
 /// A function callback that reports no value.
 ///
 /// This supplies the required execution function for descriptor tests without

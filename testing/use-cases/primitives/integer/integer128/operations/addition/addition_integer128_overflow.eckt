@@ -1,7 +1,9 @@
-# Integer128 addition overflow
+# Integer128 addition promotes overflow to bigint
 
-Adds 1 to the int128 maximum to verify the overflow fails with a runtime
-error instead of wrapping.
+Adds 1 to the int128 maximum to verify the result promotes to bigint instead
+of failing, then adds 1 again to verify chained arithmetic keeps using the
+promoted representation. Both declarations keep the static int128 type while
+the runtime values use arbitrary precision.
 
 >>> source
 maximum: int128 = 170141183460469231731687303715884105727
@@ -10,10 +12,11 @@ unit: int128 = 1
 overflow: int128 = maximum + unit
 print(overflow)
 
+chained: int128 = overflow + unit
+print(chained)
+
 <<< stdout
+170141183460469231731687303715884105728
+170141183460469231731687303715884105729
 
 <<< stderr
-eck: runtime error: integer overflow in addition
-
-<<< exit
-1
