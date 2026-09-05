@@ -1,6 +1,8 @@
-use language_core::{CoreError, Value};
+use language_core::{BinaryOperator, CoreError, ExecutionContext, Value};
 
-use crate::integer::integer32::value::{get, mixed_operands};
+use crate::integer::integer32::value::{
+    get, is_overflow_error, mixed_operands, promote_overflow_to_int64,
+};
 
 /// Raises an integer to a non-negative integer exponent using checked arithmetic.
 pub(crate) fn power_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreError> {
@@ -12,6 +14,25 @@ pub(crate) fn power_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreError
         .checked_pow(exponent)
         .ok_or_else(|| CoreError::Runtime("integer overflow in power".into()))?;
     Ok(Value::new(lhs.type_id(), value))
+}
+
+/// Raises an integer to an exponent, promoting overflowed results to `int64`.
+///
+/// The runtime prefers this registry-aware implementation over
+/// `power_integer`; invalid exponents still report without promotion, results
+/// fitting `int64` promote, and larger results keep the overflow error.
+pub(crate) fn power_integer_with_context(
+    context: &ExecutionContext<'_>,
+    lhs: &Value,
+    rhs: &Value,
+) -> Result<Value, CoreError> {
+    match power_integer(lhs, rhs) {
+        Ok(value) => Ok(value),
+        Err(error) if is_overflow_error(&error) => {
+            promote_overflow_to_int64(context, get(lhs)?, get(rhs)?, BinaryOperator::Power)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 /// Raises mixed-width integers after losslessly promoting both operands to `int32`.
@@ -28,6 +49,27 @@ pub(crate) fn power_mixed_integer(
         .checked_pow(exponent)
         .ok_or_else(|| CoreError::Runtime("integer overflow in power".into()))?;
     Ok(Value::new(result_type_id, value))
+}
+
+/// Raises mixed-width integers, promoting overflowed results to `int64`.
+///
+/// The runtime prefers this registry-aware implementation over
+/// `power_mixed_integer`; invalid exponents and operand extraction errors
+/// still report without promotion, results fitting `int64` promote, and larger
+/// results keep the overflow error.
+pub(crate) fn power_mixed_integer_with_context(
+    context: &ExecutionContext<'_>,
+    left_operand: &Value,
+    right_operand: &Value,
+) -> Result<Value, CoreError> {
+    match power_mixed_integer(left_operand, right_operand) {
+        Ok(value) => Ok(value),
+        Err(error) if is_overflow_error(&error) => {
+            let (left_integer, right_integer, _) = mixed_operands(left_operand, right_operand)?;
+            promote_overflow_to_int64(context, left_integer, right_integer, BinaryOperator::Power)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[cfg(test)]
