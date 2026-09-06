@@ -1,0 +1,14 @@
+# Integer range loop with a single iteration
+
+Verifies a `for` loop over `10..11` executes its body exactly once with the
+start value through the complete CLI pipeline.
+
+>>> source
+for (i in 10..11) {
+    print(i)
+}
+
+<<< stdout
+10
+
+<<< stderr

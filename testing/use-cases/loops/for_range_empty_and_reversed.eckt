@@ -1,0 +1,18 @@
+# Empty and reversed integer ranges
+
+Verifies `for` loops over `10..10` and `10..5` execute zero iterations:
+a reversed range never iterates downward, it simply produces no values.
+Both cases run through the complete CLI pipeline.
+
+>>> source
+for (i in 10..10) {
+    print(i)
+}
+
+for (i in 10..5) {
+    print(i)
+}
+
+<<< stdout
+
+<<< stderr

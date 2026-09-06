@@ -1,0 +1,16 @@
+# Integer range loop with a nonzero start
+
+Verifies a `for` loop over `5..8` starts iteration at the lower bound and
+still stops before the upper bound through the complete CLI pipeline.
+
+>>> source
+for (i in 5..8) {
+    print(i)
+}
+
+<<< stdout
+5
+6
+7
+
+<<< stderr

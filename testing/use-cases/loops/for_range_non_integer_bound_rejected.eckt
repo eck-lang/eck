@@ -1,0 +1,17 @@
+# Range loop with a non-integer bound
+
+Verifies a `for` loop over `0.5..10.5` is rejected with a diagnostic stating
+that range bounds must be integers through the complete CLI pipeline.
+
+>>> source
+for (i in 0.5..10.5) {
+    print(i)
+}
+
+<<< stdout
+
+<<< stderr
+eck: for range bounds must be integers, found `decimal` at Span { start: 10, end: 13 }
+
+<<< exit
+1

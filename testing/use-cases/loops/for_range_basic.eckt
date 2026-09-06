@@ -1,0 +1,17 @@
+# Basic integer range loop
+
+Verifies a `for` loop over `0..3` binds the loop variable to each value in
+the start-inclusive, end-exclusive sequence through the complete CLI
+pipeline.
+
+>>> source
+for (i in 0..3) {
+    print(i)
+}
+
+<<< stdout
+0
+1
+2
+
+<<< stderr
