@@ -83,6 +83,8 @@ enum RawTokenKind {
     RightBracket,
     #[token(",")]
     Comma,
+    #[token("..")]
+    DotDot,
     #[token(".")]
     Dot,
     #[token("&&")]
@@ -92,9 +94,15 @@ enum RawTokenKind {
 
     #[token("if")]
     If,
+    #[token("for")]
+    For,
+    #[token("in")]
+    In,
 
     // Preserve the source spelling: each concrete type validates the numeric
-    // literal only after the compiler resolves its expected type.
+    // literal only after the compiler resolves its expected type. `lex`
+    // splits a trailing decimal dot followed by another dot into `..`, which
+    // retains support for both `1.` and range bounds such as `0..10`.
     #[regex(r"[0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]*)?")]
     Number,
 
@@ -124,20 +132,8 @@ enum RawTokenKind {
 /// `eck-dialect` and `eck-parser` so editor tooling does not hardcode a
 /// divergent list. The list includes `@config` with its leading `@`.
 pub const ECK_KEYWORDS: &[&str] = &[
-    "type",
-    "frame",
-    "relation",
-    "on",
-    "one",
-    "many",
-    "use",
-    "as",
-    "from",
-    "@config",
-    "if",
-    "true",
-    "false",
-    "null",
+    "type", "frame", "relation", "on", "one", "many", "use", "as", "from", "@config", "if", "for",
+    "in", "true", "false", "null",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -171,6 +167,8 @@ pub(crate) enum TokenKind {
     RightBracket,
     Comma,
     If,
+    For,
+    In,
     Newline,
     Config,
     Type,
@@ -183,6 +181,7 @@ pub(crate) enum TokenKind {
     As,
     From,
     Dot,
+    DotDot,
     AmpersandAmpersand,
     PipePipe,
     Eof,
@@ -210,6 +209,30 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, ParseError> {
         };
         let raw_kind = result.map_err(|_| invalid_token_error(source, span))?;
         let kind = convert_raw_token(raw_kind, &source[range], span)?;
+        let range_start = if matches!(kind, TokenKind::Dot)
+            && let Some(Token {
+                kind: TokenKind::Number(number),
+                span: number_span,
+            }) = tokens.last_mut()
+            && number.ends_with('.')
+            && number_span.end == span.start
+        {
+            number.pop();
+            number_span.end -= 1;
+            Some(number_span.end)
+        } else {
+            None
+        };
+        if let Some(range_start) = range_start {
+            tokens.push(Token {
+                kind: TokenKind::DotDot,
+                span: Span {
+                    start: range_start,
+                    end: span.end,
+                },
+            });
+            continue;
+        }
         tokens.push(Token { kind, span });
     }
 
@@ -265,9 +288,12 @@ fn convert_raw_token(
         RawTokenKind::RightBracket => TokenKind::RightBracket,
         RawTokenKind::Comma => TokenKind::Comma,
         RawTokenKind::Dot => TokenKind::Dot,
+        RawTokenKind::DotDot => TokenKind::DotDot,
         RawTokenKind::AmpersandAmpersand => TokenKind::AmpersandAmpersand,
         RawTokenKind::PipePipe => TokenKind::PipePipe,
         RawTokenKind::If => TokenKind::If,
+        RawTokenKind::For => TokenKind::For,
+        RawTokenKind::In => TokenKind::In,
         RawTokenKind::Number => TokenKind::Number(raw_text.into()),
         RawTokenKind::Ident => TokenKind::Ident(raw_text.into()),
         RawTokenKind::DoubleQuotedString => TokenKind::String(decode_string(raw_text, '"', span)?),

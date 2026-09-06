@@ -331,3 +331,72 @@ fn rejects_invalid_use_syntax() {
         assert!(parse(source).is_err(), "`{source}` should be rejected");
     }
 }
+
+/// Verifies a numeric range loop preserves its variable, bounds, and spans.
+#[test]
+fn parses_for_range_loop_with_literal_bounds() {
+    let program = parse("for (i in 0..10) {\nprint(i)\n}\n").unwrap();
+
+    let Statement::For {
+        variable,
+        start,
+        end,
+        body,
+        span,
+    } = &program.statements[0]
+    else {
+        panic!("expected a for statement");
+    };
+    assert_eq!(variable, "i");
+    assert!(matches!(start, Expression::Number { raw_text, .. } if raw_text == "0"));
+    assert!(matches!(end, Expression::Number { raw_text, .. } if raw_text == "10"));
+    assert_eq!(body.statements.len(), 1);
+    assert_eq!(*span, syntax::Span { start: 0, end: 29 });
+}
+
+/// Verifies range bounds accept variables and arithmetic with precedence.
+#[test]
+fn parses_for_range_loop_with_expression_bounds() {
+    let program = parse("for (i in start..end) {}\nfor (i in 2 + 3..20 / 2) {}\n").unwrap();
+
+    let Statement::For { start, end, .. } = &program.statements[0] else {
+        panic!("expected a for statement");
+    };
+    assert!(matches!(start, Expression::Variable { name, .. } if name == "start"));
+    assert!(matches!(end, Expression::Variable { name, .. } if name == "end"));
+    let Statement::For { start, end, .. } = &program.statements[1] else {
+        panic!("expected a for statement");
+    };
+    assert!(matches!(
+        start,
+        Expression::Binary {
+            operator: syntax::BinaryOperator::Addition,
+            ..
+        }
+    ));
+    assert!(matches!(
+        end,
+        Expression::Binary {
+            operator: syntax::BinaryOperator::Division,
+            ..
+        }
+    ));
+}
+
+/// Verifies malformed range loops fail with precise diagnostics.
+#[test]
+fn rejects_invalid_for_range_syntax() {
+    for (source, expected) in [
+        ("for (i in 0..10 {}\n", "expected RightParenthesis"),
+        ("for (i in 0.10) {}\n", "expected DotDot"),
+        ("for i in 0..10) {}\n", "expected LeftParenthesis"),
+        ("for (i 0..10) {}\n", "expected In"),
+        ("for (i in 0..10)\nprint(1)\n", "expected LeftBrace"),
+    ] {
+        let error = parse(source).unwrap_err();
+        assert!(
+            error.message.contains(expected),
+            "unexpected error for `{source}`: {error}"
+        );
+    }
+}

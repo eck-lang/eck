@@ -28,6 +28,9 @@ impl Parser {
         if matches!(&self.peek().kind, TokenKind::If) {
             return self.parse_if_statement();
         }
+        if matches!(&self.peek().kind, TokenKind::For) {
+            return self.parse_for_statement();
+        }
         if self.starts_frame_declaration() {
             return self.parse_frame_declaration();
         }
@@ -420,6 +423,36 @@ impl Parser {
         };
         Ok(Statement::If {
             condition,
+            body,
+            span,
+        })
+    }
+
+    /// Parses a `for (variable in start..end) { statements }` range loop.
+    ///
+    /// Both bounds are ordinary expressions parsed with the existing
+    /// precedence rules. The `..` token delimits them: expression parsing
+    /// stops at `DotDot` because only a single `.` continues into field
+    /// access, so `5..10` yields `start = 5` and `end = 10`.
+    fn parse_for_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.advance().span.start;
+        self.expect_simple(TokenKind::LeftParenthesis)?;
+        let variable = self.expect_identifier("expected loop variable after `(`")?;
+        self.expect_simple(TokenKind::In)?;
+        let range_start = self.parse_expression(0)?;
+        self.expect_simple(TokenKind::DotDot)?;
+        let range_end = self.parse_expression(0)?;
+        self.expect_simple(TokenKind::RightParenthesis)?;
+        self.skip_newlines();
+        let body = self.parse_block()?;
+        let span = Span {
+            start,
+            end: body.span.end,
+        };
+        Ok(Statement::For {
+            variable,
+            start: range_start,
+            end: range_end,
             body,
             span,
         })

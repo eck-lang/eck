@@ -158,3 +158,59 @@ fn lexes_if_and_braces_without_claiming_prefixed_identifiers() {
         ] if name == "iffy"
     ));
 }
+
+/// Verifies `for (i in 0..10) {}` lexes `..` as one token with exact spans.
+///
+/// The range operator must not split into two dots, the bounds must not
+/// swallow a dot into the number, and `for`/`in` must remain usable as
+/// identifier prefixes elsewhere.
+#[test]
+fn lexes_for_range_with_single_dot_dot_token() {
+    let tokens = lex("for (i in 0..10) {}").unwrap();
+    let kinds = tokens.iter().map(|token| &token.kind).collect::<Vec<_>>();
+
+    assert!(matches!(
+        kinds.as_slice(),
+        [
+            TokenKind::For,
+            TokenKind::LeftParenthesis,
+            TokenKind::Ident(variable),
+            TokenKind::In,
+            TokenKind::Number(start),
+            TokenKind::DotDot,
+            TokenKind::Number(end),
+            TokenKind::RightParenthesis,
+            TokenKind::LeftBrace,
+            TokenKind::RightBrace,
+            TokenKind::Eof,
+        ] if variable == "i" && start == "0" && end == "10"
+    ));
+    assert_eq!(tokens[0].span, Span { start: 0, end: 3 });
+    assert_eq!(tokens[4].span, Span { start: 10, end: 11 });
+    assert_eq!(tokens[5].span, Span { start: 11, end: 13 });
+    assert_eq!(tokens[6].span, Span { start: 13, end: 15 });
+}
+
+/// Verifies range token repair preserves trailing-decimal numeric literals.
+#[test]
+fn distinguishes_range_separators_from_trailing_decimal_points() {
+    let tokens = lex("value: decimal = 1.\nfor (i in 0..1) {}").unwrap();
+
+    assert!(matches!(&tokens[4].kind, TokenKind::Number(number) if number == "1."));
+    assert!(matches!(&tokens[10].kind, TokenKind::Number(number) if number == "0"));
+    assert!(matches!(tokens[11].kind, TokenKind::DotDot));
+    assert!(matches!(&tokens[12].kind, TokenKind::Number(number) if number == "1"));
+}
+
+/// Verifies `for` and `in` keywords do not claim longer identifiers.
+#[test]
+fn lexes_for_in_prefixes_as_identifiers() {
+    let tokens = lex("format inside").unwrap();
+    let kinds = tokens.iter().map(|token| &token.kind).collect::<Vec<_>>();
+
+    assert!(matches!(
+        kinds.as_slice(),
+        [TokenKind::Ident(first), TokenKind::Ident(second), TokenKind::Eof,]
+            if first == "format" && second == "inside"
+    ));
+}
