@@ -6,20 +6,22 @@ mod remainder;
 mod subtraction;
 
 pub(crate) use self::addition::{
-    addition_decimal, addition_decimal_double, addition_decimal_float, addition_decimal_int,
+    addition_decimal, addition_decimal_double, addition_decimal_float, addition_decimal_in_place,
+    addition_decimal_int,
 };
 pub(crate) use self::division::{
     division_decimal, division_decimal_double, division_decimal_float, division_decimal_int,
 };
 pub(crate) use self::multiplication::{
     multiplication_decimal, multiplication_decimal_double, multiplication_decimal_float,
-    multiplication_decimal_int,
+    multiplication_decimal_in_place, multiplication_decimal_int,
 };
 pub(crate) use self::power::{
     power_decimal, power_decimal_double, power_decimal_float, power_decimal_int,
 };
 pub(crate) use self::remainder::{
-    remainder_decimal, remainder_decimal_double, remainder_decimal_float, remainder_decimal_int,
+    remainder_decimal, remainder_decimal_double, remainder_decimal_float,
+    remainder_decimal_in_place, remainder_decimal_int,
 };
 pub(crate) use self::subtraction::{
     subtraction_decimal, subtraction_decimal_double, subtraction_decimal_float,
@@ -40,6 +42,12 @@ pub(crate) fn register(registry: &mut Registry, decimal_id: TypeId) -> Result<()
         decimal_id,
         addition_decimal,
     )?;
+    registry.register_in_place_binary_operator(
+        BinaryOperator::Addition,
+        decimal_id,
+        decimal_id,
+        addition_decimal_in_place,
+    )?;
     registry.register_binary_operator(
         BinaryOperator::Subtraction,
         decimal_id,
@@ -54,6 +62,12 @@ pub(crate) fn register(registry: &mut Registry, decimal_id: TypeId) -> Result<()
         decimal_id,
         multiplication_decimal,
     )?;
+    registry.register_in_place_binary_operator(
+        BinaryOperator::Multiplication,
+        decimal_id,
+        decimal_id,
+        multiplication_decimal_in_place,
+    )?;
     registry.register_binary_operator(
         BinaryOperator::Division,
         decimal_id,
@@ -67,6 +81,12 @@ pub(crate) fn register(registry: &mut Registry, decimal_id: TypeId) -> Result<()
         decimal_id,
         decimal_id,
         remainder_decimal,
+    )?;
+    registry.register_in_place_binary_operator(
+        BinaryOperator::Remainder,
+        decimal_id,
+        decimal_id,
+        remainder_decimal_in_place,
     )?;
     registry.register_binary_operator(
         BinaryOperator::Power,

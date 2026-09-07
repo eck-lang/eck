@@ -44,15 +44,17 @@ fn rejects_invalid_remove_inputs() {
 
     assert!(remove(&context, &[]).is_err());
     assert!(remove(&context, &[string_value.clone()]).is_err());
-    assert!(remove(
-        &context,
-        &[
-            string_value.clone(),
-            string_value.clone(),
-            string_value.clone()
-        ]
-    )
-    .is_err());
+    assert!(
+        remove(
+            &context,
+            &[
+                string_value.clone(),
+                string_value.clone(),
+                string_value.clone()
+            ]
+        )
+        .is_err()
+    );
     let empty = registry.parse_string("", None).unwrap();
     assert!(remove(&context, &[string_value.clone(), empty]).is_err());
     assert!(remove(&context, &[integer_value, string_value.clone()]).is_err());

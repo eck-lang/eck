@@ -26,6 +26,7 @@ impl Extension for FloatExtension {
         registry.register_type(TypeDescriptor {
             id,
             name: "float",
+            is_integer: false,
             parse_numeric_literal: Some(literal::parse),
             parse_string_literal: None,
             parse_regex_literal: None,

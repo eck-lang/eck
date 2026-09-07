@@ -64,16 +64,18 @@ fn rejects_invalid_regex_replace_inputs() {
 
     assert!(replace_regex(&context, &[]).is_err());
     assert!(replace_regex(&context, &[string_value.clone(), regex_value.clone()]).is_err());
-    assert!(replace_regex(
-        &context,
-        &[
-            string_value.clone(),
-            regex_value.clone(),
-            string_value.clone(),
-            string_value.clone()
-        ]
-    )
-    .is_err());
+    assert!(
+        replace_regex(
+            &context,
+            &[
+                string_value.clone(),
+                regex_value.clone(),
+                string_value.clone(),
+                string_value.clone()
+            ]
+        )
+        .is_err()
+    );
     assert!(
         replace_regex(
             &context,
@@ -88,7 +90,11 @@ fn rejects_invalid_regex_replace_inputs() {
     assert!(
         replace_regex(
             &context,
-            &[integer_value.clone(), regex_value.clone(), string_value.clone()]
+            &[
+                integer_value.clone(),
+                regex_value.clone(),
+                string_value.clone()
+            ]
         )
         .is_err()
     );

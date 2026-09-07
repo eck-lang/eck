@@ -22,9 +22,7 @@ fn repeats_string_the_requested_times() {
     ] {
         let receiver = registry.parse_string(input, None).unwrap();
         let count_value = registry.parse_numeric(&count.to_string(), None).unwrap();
-        let result = repeat(&context, &[receiver, count_value])
-            .unwrap()
-            .unwrap();
+        let result = repeat(&context, &[receiver, count_value]).unwrap().unwrap();
         assert_eq!(
             result.downcast_ref::<String>().unwrap(),
             expected,
@@ -46,15 +44,17 @@ fn rejects_invalid_repeat_inputs() {
 
     assert!(repeat(&context, &[]).is_err());
     assert!(repeat(&context, &[string_value.clone()]).is_err());
-    assert!(repeat(
-        &context,
-        &[
-            string_value.clone(),
-            integer_value.clone(),
-            integer_value.clone()
-        ]
-    )
-    .is_err());
+    assert!(
+        repeat(
+            &context,
+            &[
+                string_value.clone(),
+                integer_value.clone(),
+                integer_value.clone()
+            ]
+        )
+        .is_err()
+    );
     assert!(repeat(&context, &[string_value.clone(), string_value.clone()]).is_err());
     assert!(repeat(&context, &[integer_value.clone(), integer_value]).is_err());
 

@@ -71,11 +71,7 @@ fn registers_string_pipe_functions() {
     assert_eq!(descriptor.output, Some(string_type));
 
     let replace_regex_function = registry
-        .resolve_namespace_function(
-            "String",
-            "replace",
-            &[string_type, regex_type, string_type],
-        )
+        .resolve_namespace_function("String", "replace", &[string_type, regex_type, string_type])
         .unwrap();
     let descriptor = registry.function(replace_regex_function).unwrap();
     assert_eq!(descriptor.output, Some(string_type));
@@ -128,10 +124,9 @@ fn executes_registered_pipe_via_registry() {
         .resolve_namespace_function("String", "capitalize", &[string_type])
         .unwrap();
     let receiver = registry.parse_string("hello", None).unwrap();
-    let result =
-        (registry.function(capitalize_id).unwrap().execute)(&context, &[receiver])
-            .unwrap()
-            .unwrap();
+    let result = (registry.function(capitalize_id).unwrap().execute)(&context, &[receiver])
+        .unwrap()
+        .unwrap();
     assert_eq!(result.downcast_ref::<String>().unwrap(), "Hello");
 
     let pad_start_id = registry
@@ -144,12 +139,10 @@ fn executes_registered_pipe_via_registry() {
     let receiver = registry.parse_string("foo", None).unwrap();
     let target = registry.parse_numeric("5", None).unwrap();
     let pad = registry.parse_string(" ", None).unwrap();
-    let result = (registry.function(pad_start_id).unwrap().execute)(
-        &context,
-        &[receiver, target, pad],
-    )
-    .unwrap()
-    .unwrap();
+    let result =
+        (registry.function(pad_start_id).unwrap().execute)(&context, &[receiver, target, pad])
+            .unwrap()
+            .unwrap();
     assert_eq!(result.downcast_ref::<String>().unwrap(), "  foo");
 
     let repeat_id = registry
@@ -163,11 +156,7 @@ fn executes_registered_pipe_via_registry() {
     assert_eq!(result.downcast_ref::<String>().unwrap(), "ababab");
 
     let replace_regex_id = registry
-        .resolve_namespace_function(
-            "String",
-            "replace",
-            &[string_type, regex_type, string_type],
-        )
+        .resolve_namespace_function("String", "replace", &[string_type, regex_type, string_type])
         .unwrap();
     let receiver = registry.parse_string("hello 123 world", None).unwrap();
     let pattern = registry.parse_regex(r"/\d+/g", None).unwrap();
@@ -209,11 +198,7 @@ fn skips_integer_dependent_functions_without_integer_type() {
     );
     assert!(
         registry
-            .resolve_namespace_function(
-                "String",
-                "repeat",
-                &[string_type, integer_placeholder],
-            )
+            .resolve_namespace_function("String", "repeat", &[string_type, integer_placeholder],)
             .is_err()
     );
 }
@@ -241,11 +226,13 @@ fn skips_regex_dependent_functions_without_regex_type() {
     crate::StringExtension.register(&mut with_regex).unwrap();
     let regex_type = with_regex.type_by_name("regex").unwrap();
     let string_type2 = with_regex.type_by_name("string").unwrap();
-    assert!(with_regex
-        .resolve_namespace_function(
-            "String",
-            "replace",
-            &[string_type2, regex_type, string_type2],
-        )
-        .is_ok());
+    assert!(
+        with_regex
+            .resolve_namespace_function(
+                "String",
+                "replace",
+                &[string_type2, regex_type, string_type2],
+            )
+            .is_ok()
+    );
 }

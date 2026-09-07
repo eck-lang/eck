@@ -53,20 +53,28 @@ fn rejects_invalid_pad_start_inputs() {
 
     assert!(pad_start(&context, &[]).is_err());
     assert!(pad_start(&context, &[string_value.clone(), integer_value.clone()]).is_err());
-    assert!(pad_start(
-        &context,
-        &[
-            string_value.clone(),
-            string_value.clone(),
-            string_value.clone()
-        ]
-    )
-    .is_err());
-    assert!(pad_start(
-        &context,
-        &[short_string.clone(), larger_target.clone(), empty_pad.clone()]
-    )
-    .is_err());
+    assert!(
+        pad_start(
+            &context,
+            &[
+                string_value.clone(),
+                string_value.clone(),
+                string_value.clone()
+            ]
+        )
+        .is_err()
+    );
+    assert!(
+        pad_start(
+            &context,
+            &[
+                short_string.clone(),
+                larger_target.clone(),
+                empty_pad.clone()
+            ]
+        )
+        .is_err()
+    );
 
     let negative = registry.parse_numeric("-1", None).unwrap();
     let pad = registry.parse_string(" ", None).unwrap();

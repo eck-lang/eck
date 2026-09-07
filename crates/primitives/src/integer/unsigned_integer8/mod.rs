@@ -28,6 +28,7 @@ impl Extension for UnsignedInteger8Extension {
         registry.register_type(TypeDescriptor {
             id,
             name: "uint8",
+            is_integer: true,
             parse_numeric_literal: Some(literal::parse),
             parse_string_literal: None,
             parse_regex_literal: None,

@@ -20,6 +20,7 @@ impl Extension for NullExtension {
         registry.register_type(TypeDescriptor {
             id,
             name: "null",
+            is_integer: false,
             parse_numeric_literal: None,
             parse_string_literal: None,
             parse_regex_literal: None,

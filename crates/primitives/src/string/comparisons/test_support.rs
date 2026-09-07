@@ -7,6 +7,7 @@ pub(super) fn register_string_type(registry: &mut Registry) {
         .register_type(TypeDescriptor {
             id: string_type,
             name: "string",
+            is_integer: false,
             parse_numeric_literal: None,
             parse_string_literal: None,
             parse_regex_literal: None,

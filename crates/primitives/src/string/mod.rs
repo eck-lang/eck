@@ -23,6 +23,7 @@ impl Extension for StringExtension {
         registry.register_type(TypeDescriptor {
             id: string_type,
             name: "string",
+            is_integer: false,
             parse_numeric_literal: None,
             parse_string_literal: Some(literal::parse),
             parse_regex_literal: None,

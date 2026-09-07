@@ -28,6 +28,7 @@ impl Extension for Integer16Extension {
         registry.register_type(TypeDescriptor {
             id,
             name: "int16",
+            is_integer: true,
             parse_numeric_literal: Some(literal::parse),
             parse_string_literal: None,
             parse_regex_literal: None,

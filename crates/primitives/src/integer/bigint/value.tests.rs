@@ -7,7 +7,7 @@ fn extracts_integer_values_and_rejects_other_representations() {
     let integer = Value::new(crate::integer::bigint::test_type_id(), BigInt::from(42));
     let float = Value::new(crate::integer::bigint::test_type_id(), 42.0_f32);
 
-    assert_eq!(get(&integer).unwrap(), BigInt::from(42));
+    assert_eq!(get(&integer).unwrap(), &BigInt::from(42));
     assert!(matches!(
         get(&float),
         Err(CoreError::InvalidValueRepresentation(name)) if name == "bigint"
@@ -26,13 +26,17 @@ fn widens_narrower_operands_to_bigint_in_source_order() {
     let narrow128 = Value::new(crate::integer::integer128::test_type_id(), 7_i128);
 
     for narrow in [&narrow8, &narrow16, &narrow32, &narrow64, &narrow128] {
-        let (left_operand, right_operand, result_type_id) =
-            mixed_operands(&wide, narrow).unwrap();
-        assert_eq!((left_operand, right_operand), (BigInt::from(100), BigInt::from(7)));
+        let (left_operand, right_operand, result_type_id) = mixed_operands(&wide, narrow).unwrap();
+        assert_eq!(
+            (left_operand, right_operand),
+            (BigInt::from(100), BigInt::from(7))
+        );
         assert_eq!(result_type_id, wider_id);
-        let (left_operand, right_operand, result_type_id) =
-            mixed_operands(narrow, &wide).unwrap();
-        assert_eq!((left_operand, right_operand), (BigInt::from(7), BigInt::from(100)));
+        let (left_operand, right_operand, result_type_id) = mixed_operands(narrow, &wide).unwrap();
+        assert_eq!(
+            (left_operand, right_operand),
+            (BigInt::from(7), BigInt::from(100))
+        );
         assert_eq!(result_type_id, wider_id);
     }
     let float = Value::new(wider_id, 7.0_f32);

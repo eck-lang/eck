@@ -26,10 +26,7 @@ pub(crate) fn replace_regex(
             .replace_all(text, replacement)
             .into_owned()
     } else {
-        regex_value
-            .regex()
-            .replace(text, replacement)
-            .into_owned()
+        regex_value.regex().replace(text, replacement).into_owned()
     };
     let value = context.registry().parse_string(&transformed, None)?;
     Ok(Some(value))

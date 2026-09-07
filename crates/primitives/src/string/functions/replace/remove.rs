@@ -15,9 +15,7 @@ pub(crate) fn remove(
     let text = get(&arguments[0])?;
     let target = get(&arguments[1])?;
     if target.is_empty() {
-        return Err(CoreError::Runtime(
-            "remove target must not be empty".into(),
-        ));
+        return Err(CoreError::Runtime("remove target must not be empty".into()));
     }
     let transformed = text.replace(target, "");
     let value = context.registry().parse_string(&transformed, None)?;

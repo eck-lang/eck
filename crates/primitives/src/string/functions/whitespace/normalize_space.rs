@@ -16,10 +16,7 @@ pub(crate) fn normalize_space(
         ));
     }
     let text = get(receiver)?;
-    let transformed = text
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+    let transformed = text.split_whitespace().collect::<Vec<_>>().join(" ");
     let value = context.registry().parse_string(&transformed, None)?;
     Ok(Some(value))
 }

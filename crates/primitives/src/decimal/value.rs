@@ -14,6 +14,13 @@ pub(crate) fn get(value: &Value) -> Result<Decimal, CoreError> {
         .ok_or_else(|| CoreError::InvalidValueRepresentation("decimal".into()))
 }
 
+/// Extracts a uniquely owned decimal payload for mutation.
+pub(crate) fn get_mut(value: &mut Value) -> Result<&mut Decimal, CoreError> {
+    value
+        .downcast_mut::<Decimal>()
+        .ok_or_else(|| CoreError::InvalidValueRepresentation("uniquely owned decimal".into()))
+}
+
 /// Promotes a finite single-precision floating-point value to decimal.
 ///
 /// # Errors

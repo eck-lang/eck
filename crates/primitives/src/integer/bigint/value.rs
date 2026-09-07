@@ -2,11 +2,17 @@ use language_core::{CoreError, Value};
 use num_bigint::BigInt;
 
 /// Extracts the arbitrary-precision integer payload from a runtime value.
-pub(crate) fn get(value: &Value) -> Result<BigInt, CoreError> {
+pub(crate) fn get(value: &Value) -> Result<&BigInt, CoreError> {
     value
         .downcast_ref::<BigInt>()
-        .cloned()
         .ok_or_else(|| CoreError::InvalidValueRepresentation("bigint".into()))
+}
+
+/// Extracts a uniquely owned arbitrary-precision integer payload for mutation.
+pub(crate) fn get_mut(value: &mut Value) -> Result<&mut BigInt, CoreError> {
+    value
+        .downcast_mut::<BigInt>()
+        .ok_or_else(|| CoreError::InvalidValueRepresentation("uniquely owned bigint".into()))
 }
 
 /// Widens a mixed signed-integer pair to `bigint` while preserving operand order.

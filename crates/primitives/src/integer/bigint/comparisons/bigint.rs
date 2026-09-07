@@ -24,7 +24,7 @@ pub(super) fn register(registry: &mut Registry) -> Result<(), CoreError> {
 
 /// Produces the total ordering of two validated integer payloads.
 fn compare(left_operand: &Value, right_operand: &Value) -> Result<Ordering, CoreError> {
-    Ok(get(left_operand)?.cmp(&get(right_operand)?))
+    Ok(get(left_operand)?.cmp(get(right_operand)?))
 }
 
 /// Returns whether two integer operands are equal.

@@ -19,6 +19,7 @@ impl Extension for RegexExtension {
         registry.register_type(TypeDescriptor {
             id: regex_type,
             name: "regex",
+            is_integer: false,
             parse_numeric_literal: None,
             parse_string_literal: None,
             parse_regex_literal: Some(literal::parse),

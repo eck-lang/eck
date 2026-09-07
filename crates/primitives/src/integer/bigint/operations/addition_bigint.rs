@@ -1,6 +1,6 @@
 use language_core::{CoreError, Value};
 
-use crate::integer::bigint::value::{get, mixed_operands};
+use crate::integer::bigint::value::{get, get_mut, mixed_operands};
 
 /// Adds two arbitrary-precision integers.
 ///
@@ -9,6 +9,16 @@ use crate::integer::bigint::value::{get, mixed_operands};
 pub(crate) fn addition_integer(lhs: &Value, rhs: &Value) -> Result<Value, CoreError> {
     let value = get(lhs)? + get(rhs)?;
     Ok(Value::new(lhs.type_id(), value))
+}
+
+/// Adds a right operand into a uniquely owned `bigint` left operand.
+pub(crate) fn addition_integer_in_place(
+    left_operand: &mut Value,
+    right_operand: &Value,
+) -> Result<(), CoreError> {
+    let right_operand = get(right_operand)?;
+    *get_mut(left_operand)? += right_operand;
+    Ok(())
 }
 
 /// Adds mixed-width integers after losslessly promoting both operands to `bigint`.

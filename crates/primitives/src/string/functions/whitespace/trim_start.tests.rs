@@ -34,10 +34,6 @@ fn rejects_invalid_trim_start_inputs() {
     let integer_value = registry.parse_numeric("42", None).unwrap();
 
     assert!(trim_start(&context, &[]).is_err());
-    assert!(trim_start(
-        &context,
-        &[string_value.clone(), string_value.clone()]
-    )
-    .is_err());
+    assert!(trim_start(&context, &[string_value.clone(), string_value.clone()]).is_err());
     assert!(trim_start(&context, &[integer_value]).is_err());
 }

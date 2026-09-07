@@ -8,14 +8,17 @@ mod subtraction_bigint;
 use language_core::{BinaryOperator, BinaryOperatorExecutor, CoreError, Registry, TypeId};
 
 use self::{
-    addition_bigint::addition_integer, division_bigint::division_integer,
-    multiplication_bigint::multiplication_integer, power_bigint::power_integer,
-    remainder_bigint::remainder_integer, subtraction_bigint::subtraction_integer,
-};
-use self::{
     addition_bigint::addition_mixed_integer, division_bigint::division_mixed_integer,
     multiplication_bigint::multiplication_mixed_integer, power_bigint::power_mixed_integer,
     remainder_bigint::remainder_mixed_integer, subtraction_bigint::subtraction_mixed_integer,
+};
+use self::{
+    addition_bigint::{addition_integer, addition_integer_in_place},
+    division_bigint::division_integer,
+    multiplication_bigint::{multiplication_integer, multiplication_integer_in_place},
+    power_bigint::power_integer,
+    remainder_bigint::{remainder_integer, remainder_integer_in_place},
+    subtraction_bigint::subtraction_integer,
 };
 
 /// Registers every binary arithmetic operator for two `int` operands.
@@ -26,6 +29,12 @@ pub(crate) fn register(registry: &mut Registry, integer_id: TypeId) -> Result<()
         integer_id,
         integer_id,
         addition_integer,
+    )?;
+    registry.register_in_place_binary_operator(
+        BinaryOperator::Addition,
+        integer_id,
+        integer_id,
+        addition_integer_in_place,
     )?;
     registry.register_binary_operator(
         BinaryOperator::Subtraction,
@@ -41,6 +50,12 @@ pub(crate) fn register(registry: &mut Registry, integer_id: TypeId) -> Result<()
         integer_id,
         multiplication_integer,
     )?;
+    registry.register_in_place_binary_operator(
+        BinaryOperator::Multiplication,
+        integer_id,
+        integer_id,
+        multiplication_integer_in_place,
+    )?;
     registry.register_binary_operator(
         BinaryOperator::Division,
         integer_id,
@@ -54,6 +69,12 @@ pub(crate) fn register(registry: &mut Registry, integer_id: TypeId) -> Result<()
         integer_id,
         integer_id,
         remainder_integer,
+    )?;
+    registry.register_in_place_binary_operator(
+        BinaryOperator::Remainder,
+        integer_id,
+        integer_id,
+        remainder_integer_in_place,
     )?;
     registry.register_binary_operator(
         BinaryOperator::Power,
