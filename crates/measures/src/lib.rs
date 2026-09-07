@@ -2,6 +2,7 @@ pub mod data;
 pub mod frequency;
 pub mod linear;
 pub mod mass;
+pub mod percentage;
 pub mod time;
 pub mod volume;
 
@@ -11,6 +12,7 @@ pub use data::DataMeasureExtension;
 pub use frequency::FrequencyMeasureExtension;
 pub use linear::LinearMeasureExtension;
 pub use mass::MassMeasureExtension;
+pub use percentage::PercentageMeasureExtension;
 pub use time::TimeMeasureExtension;
 pub use volume::VolumeMeasureExtension;
 
@@ -31,6 +33,9 @@ impl Extension for MeasuresExtension {
         FrequencyMeasureExtension.register(registry)?;
         TimeMeasureExtension.register(registry)?;
         DataMeasureExtension.register(registry)?;
+        // Percentage composes with every previously registered subtype, so
+        // it runs after all measure dimensions.
+        PercentageMeasureExtension.register(registry)?;
         Ok(())
     }
 }

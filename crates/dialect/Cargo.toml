@@ -9,7 +9,6 @@ description = "Single authoritative ECK dialect – registers all builtin extens
 language_core = { package = "eck-core", path = "../core" }
 parser = { package = "eck-parser", path = "../parser" }
 primitives = { package = "eck-primitives", path = "../primitives" }
-percentage = { package = "eck-percentage", path = "../subtypes/percentage" }
 measures = { package = "eck-measures", path = "../measures" }
 io_input_output = { package = "eck-std-io", path = "../std/io" }
 thiserror.workspace = true

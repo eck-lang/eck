@@ -1,6 +1,5 @@
 use language_core::{CoreError, Extension, Registry};
 use measures::MeasuresExtension;
-use percentage::PercentageExtension;
 
 /// Re-exported keyword list from the language crate – the parser remains the
 /// single source of truth. `eck-dialect` re-exports it for convenience so
@@ -25,7 +24,6 @@ pub fn default_registry() -> Result<Registry, CoreError> {
 pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     primitives::register_all(registry)?;
     MeasuresExtension.register(registry)?;
-    PercentageExtension.register(registry)?;
     io_input_output::IoExtension.register(registry)?;
     Ok(())
 }

@@ -5,10 +5,6 @@ members = [
   "crates/language/*",
   "crates/parser",
   "crates/primitives",
-  "crates/subtypes/*",
-  "crates/extensions/*",
-  "crates/std/*",
-  "crates/cli",
   "crates/test-runner",
 ]
 
