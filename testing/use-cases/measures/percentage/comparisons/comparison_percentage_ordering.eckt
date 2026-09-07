@@ -1,0 +1,23 @@
+# Percentage comparison within one qualification
+
+Verifies equality and ordering between two percentage values without any scaling. Comparing 10% against 25% exercises `==`, `!=`, `<`, and `>`, while the reflexive `<=` and `>=` cases pin the boundary where both operands are equal.
+
+>>> source
+low: decimal = 10%
+high: decimal = 25%
+print(low == high)
+print(low != high)
+print(low < high)
+print(high > low)
+print(low <= low)
+print(high >= high)
+
+<<< stdout
+false
+true
+true
+true
+true
+true
+
+<<< stderr

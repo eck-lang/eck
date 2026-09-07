@@ -1,0 +1,15 @@
+# Percentage scaling promotes integers to decimal
+
+Verifies an integer amount scaled by a decimal rate promotes to decimal. Multiplying 200 by 50% in both operand orders yields the decimal 100.00 instead of truncating to an integer result.
+
+>>> source
+count: int = 200
+half: decimal = 50%
+print(count * half)
+print(half * count)
+
+<<< stdout
+100.00
+100.00
+
+<<< stderr

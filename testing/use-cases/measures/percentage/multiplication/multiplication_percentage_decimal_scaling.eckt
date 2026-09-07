@@ -1,0 +1,15 @@
+# Percentage scaling of decimal values
+
+Verifies a decimal rate scales a decimal amount by hundredths in both operand orders. Multiplying 12.50 by 50% exercises the percentage rule that divides the percentage operand by 100 while keeping a plain decimal result.
+
+>>> source
+price: decimal = 12.50
+half: decimal = 50%
+print(price * half)
+print(half * price)
+
+<<< stdout
+6.2500
+6.2500
+
+<<< stderr

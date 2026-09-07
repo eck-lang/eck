@@ -1,0 +1,15 @@
+# Percentage scaling preserves the other operand unit
+
+Verifies a percentage combined with a qualified length keeps the length subtype. Scaling 8m by 12.5% in both operand orders produces 1.000m: the percentage contributes only its hundredth scale while the meter unit survives.
+
+>>> source
+length: decimal = 8m
+ratio: float = 12.5%
+print(length * ratio)
+print(ratio * length)
+
+<<< stdout
+1.000m
+1.000m
+
+<<< stderr

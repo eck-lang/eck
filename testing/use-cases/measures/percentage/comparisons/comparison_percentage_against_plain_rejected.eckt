@@ -1,0 +1,14 @@
+# Percentage comparison against a plain value rejected
+
+Verifies a comparison between a qualified percentage and a plain number is rejected at compile time. An unannotated 25% literal carries the percentage subtype with no compatible rule for plain integers, so the compiler reports the undefined operand pair instead of dropping the qualification.
+
+>>> source
+print(25% == 25)
+
+<<< stdout
+
+<<< stderr
+eck: comparison `==` is not defined for `int64[%]` and `int64` at Span { start: 6, end: 15 }
+
+<<< exit
+1

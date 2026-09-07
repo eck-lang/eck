@@ -1,0 +1,14 @@
+# Percentage scaling of float values
+
+Verifies a float rate scales a plain number by hundredths in both operand orders. Multiplying 8 by 12.5% applies the hundredth scale and returns the float 1.
+
+>>> source
+ratio: float = 12.5%
+print(ratio * 8)
+print(8 * ratio)
+
+<<< stdout
+1
+1
+
+<<< stderr
