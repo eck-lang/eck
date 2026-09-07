@@ -32,7 +32,7 @@ pub(crate) fn project_root() -> PathBuf {
 }
 
 /// Returns the Eck binary used when none is supplied explicitly, honouring
-/// `ECK_BIN` and otherwise building `eck-cli` like `testing/run.sh` does.
+/// `ECK_BIN` and otherwise building `eck-cli`.
 pub(crate) fn default_eck_binary(project_root: &Path) -> Result<PathBuf, String> {
     if let Ok(binary) = env::var("ECK_BIN")
         && !binary.is_empty()

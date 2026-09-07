@@ -1,8 +1,9 @@
 //! Cross-platform entry point for the complete repository test suite.
 //!
 //! Without arguments the runner executes every Rust test followed by every
-//! `.eckt` language test. With `--binary <eck-binary> <paths>...` it executes
-//! one focused `.eckt` subset instead.
+//! `.eckt` language test. With `[--binary <eck-binary>] <paths>...` it
+//! executes one focused `.eckt` subset instead, building `eck-cli` when no
+//! binary is supplied.
 
 use std::{env, process};
 
@@ -25,7 +26,7 @@ mod execution;
 enum Mode {
     /// Runs every Rust test plus every `.eckt` language test.
     Complete,
-    /// Runs one focused `.eckt` subset against an explicit binary.
+    /// Runs one focused `.eckt` subset, defaulting to a built binary.
     Focused(RunnerArguments),
 }
 
@@ -46,7 +47,11 @@ fn run() -> Result<bool, String> {
     match select_mode(env::args_os().skip(1))? {
         Mode::Complete => run_all_tests(),
         Mode::Focused(arguments) => {
-            execute_language_tests(&arguments.search_roots, &arguments.eck_binary)
+            let eck_binary = match arguments.eck_binary {
+                Some(binary) => binary,
+                None => default_eck_binary(&project_root())?,
+            };
+            execute_language_tests(&arguments.search_roots, &eck_binary)
         }
     }
 }

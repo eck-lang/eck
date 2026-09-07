@@ -18,7 +18,7 @@ fn parses_binary_and_search_roots() {
     assert_eq!(
         arguments,
         RunnerArguments {
-            eck_binary: "eck".into(),
+            eck_binary: Some("eck".into()),
             search_roots: vec!["testing/use-cases".into(), "testing/regressions".into()],
         }
     );
@@ -36,21 +36,27 @@ fn resolves_relative_binary_against_current_directory() {
 
     assert_eq!(
         arguments.eck_binary,
-        std::env::current_dir().unwrap().join("target/debug/eck")
+        Some(std::env::current_dir().unwrap().join("target/debug/eck"))
     );
 }
 
-/// Rejects argument lists that name no binary flag.
+/// Accepts search roots without a binary flag, deferring to the default binary.
 #[test]
-fn rejects_missing_binary_flag() {
-    let error = parse_arguments(
+fn accepts_search_roots_without_binary_flag() {
+    let arguments = parse_arguments(
         ["testing/use-cases"]
             .into_iter()
             .map(std::ffi::OsString::from),
     )
-    .unwrap_err();
+    .unwrap();
 
-    assert!(error.starts_with("usage:"));
+    assert_eq!(
+        arguments,
+        RunnerArguments {
+            eck_binary: None,
+            search_roots: vec!["testing/use-cases".into()],
+        }
+    );
 }
 
 /// Rejects a binary flag without a binary path.

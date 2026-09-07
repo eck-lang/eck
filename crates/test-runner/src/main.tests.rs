@@ -22,16 +22,22 @@ fn selects_focused_run_with_binary_and_roots() {
     assert_eq!(
         mode,
         Mode::Focused(RunnerArguments {
-            eck_binary: "eck".into(),
+            eck_binary: Some("eck".into()),
             search_roots: vec!["testing/use-cases".into()],
         })
     );
 }
 
-/// Rejects argument lists that name no binary.
+/// Selects a focused run for search roots alone, deferring to the default binary.
 #[test]
-fn rejects_argument_lists_without_a_binary_flag() {
-    let error = select_mode(os_arguments(&["testing/use-cases"])).unwrap_err();
+fn selects_focused_run_without_a_binary_flag() {
+    let mode = select_mode(os_arguments(&["testing/use-cases"])).unwrap();
 
-    assert!(error.starts_with("usage:"));
+    assert_eq!(
+        mode,
+        Mode::Focused(RunnerArguments {
+            eck_binary: None,
+            search_roots: vec!["testing/use-cases".into()],
+        })
+    );
 }
