@@ -1,0 +1,16 @@
+# Frequency comparison across dimensions rejected
+
+Verifies a comparison between a frequency and a duration is rejected at compile time. Kilohertz and seconds belong to separate dimensions, so no cross-dimensional comparison or scaling is available.
+
+>>> source
+frequency: int = 1khz
+duration: int = 1s
+print(frequency == duration)
+
+<<< stdout
+
+<<< stderr
+eck: comparison `==` is not defined for `int64[khz]` and `int64[s]` at Span { start: 47, end: 68 }
+
+<<< exit
+1

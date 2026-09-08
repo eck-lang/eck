@@ -1,0 +1,21 @@
+# Frequency conversion between gigahertz and terahertz
+
+Verifies direct conversion between gigahertz and terahertz in both directions. Gigahertz converts to the coarser unit through decimal promotion, while terahertz converts to gigahertz with an integer scale.
+
+>>> source
+forward_whole: int = 1ghz
+print(forward_whole->to(thz))
+forward_fractional: decimal = 1.5ghz
+print(forward_fractional->to(thz))
+backward_whole: int = 1thz
+print(backward_whole->to(ghz))
+backward_fractional: decimal = 1.5thz
+print(backward_fractional->to(ghz))
+
+<<< stdout
+0.001thz
+0.0015thz
+1000ghz
+1500.0ghz
+
+<<< stderr

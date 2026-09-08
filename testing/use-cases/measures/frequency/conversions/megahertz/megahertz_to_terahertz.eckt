@@ -1,0 +1,21 @@
+# Frequency conversion between megahertz and terahertz
+
+Verifies direct conversion between megahertz and terahertz in both directions. Megahertz converts to the coarser unit through decimal promotion and four-place rounding, while terahertz converts exactly to megahertz.
+
+>>> source
+forward_whole: int = 1mhz
+print(forward_whole->to(thz))
+forward_fractional: decimal = 1.5mhz
+print(forward_fractional->to(thz))
+backward_whole: int = 1thz
+print(backward_whole->to(mhz))
+backward_fractional: decimal = 1.5thz
+print(backward_fractional->to(mhz))
+
+<<< stdout
+0.0000thz
+0.0000thz
+1000000mhz
+1500000.0mhz
+
+<<< stderr

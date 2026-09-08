@@ -1,0 +1,21 @@
+# Frequency conversion between hertz and megahertz
+
+Verifies direct conversion between hertz and megahertz in both directions. Hertz converts to the coarser unit through decimal promotion and four-place rounding, while megahertz converts exactly to hertz.
+
+>>> source
+forward_whole: int = 1hz
+print(forward_whole->to(mhz))
+forward_fractional: decimal = 1.5hz
+print(forward_fractional->to(mhz))
+backward_whole: int = 1mhz
+print(backward_whole->to(hz))
+backward_fractional: decimal = 1.5mhz
+print(backward_fractional->to(hz))
+
+<<< stdout
+0.0000mhz
+0.0000mhz
+1000000hz
+1500000.0hz
+
+<<< stderr

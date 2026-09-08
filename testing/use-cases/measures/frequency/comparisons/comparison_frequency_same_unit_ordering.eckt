@@ -1,0 +1,23 @@
+# Frequency comparison within one unit
+
+Verifies equality and ordering between hertz values without unit scaling. Distinct operands exercise `==`, `!=`, `<`, and `>`, while reflexive operands pin the inclusive ordering boundaries.
+
+>>> source
+small: int = 500hz
+large: int = 1000hz
+print(small == large)
+print(small != large)
+print(small < large)
+print(large > small)
+print(small <= small)
+print(large >= large)
+
+<<< stdout
+false
+true
+true
+true
+true
+true
+
+<<< stderr
