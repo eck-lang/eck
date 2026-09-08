@@ -8,27 +8,27 @@ pub struct FrequencyMeasureExtension;
 const UNITS: &[UnitDefinition] = &[
     UnitDefinition {
         name: "terahertz",
-        suffixes: &["thz", "terahertz", "terahertzs"],
+        suffixes: &["thz", "terahertz"],
         units_per_smallest: 1_000_000_000_000,
     },
     UnitDefinition {
         name: "gigahertz",
-        suffixes: &["ghz", "gigahertz", "gigahertzs"],
+        suffixes: &["ghz", "gigahertz"],
         units_per_smallest: 1_000_000_000,
     },
     UnitDefinition {
         name: "megahertz",
-        suffixes: &["mhz", "megahertz", "megahertzs"],
+        suffixes: &["mhz", "megahertz"],
         units_per_smallest: 1_000_000,
     },
     UnitDefinition {
         name: "kilohertz",
-        suffixes: &["khz", "kilohertz", "kilohertzs"],
+        suffixes: &["khz", "kilohertz"],
         units_per_smallest: 1_000,
     },
     UnitDefinition {
         name: "hertz",
-        suffixes: &["hz", "hertz", "hertzs"],
+        suffixes: &["hz", "hertz"],
         units_per_smallest: 1,
     },
 ];
