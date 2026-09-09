@@ -1,0 +1,2 @@
+[alias]
+test-all = "run --package eck-test-runner"
