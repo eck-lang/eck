@@ -1,0 +1,15 @@
+# Division by zero percent rejected
+
+Verifies that normalizing a zero percentage still reaches the Decimal division-by-zero guard instead of producing an invalid or infinite magnitude.
+
+>>> source
+value: decimal = 12.50
+print(value / 0%)
+
+<<< stdout
+
+<<< stderr
+eck: division by zero
+
+<<< exit
+1

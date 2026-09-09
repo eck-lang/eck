@@ -1,0 +1,13 @@
+# Percentage addition within one qualification
+
+Verifies adding two percentages keeps the percentage subtype without any scaling. Adding decimal 50% and 25% exercises same-subtype addition and returns the plain face-value sum qualified with percent.
+
+>>> source
+low: decimal = 25%
+high: decimal = 50%
+print(high + low)
+
+<<< stdout
+75%
+
+<<< stderr

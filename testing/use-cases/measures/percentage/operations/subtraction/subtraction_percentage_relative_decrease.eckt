@@ -1,0 +1,17 @@
+# Percentage subtraction relative to the left operand
+
+Verifies a percentage on the right of subtraction reads as a fraction of the left operand. Subtracting decimal 50% from plain 100 returns the plain 50.00, while subtracting 10% from 8m preserves the meter unit with 7.20m.
+
+>>> source
+total: decimal = 100
+rate: decimal = 50%
+print(total - rate)
+length: decimal = 8m
+discount: decimal = 10%
+print(length - discount)
+
+<<< stdout
+50.00
+7.20m
+
+<<< stderr

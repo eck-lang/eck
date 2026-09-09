@@ -1,0 +1,16 @@
+# Relative percentage addition at zero and whole boundaries
+
+Verifies relative addition with zero, one hundred, and more than one hundred percent. The cases pin identity, doubling, and growth beyond twice the original decimal magnitude.
+
+>>> source
+value: decimal = 12.50
+print(value + 0%)
+print(value + 100%)
+print(value + 150%)
+
+<<< stdout
+12.50
+25.00
+31.2500
+
+<<< stderr

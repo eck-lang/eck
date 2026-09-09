@@ -1,0 +1,17 @@
+# Percentage addition relative to the left operand
+
+Verifies a percentage on the right of addition reads as a fraction of the left operand. Adding decimal 50% to plain 100 returns the plain 150.00, while adding 10% to 8m preserves the meter unit with 8.80m.
+
+>>> source
+total: decimal = 100
+rate: decimal = 50%
+print(total + rate)
+length: decimal = 8m
+bonus: decimal = 10%
+print(length + bonus)
+
+<<< stdout
+150.00
+8.80m
+
+<<< stderr

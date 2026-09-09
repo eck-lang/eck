@@ -1,0 +1,14 @@
+# Percentage addition with the percentage on the left rejected
+
+Verifies a percentage on the left of addition has no reference magnitude and is rejected at compile time. An unannotated 50% literal carries the percentage subtype with no relative rule for a plain right operand, so the compiler reports the undefined operand pair instead of guessing a fraction base.
+
+>>> source
+print(50% + 100)
+
+<<< stdout
+
+<<< stderr
+eck: operator `+` is not defined for `int64[%]` and `int64` at Span { start: 6, end: 15 }
+
+<<< exit
+1
