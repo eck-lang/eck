@@ -1,4 +1,5 @@
 mod boolean;
+mod comparison;
 mod decimal;
 mod double;
 mod float;
@@ -57,3 +58,7 @@ pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     StringExtension.register(registry)?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "lib.tests.rs"]
+mod tests;

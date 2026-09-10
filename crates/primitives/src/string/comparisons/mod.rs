@@ -7,9 +7,11 @@ mod string_integer;
 #[cfg(test)]
 mod test_support;
 
-use std::{any::Any, cmp::Ordering};
+use std::any::Any;
 
 use language_core::{ComparisonExecutor, ComparisonOperator, CoreError, Registry, Value};
+
+use crate::comparison::evaluate_total_order as evaluate;
 
 /// Registers every equality and ordering comparison between strings.
 pub(crate) fn register(registry: &mut Registry) -> Result<(), CoreError> {
@@ -74,20 +76,4 @@ fn validate_distinct_payloads<T: Any>(
     Err(CoreError::InvalidValueRepresentation(
         "string and numeric comparison".into(),
     ))
-}
-
-/// Evaluates one comparison operator from a total lexicographic ordering.
-fn evaluate(ordering: Ordering, operator: ComparisonOperator) -> bool {
-    match operator {
-        ComparisonOperator::Equal => ordering == Ordering::Equal,
-        ComparisonOperator::NotEqual => ordering != Ordering::Equal,
-        ComparisonOperator::Less => ordering == Ordering::Less,
-        ComparisonOperator::LessOrEqual => {
-            matches!(ordering, Ordering::Less | Ordering::Equal)
-        }
-        ComparisonOperator::Greater => ordering == Ordering::Greater,
-        ComparisonOperator::GreaterOrEqual => {
-            matches!(ordering, Ordering::Greater | Ordering::Equal)
-        }
-    }
 }
