@@ -1,0 +1,17 @@
+# Undefined variable in condition rejected
+
+Verifies an `if` condition referencing a name that was never declared fails
+with the standard undefined-variable diagnostic before execution.
+
+>>> source
+if (missing) {
+    print(1)
+}
+
+<<< stdout
+
+<<< stderr
+eck: unknown variable `missing` at Span { start: 4, end: 11 }
+
+<<< exit
+1

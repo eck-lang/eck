@@ -1,0 +1,24 @@
+# Boolean variable as a condition
+
+Verifies an `if` reads its condition from a boolean variable rather than a
+literal: the body runs for the true variable and is skipped for the false one,
+after which execution continues normally.
+
+>>> source
+flag: bool = true
+if (flag) {
+    print(1)
+}
+
+other: bool = false
+if (other) {
+    print(2)
+}
+
+print(3)
+
+<<< stdout
+1
+3
+
+<<< stderr

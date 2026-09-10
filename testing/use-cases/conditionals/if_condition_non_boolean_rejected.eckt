@@ -1,0 +1,17 @@
+# Non-boolean condition rejected
+
+Verifies an `if` condition must produce the configured boolean type: an integer
+literal is rejected before execution with the standard type diagnostic.
+
+>>> source
+if (1) {
+    print(1)
+}
+
+<<< stdout
+
+<<< stderr
+eck: if condition must produce `bool`, found `int64` at Span { start: 4, end: 5 }
+
+<<< exit
+1

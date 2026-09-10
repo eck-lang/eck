@@ -1,0 +1,22 @@
+# Conditional execution of boolean literals
+
+Verifies a `true` condition runs its body while a `false` condition skips it.
+The skipped body contains no observable output, so only the `true` body and the
+statement after both conditionals reach standard output.
+
+>>> source
+if (true) {
+    print(1)
+}
+
+if (false) {
+    print(2)
+}
+
+print(3)
+
+<<< stdout
+1
+3
+
+<<< stderr

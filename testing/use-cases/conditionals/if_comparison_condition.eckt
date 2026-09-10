@@ -1,0 +1,31 @@
+# Comparison result as a condition
+
+Verifies an `if` consumes the boolean produced by a comparison. Each body runs
+only when its relation holds, so the true relations print while the false ones
+leave no output.
+
+>>> source
+a: int = 3
+b: int = 5
+
+if (a < b) {
+    print(1)
+}
+
+if (a > b) {
+    print(2)
+}
+
+if (a == b) {
+    print(3)
+}
+
+if (a != b) {
+    print(4)
+}
+
+<<< stdout
+1
+4
+
+<<< stderr
