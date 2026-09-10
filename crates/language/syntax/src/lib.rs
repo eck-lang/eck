@@ -5,7 +5,7 @@ mod span;
 pub use ast::{
     Block, ConfigurationEntry, ConfigurationValue, Expression, FrameLiteralColumn, Program,
     RelationBinding, RelationCardinality, RelationDefinition, RelationRole, RelationRoleBinding,
-    Statement, TypeDefinition, TypeField,
+    SourceIdentifier, Statement, TypeDefinition, TypeField, UseClause, UseDeclaration, UseMember,
 };
 pub use operator::{BinaryOperator, ComparisonOperator, LogicalOperator, UnaryOperator};
 pub use span::Span;

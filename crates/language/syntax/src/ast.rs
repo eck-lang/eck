@@ -13,6 +13,7 @@ pub struct Block {
 
 #[derive(Clone, Debug)]
 pub enum Statement {
+    Use(UseDeclaration),
     TypeDeclaration {
         definition: TypeDefinition,
         span: Span,
@@ -54,6 +55,46 @@ pub enum Statement {
         span: Span,
     },
     Expression(Expression),
+}
+
+/// Represents one compile-time namespace import declaration.
+#[derive(Clone, Debug)]
+pub struct UseDeclaration {
+    pub clause: UseClause,
+    pub use_span: Span,
+    pub span: Span,
+}
+
+/// Captures the three semantically distinct namespace import forms.
+#[derive(Clone, Debug)]
+pub enum UseClause {
+    Namespace {
+        namespace: SourceIdentifier,
+        alias: Option<SourceIdentifier>,
+    },
+    Members {
+        namespace: SourceIdentifier,
+        members: Vec<UseMember>,
+    },
+    Wildcard {
+        namespace: SourceIdentifier,
+        alias: Option<SourceIdentifier>,
+    },
+}
+
+/// Stores one selectively imported member and its optional local alias.
+#[derive(Clone, Debug)]
+pub struct UseMember {
+    pub name: SourceIdentifier,
+    pub alias: Option<SourceIdentifier>,
+    pub span: Span,
+}
+
+/// Stores an identifier together with its exact source span.
+#[derive(Clone, Debug)]
+pub struct SourceIdentifier {
+    pub name: String,
+    pub span: Span,
 }
 
 /// Describes the logical fields that make up one user-defined row type.
@@ -169,6 +210,10 @@ pub enum Expression {
         value: String,
         span: Span,
     },
+    Regex {
+        raw_text: String,
+        span: Span,
+    },
     Boolean {
         raw_text: String,
         span: Span,
@@ -217,8 +262,15 @@ pub enum Expression {
         target: String,
         span: Span,
     },
+    Pipe {
+        expression: Box<Expression>,
+        function: String,
+        arguments: Vec<Expression>,
+        span: Span,
+    },
     Call {
-        name: String,
+        namespace: Option<SourceIdentifier>,
+        function: SourceIdentifier,
         arguments: Vec<Expression>,
         span: Span,
     },
@@ -229,6 +281,7 @@ impl Expression {
         match self {
             Expression::Number { span, .. }
             | Expression::String { span, .. }
+            | Expression::Regex { span, .. }
             | Expression::Boolean { span, .. }
             | Expression::Null { span, .. }
             | Expression::Variable { span, .. }
@@ -239,6 +292,7 @@ impl Expression {
             | Expression::Comparison { span, .. }
             | Expression::Logical { span, .. }
             | Expression::Convert { span, .. }
+            | Expression::Pipe { span, .. }
             | Expression::Call { span, .. } => *span,
         }
     }

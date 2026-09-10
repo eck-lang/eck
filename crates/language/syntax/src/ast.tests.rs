@@ -1,4 +1,4 @@
-use super::{Expression, FrameLiteralColumn};
+use super::{Expression, FrameLiteralColumn, SourceIdentifier};
 use crate::{BinaryOperator, ComparisonOperator, LogicalOperator, Span, UnaryOperator};
 
 fn span(start: usize, end: usize) -> Span {
@@ -81,7 +81,11 @@ fn every_expression_variant_returns_its_span() {
             span: expected_span,
         },
         Expression::Call {
-            name: "print".into(),
+            namespace: None,
+            function: SourceIdentifier {
+                name: "print".into(),
+                span: expected_span,
+            },
             arguments: vec![number_expression(expected_span)],
             span: expected_span,
         },
