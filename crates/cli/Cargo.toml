@@ -1,0 +1,15 @@
+[package]
+name = "eck-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "eck"
+path = "src/main.rs"
+
+[dependencies]
+dialect = { package = "eck-dialect", path = "../dialect" }
+parser = { package = "eck-parser", path = "../parser" }
+compiler = { package = "eck-compiler", path = "../language/compiler" }
+runtime = { package = "eck-runtime", path = "../language/runtime" }
