@@ -95,7 +95,7 @@ fn rejects_double_minus_to_reserve_pre_decrement_syntax() {
 #[test]
 fn parses_adjacent_numeric_suffix() {
     let program = parse("distance: decimal = 10m\n").unwrap();
-    let Statement::VariableDecl { expression, .. } = &program.statements[0] else {
+    let Statement::VariableDeclaration { expression, .. } = &program.statements[0] else {
         panic!("expected a variable declaration");
     };
     assert!(matches!(
@@ -112,7 +112,7 @@ fn parses_adjacent_numeric_suffix() {
 fn parses_boolean_literals_without_claiming_identifiers_with_the_same_prefix() {
     let program = parse("enabled: bool = true\nprint(false)\ntruthy: int = 1\n").unwrap();
 
-    let Statement::VariableDecl { expression, .. } = &program.statements[0] else {
+    let Statement::VariableDeclaration { expression, .. } = &program.statements[0] else {
         panic!("expected a variable declaration");
     };
     assert!(matches!(
@@ -128,7 +128,7 @@ fn parses_boolean_literals_without_claiming_identifiers_with_the_same_prefix() {
         Expression::Boolean { raw_text, .. } if raw_text == "false"
     ));
 
-    let Statement::VariableDecl { name, .. } = &program.statements[2] else {
+    let Statement::VariableDeclaration { name, .. } = &program.statements[2] else {
         panic!("expected a variable declaration");
     };
     assert_eq!(name, "truthy");
@@ -137,7 +137,7 @@ fn parses_boolean_literals_without_claiming_identifiers_with_the_same_prefix() {
 #[test]
 fn parses_space_separated_numeric_suffix() {
     let program = parse("distance: decimal = 10 meters\n").unwrap();
-    let Statement::VariableDecl { expression, .. } = &program.statements[0] else {
+    let Statement::VariableDeclaration { expression, .. } = &program.statements[0] else {
         panic!("expected a variable declaration");
     };
     assert!(matches!(

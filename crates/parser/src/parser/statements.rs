@@ -521,7 +521,7 @@ impl Parser {
         self.expect_simple(TokenKind::Equal)?;
         let expression = self.parse_expression(0)?;
         let end = expression.span().end;
-        Ok(Statement::VariableDecl {
+        Ok(Statement::VariableDeclaration {
             name,
             type_name,
             expression,

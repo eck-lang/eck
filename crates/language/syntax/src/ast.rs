@@ -35,7 +35,7 @@ pub enum Statement {
         entries: Vec<ConfigurationEntry>,
         span: Span,
     },
-    VariableDecl {
+    VariableDeclaration {
         name: String,
         type_name: String,
         expression: Expression,
