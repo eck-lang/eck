@@ -9,6 +9,7 @@ Read the relevant files before making changes:
 * `.agents/docs/commits.md` — commit message and commit workflow conventions
 * `.agents/docs/eck-lang/crate-structure.md` — common crate and operation layout
 * `.agents/docs/eck-lang/use-cases.md` — language use-case test conventions
+* `.agents/docs/eck-lang/performance.md` — raw execution speed as the primary implementation goal
 * `.agents/docs/eck-lang/variable-scope.md` — binding, scope, shadowing, and control-flow scope semantics
 * `.agents/docs/tests.md` — testing conventions, structure, and requirements
 
