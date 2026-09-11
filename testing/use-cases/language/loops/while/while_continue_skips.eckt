@@ -1,0 +1,25 @@
+# while loop skips an iteration through continue
+
+Verifies `continue` abandons the current `while` iteration and re-evaluates
+the condition, so the skipped value is never printed.
+
+>>> source
+let i: int = 0
+
+while (i < 5) {
+    i = i + 1
+
+    if (i == 3) {
+        continue
+    }
+
+    print(i)
+}
+
+<<< stdout
+1
+2
+4
+5
+
+<<< stderr

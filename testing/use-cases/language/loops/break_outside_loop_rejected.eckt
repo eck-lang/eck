@@ -1,0 +1,15 @@
+# break outside a loop rejected
+
+Verifies a `break` statement outside any loop is rejected during compilation
+instead of being accepted as a stray statement.
+
+>>> source
+break
+
+<<< stdout
+
+<<< stderr
+eck: `break` is only allowed inside a loop at Span { start: 0, end: 5 }
+
+<<< exit
+1

@@ -1,0 +1,23 @@
+# while loop exits through break
+
+Verifies `break` terminates the enclosing `while` loop immediately, so the
+counter stops producing output once it reaches the sentinel value.
+
+>>> source
+let i: int = 0
+
+while (true) {
+    if (i == 3) {
+        break
+    }
+
+    print(i)
+    i = i + 1
+}
+
+<<< stdout
+0
+1
+2
+
+<<< stderr

@@ -1,0 +1,15 @@
+# continue outside a loop rejected
+
+Verifies a `continue` statement outside any loop is rejected during compilation
+instead of being accepted as a stray statement.
+
+>>> source
+continue
+
+<<< stdout
+
+<<< stderr
+eck: `continue` is only allowed inside a loop at Span { start: 0, end: 8 }
+
+<<< exit
+1

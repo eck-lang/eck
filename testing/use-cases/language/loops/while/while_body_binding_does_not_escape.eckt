@@ -1,0 +1,19 @@
+# While body binding does not escape
+
+Verifies a binding declared inside a `while` body is scoped to that body: using
+the name after the loop fails with the standard undefined-variable diagnostic.
+
+>>> source
+while (false) {
+    let local: int = 1
+}
+
+print(local)
+
+<<< stdout
+
+<<< stderr
+eck: unknown binding `local` at Span { start: 48, end: 53 }
+
+<<< exit
+1

@@ -14,7 +14,7 @@ print(i)
 <<< stdout
 
 <<< stderr
-eck: unknown variable `i` at Span { start: 40, end: 41 }
+eck: unknown binding `i` at Span { start: 40, end: 41 }
 
 <<< exit
 1

@@ -1,0 +1,19 @@
+# for range loop skips through continue
+
+Verifies `continue` in a `for` range loop still advances the loop variable, so
+even values are skipped and odd values are printed.
+
+>>> source
+for (i in 0..5) {
+    if (i % 2 == 0) {
+        continue
+    }
+
+    print(i)
+}
+
+<<< stdout
+1
+3
+
+<<< stderr

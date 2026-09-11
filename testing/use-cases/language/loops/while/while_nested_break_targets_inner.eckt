@@ -1,0 +1,28 @@
+# Nested break targets the innermost loop
+
+Verifies a `break` inside a nested `while` exits only the inner loop while the
+outer loop keeps iterating and re-runs the inner loop from the start.
+
+>>> source
+let outer: int = 0
+
+while (outer < 2) {
+    let inner: int = 0
+
+    while (inner < 3) {
+        if (inner == 1) {
+            break
+        }
+
+        print(outer * 10 + inner)
+        inner = inner + 1
+    }
+
+    outer = outer + 1
+}
+
+<<< stdout
+0
+10
+
+<<< stderr

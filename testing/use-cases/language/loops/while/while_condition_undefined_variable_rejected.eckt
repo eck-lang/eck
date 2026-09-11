@@ -1,0 +1,17 @@
+# Undefined variable in while condition rejected
+
+Verifies a `while` condition referencing a name that was never declared fails
+with the standard undefined-variable diagnostic before execution.
+
+>>> source
+while (missing) {
+    print(1)
+}
+
+<<< stdout
+
+<<< stderr
+eck: unknown binding `missing` at Span { start: 7, end: 14 }
+
+<<< exit
+1

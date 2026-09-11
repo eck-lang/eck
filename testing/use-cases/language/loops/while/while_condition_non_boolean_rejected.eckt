@@ -1,0 +1,18 @@
+# Non-boolean while condition rejected
+
+Verifies a `while` condition must produce the configured boolean type: an
+integer literal is rejected before execution with the standard type
+diagnostic.
+
+>>> source
+while (1) {
+    print(1)
+}
+
+<<< stdout
+
+<<< stderr
+eck: while condition must produce `bool`, found `int64` at Span { start: 7, end: 8 }
+
+<<< exit
+1

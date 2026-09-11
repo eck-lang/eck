@@ -1,0 +1,15 @@
+# While condition false before the first iteration
+
+Verifies a `while` loop whose condition is already false never executes its
+body, so the program produces no output.
+
+>>> source
+let done: bool = false
+
+while (done) {
+    print(1)
+}
+
+<<< stdout
+
+<<< stderr

@@ -1,0 +1,20 @@
+# Counter loop with a while condition
+
+Verifies a `while` loop re-evaluates its boolean condition before every
+iteration and stops when the condition becomes false, printing the values
+0, 1, and 2 through the complete CLI pipeline.
+
+>>> source
+let i: int = 0
+
+while (i < 3) {
+    print(i)
+    i = i + 1
+}
+
+<<< stdout
+0
+1
+2
+
+<<< stderr
