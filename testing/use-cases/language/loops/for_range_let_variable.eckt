@@ -1,0 +1,17 @@
+# Range loop variable declared with let
+
+Verifies the `for` range loop introduces its iterator through an explicit `let`
+binding instead of a bare identifier. Each iteration prints the current value of
+the start-inclusive, end-exclusive sequence.
+
+>>> source
+for (let item in 0..3) {
+    print(item)
+}
+
+<<< stdout
+0
+1
+2
+
+<<< stderr

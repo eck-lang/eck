@@ -1,0 +1,20 @@
+# Range loop promotes the iteration value at an integer boundary
+
+Verifies an `int8` loop variable widens to `int16` after its maximum value so
+an end-exclusive `int16` bound remains reachable without repeating or
+overflowing an iteration value.
+
+>>> source
+start: int8 = 126
+end: int16 = 130
+for (index in start..end) {
+    print(index)
+}
+
+<<< stdout
+126
+127
+128
+129
+
+<<< stderr
