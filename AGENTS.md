@@ -8,6 +8,8 @@ Read the relevant files before making changes:
 * `.agents/docs/code-style.md` — naming and code-style conventions
 * `.agents/docs/commits.md` — commit message and commit workflow conventions
 * `.agents/docs/eck-lang/crate-structure.md` — common crate and operation layout
+* `.agents/docs/eck-lang/use-cases.md` — language use-case test conventions
+* `.agents/docs/eck-lang/variable-scope.md` — binding, scope, shadowing, and control-flow scope semantics
 * `.agents/docs/tests.md` — testing conventions, structure, and requirements
 
 When a task modifies files under `.agents/docs/`, review this index as part of
