@@ -1,0 +1,16 @@
+# Assignment to a const binding rejected
+
+Verifies a `const` binding cannot be reassigned. The assignment is rejected
+with the immutable-binding diagnostic before execution.
+
+>>> source
+const y: int = 20
+y = 30
+
+<<< stdout
+
+<<< stderr
+eck: cannot assign to immutable binding `y` at Span { start: 18, end: 24 }
+
+<<< exit
+1

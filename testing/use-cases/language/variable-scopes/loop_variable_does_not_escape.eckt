@@ -1,0 +1,19 @@
+# Loop variable does not escape the loop
+
+Verifies the `for` range loop variable lives only inside the loop body. Reading
+it after the loop fails with the standard unknown-binding diagnostic.
+
+>>> source
+for (item in 0..3) {
+    print(item)
+}
+
+print(item)
+
+<<< stdout
+
+<<< stderr
+eck: unknown binding `item` at Span { start: 46, end: 50 }
+
+<<< exit
+1

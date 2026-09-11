@@ -1,0 +1,26 @@
+# Lexical lookup reads through enclosing scopes
+
+Verifies name resolution walks parent scopes recursively: the innermost block
+reads `x` from the root scope and `y` from its immediate parent. The final read
+after both blocks proves the root binding is still visible there.
+
+>>> source
+let x: int = 10
+
+{
+    let y: int = 20
+
+    {
+        print(x)
+        print(y)
+    }
+}
+
+print(x)
+
+<<< stdout
+10
+20
+10
+
+<<< stderr

@@ -1,0 +1,21 @@
+# Shadowing in a nested scope allowed
+
+Verifies a nested block may declare a name that already exists in an enclosing
+scope. The inner binding shadows the outer one and may have a different type;
+after the block the outer binding is visible again.
+
+>>> source
+let x: int = 10
+
+{
+    let x: string = "hello"
+    print(x)
+}
+
+print(x)
+
+<<< stdout
+hello
+10
+
+<<< stderr

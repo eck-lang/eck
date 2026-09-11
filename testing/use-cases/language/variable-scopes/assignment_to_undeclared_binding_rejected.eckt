@@ -1,0 +1,16 @@
+# Assignment to an undeclared name rejected
+
+Verifies assignment never introduces a binding. Assigning to a name that was
+never declared fails with the standard unknown-binding diagnostic before
+execution.
+
+>>> source
+x = 10
+
+<<< stdout
+
+<<< stderr
+eck: unknown binding `x` at Span { start: 0, end: 6 }
+
+<<< exit
+1

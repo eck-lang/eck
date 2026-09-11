@@ -1,0 +1,22 @@
+# Block-local binding does not escape its block
+
+Verifies a binding declared inside a standalone block is not visible after the
+block ends. Reading it afterwards fails with the standard unknown-binding
+diagnostic before execution.
+
+>>> source
+let x: int = 10
+
+{
+    let y: int = 20
+}
+
+print(y)
+
+<<< stdout
+
+<<< stderr
+eck: unknown binding `y` at Span { start: 48, end: 49 }
+
+<<< exit
+1

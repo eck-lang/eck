@@ -1,0 +1,18 @@
+# Reassigning a binding to an incompatible type rejected
+
+Verifies a `let` binding keeps its declared type across assignments. Reassigning
+a string binding to an integer binding is rejected even though the target
+binding itself is mutable.
+
+>>> source
+let value: int = 10
+let other: string = "x"
+value = other
+
+<<< stdout
+
+<<< stderr
+eck: type mismatch: binding `value` expects `int64`, expression produces `string` at Span { start: 52, end: 57 }
+
+<<< exit
+1

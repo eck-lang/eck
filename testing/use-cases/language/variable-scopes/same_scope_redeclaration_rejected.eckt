@@ -1,0 +1,17 @@
+# Redeclaration in the same scope rejected
+
+Verifies two `let` declarations of the same name in one lexical scope are
+rejected. The second declaration is a redeclaration, not shadowing, because
+both bindings belong to the same scope.
+
+>>> source
+let x: int = 10
+let x: int = 20
+
+<<< stdout
+
+<<< stderr
+eck: binding `x` is already declared in this scope at Span { start: 16, end: 31 }
+
+<<< exit
+1

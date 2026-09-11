@@ -1,0 +1,13 @@
+# Reading a const binding
+
+Verifies a `const` binding is fully readable after initialization; only
+reassignment is forbidden.
+
+>>> source
+const y: int = 20
+print(y)
+
+<<< stdout
+20
+
+<<< stderr

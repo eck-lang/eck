@@ -1,0 +1,14 @@
+# Reassigning a let binding
+
+Verifies a `let` binding may be reassigned after initialization and that the
+latest value is what later reads observe.
+
+>>> source
+let value: int = 10
+value = 20
+print(value)
+
+<<< stdout
+20
+
+<<< stderr

@@ -1,0 +1,22 @@
+# Branch-local bindings do not escape
+
+Verifies `if` and `else` blocks are independent child scopes. The same name may
+be declared in each, but neither binding is visible after the conditional.
+
+>>> source
+if (true) {
+    let x: int = 10
+    print(x)
+} else {
+    let x: int = 20
+}
+
+print(x)
+
+<<< stdout
+
+<<< stderr
+eck: unknown binding `x` at Span { start: 83, end: 84 }
+
+<<< exit
+1
