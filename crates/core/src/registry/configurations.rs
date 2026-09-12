@@ -117,6 +117,19 @@ impl Registry {
         Ok(())
     }
 
+    /// Reports whether a type's initial configuration leaves operation results unchanged.
+    ///
+    /// Types without configuration behavior are identity by definition. Returns
+    /// [`CoreError::UnknownTypeId`] when `type_id` is not registered.
+    pub fn initial_result_transform_is_identity(&self, type_id: TypeId) -> Result<bool, CoreError> {
+        self.type_descriptor(type_id)?;
+        Ok(self
+            .type_configurations
+            .get(&type_id)
+            .map(|registered| registered.descriptor.initial_result_transform_is_identity)
+            .unwrap_or(true))
+    }
+
     /// Applies the active configuration to one operation result when its type opts in.
     pub fn transform_configured_result(
         &self,
@@ -132,6 +145,32 @@ impl Registry {
                 }
             }
             None => Ok(value.clone()),
+        }
+    }
+
+    /// Applies the active result transformation while preserving ownership when none exists.
+    ///
+    /// This is equivalent to [`Self::transform_configured_result`], but avoids
+    /// cloning an already-owned value for types that do not register a result
+    /// transformer.
+    pub fn transform_owned_configured_result(
+        &self,
+        value: Value,
+        configuration: &RuntimeConfiguration,
+    ) -> Result<Value, CoreError> {
+        match self.type_configurations.get(&value.type_id()) {
+            Some(registered) => {
+                debug_assert_eq!(registered.type_id, value.type_id());
+                match (
+                    registered.descriptor.transform_owned_result,
+                    registered.descriptor.transform_result,
+                ) {
+                    (Some(transform), _) => transform(value, configuration),
+                    (None, Some(transform)) => transform(&value, configuration),
+                    (None, None) => Ok(value),
+                }
+            }
+            None => Ok(value),
         }
     }
 

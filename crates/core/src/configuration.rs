@@ -18,6 +18,9 @@ pub type ConfigurationNormalizer = fn(ConfigurationValue) -> Result<Configuratio
 
 /// Applies the active runtime configuration to a value produced by an operation.
 pub type ConfiguredValueTransformer = fn(&Value, &RuntimeConfiguration) -> Result<Value, CoreError>;
+/// Transforms an operation result while retaining ownership when possible.
+pub type OwnedConfiguredValueTransformer =
+    fn(Value, &RuntimeConfiguration) -> Result<Value, CoreError>;
 
 /// Formats a value using the active runtime configuration.
 pub type ConfiguredValueFormatter = fn(&Value, &RuntimeConfiguration) -> Result<String, CoreError>;
@@ -44,6 +47,13 @@ pub struct ConfigurationDescriptor {
 pub struct TypeConfigurationDescriptor {
     /// Optionally transforms results produced by operations on the type.
     pub transform_result: Option<ConfiguredValueTransformer>,
+    /// Optionally transforms owned results without forcing an intermediate clone.
+    pub transform_owned_result: Option<OwnedConfiguredValueTransformer>,
+    /// Declares whether the initial runtime configuration leaves results unchanged.
+    ///
+    /// This permits compiled execution plans to skip configuration dispatch
+    /// until a source override changes the runtime configuration.
+    pub initial_result_transform_is_identity: bool,
     /// Optionally replaces the type's ordinary formatter during execution.
     pub format: Option<ConfiguredValueFormatter>,
 }
@@ -72,12 +82,16 @@ impl ConfigurationOverride {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RuntimeConfiguration {
     values: HashMap<String, ConfigurationValue>,
+    uses_initial_values: bool,
 }
 
 impl RuntimeConfiguration {
     /// Creates a configuration from fully validated initial values.
     pub(crate) fn new(values: HashMap<String, ConfigurationValue>) -> Self {
-        Self { values }
+        Self {
+            values,
+            uses_initial_values: true,
+        }
     }
 
     /// Returns the active value for a registered dot-separated path.
@@ -85,10 +99,21 @@ impl RuntimeConfiguration {
         self.values.get(path)
     }
 
+    /// Returns whether no source configuration override has changed the initial values.
+    ///
+    /// This is useful for extensions whose registered initial configuration is
+    /// known to make a transformation a semantic no-op. A directly constructed
+    /// default configuration is conservatively treated as not initialised by a
+    /// registry and therefore returns `false`.
+    pub fn uses_initial_values(&self) -> bool {
+        self.uses_initial_values
+    }
+
     /// Merges a validated override into the current execution state.
     pub fn apply(&mut self, configuration_override: &ConfigurationOverride) {
         for (path, value) in configuration_override.entries() {
             self.values.insert(path.to_string(), value.clone());
+            self.uses_initial_values = false;
         }
     }
 }

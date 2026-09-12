@@ -10,8 +10,8 @@ mod value;
 
 pub use configuration::{
     ConfigurationDescriptor, ConfigurationNormalizer, ConfigurationOverride, ConfigurationValue,
-    ConfiguredValueFormatter, ConfiguredValueTransformer, ExecutionContext, RuntimeConfiguration,
-    TypeConfigurationDescriptor,
+    ConfiguredValueFormatter, ConfiguredValueTransformer, ExecutionContext,
+    OwnedConfiguredValueTransformer, RuntimeConfiguration, TypeConfigurationDescriptor,
 };
 pub use descriptor::{
     BinaryOperatorDescriptor, BinaryOperatorExecutor, BooleanEvaluator, ComparisonDescriptor,

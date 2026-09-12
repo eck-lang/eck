@@ -44,10 +44,16 @@ fn creates_execution_local_defaults_and_applies_overrides() {
     let normalized = registry
         .normalize_configuration_value("example.limit", ConfigurationValue::Integer(7))
         .unwrap();
+
+    assert!(first_execution.uses_initial_values());
+    assert!(second_execution.uses_initial_values());
     first_execution.apply(&ConfigurationOverride::new(vec![(
         "example.limit".into(),
         normalized,
     )]));
+
+    assert!(!first_execution.uses_initial_values());
+    assert!(second_execution.uses_initial_values());
 
     assert_eq!(
         first_execution.value("example.limit"),
@@ -103,4 +109,28 @@ fn resolves_explicit_none_objects_without_adding_reset_behavior() {
         registry.normalize_none_configuration_value("other"),
         Err(CoreError::UnknownConfiguration(path)) if path == "other"
     ));
+}
+
+/// Verifies a configured type explicitly exposes its initial-result identity.
+#[test]
+fn reports_initial_result_transform_identity_for_registered_types() {
+    let mut registry = Registry::new();
+    let type_id = crate::registry::test_support::register_type(&mut registry, "configured");
+    registry
+        .register_type_configuration(
+            type_id,
+            TypeConfigurationDescriptor {
+                transform_result: None,
+                transform_owned_result: None,
+                initial_result_transform_is_identity: true,
+                format: None,
+            },
+        )
+        .unwrap();
+
+    assert!(
+        registry
+            .initial_result_transform_is_identity(type_id)
+            .unwrap()
+    );
 }
