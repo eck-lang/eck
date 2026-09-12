@@ -71,3 +71,29 @@ fn promotes_overflowed_context_multiplication_to_bigint() {
         &(BigInt::from(i128::MAX) * 2)
     );
 }
+
+/// Verifies context-aware mixed multiplication promotes `int128` overflow to `bigint`.
+#[test]
+fn promotes_overflowed_mixed_context_multiplication_to_bigint() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer128_id = registry.type_by_name("int128").unwrap();
+    let integer64_id = registry.type_by_name("int64").unwrap();
+    let bigint_id = registry.type_by_name("bigint").unwrap();
+    let maximum = Value::new(integer128_id, i128::MAX);
+    let two = Value::new(integer64_id, 2_i64);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Multiplication, integer128_id, integer64_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &maximum, &two).unwrap();
+
+    assert_eq!(promoted.type_id(), bigint_id);
+    assert_eq!(
+        promoted.downcast_ref::<BigInt>().unwrap(),
+        &(BigInt::from(i128::MAX) * 2)
+    );
+}

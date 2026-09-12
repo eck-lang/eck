@@ -98,3 +98,26 @@ fn keeps_context_power_overflow_beyond_int64_as_error() {
         Err(CoreError::Runtime(message)) if message.contains("overflow")
     ));
 }
+
+/// Verifies context-aware mixed power promotes `int32` overflow to `int64`.
+#[test]
+fn promotes_overflowed_mixed_context_power_to_int64() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer32_id = registry.type_by_name("int32").unwrap();
+    let integer16_id = registry.type_by_name("int16").unwrap();
+    let integer64_id = registry.type_by_name("int64").unwrap();
+    let base = Value::new(integer32_id, 2_i32);
+    let exponent = Value::new(integer16_id, 31_i16);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Power, integer32_id, integer16_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &base, &exponent).unwrap();
+
+    assert_eq!(promoted.type_id(), integer64_id);
+    assert_eq!(*promoted.downcast_ref::<i64>().unwrap(), 2_147_483_648);
+}

@@ -66,3 +66,26 @@ fn promotes_overflowed_context_subtraction_to_int64() {
     assert_eq!(promoted.type_id(), integer64_id);
     assert_eq!(*promoted.downcast_ref::<i64>().unwrap(), -2_147_483_649);
 }
+
+/// Verifies context-aware mixed subtraction promotes `int32` overflow to `int64`.
+#[test]
+fn promotes_overflowed_mixed_context_subtraction_to_int64() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer32_id = registry.type_by_name("int32").unwrap();
+    let integer16_id = registry.type_by_name("int16").unwrap();
+    let integer64_id = registry.type_by_name("int64").unwrap();
+    let minimum = Value::new(integer32_id, i32::MIN);
+    let one = Value::new(integer16_id, 1_i16);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Subtraction, integer32_id, integer16_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &one).unwrap();
+
+    assert_eq!(promoted.type_id(), integer64_id);
+    assert_eq!(*promoted.downcast_ref::<i64>().unwrap(), -2_147_483_649);
+}

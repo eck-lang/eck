@@ -87,3 +87,26 @@ fn promotes_overflowed_context_division_to_int32() {
     assert_eq!(promoted.type_id(), int32_id);
     assert_eq!(*promoted.downcast_ref::<i32>().unwrap(), 32_768);
 }
+
+/// Verifies context-aware mixed division promotes the `MIN / -1` overflow to `int32`.
+#[test]
+fn promotes_overflowed_mixed_context_division_to_int32() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer16_id = registry.type_by_name("int16").unwrap();
+    let integer8_id = registry.type_by_name("int8").unwrap();
+    let int32_id = registry.type_by_name("int32").unwrap();
+    let minimum = Value::new(integer16_id, i16::MIN);
+    let negative_one = Value::new(integer8_id, -1_i8);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Division, integer16_id, integer8_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &negative_one).unwrap();
+
+    assert_eq!(promoted.type_id(), int32_id);
+    assert_eq!(*promoted.downcast_ref::<i32>().unwrap(), 32_768);
+}

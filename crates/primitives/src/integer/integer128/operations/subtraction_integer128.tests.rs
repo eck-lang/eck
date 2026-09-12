@@ -70,3 +70,29 @@ fn promotes_overflowed_context_subtraction_to_bigint() {
         &(BigInt::from(i128::MIN) - 1)
     );
 }
+
+/// Verifies context-aware mixed subtraction promotes `int128` overflow to `bigint`.
+#[test]
+fn promotes_overflowed_mixed_context_subtraction_to_bigint() {
+    let mut registry = Registry::new();
+    crate::register_all(&mut registry).unwrap();
+    let configuration = registry.default_runtime_configuration();
+    let context = ExecutionContext::new(&registry, &configuration);
+    let integer128_id = registry.type_by_name("int128").unwrap();
+    let integer64_id = registry.type_by_name("int64").unwrap();
+    let bigint_id = registry.type_by_name("bigint").unwrap();
+    let minimum = Value::new(integer128_id, i128::MIN);
+    let one = Value::new(integer64_id, 1_i64);
+    let operator = registry
+        .resolve_binary_operator(BinaryOperator::Subtraction, integer128_id, integer64_id)
+        .unwrap();
+    let descriptor = registry.operator(operator).unwrap();
+
+    let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &one).unwrap();
+
+    assert_eq!(promoted.type_id(), bigint_id);
+    assert_eq!(
+        promoted.downcast_ref::<BigInt>().unwrap(),
+        &(BigInt::from(i128::MIN) - 1)
+    );
+}
