@@ -121,6 +121,16 @@ pub enum CoreError {
     UnknownFunction(String),
     #[error("function `{name}` already has overload `{signature}`")]
     DuplicateFunctionSignature { name: String, signature: String },
+    #[error("namespace `{0}` is already registered")]
+    DuplicateNamespace(String),
+    #[error("unknown namespace `{0}`")]
+    UnknownNamespace(String),
+    #[error("namespace `{namespace}` already exports `{member}`")]
+    DuplicateNamespaceMember { namespace: String, member: String },
+    #[error("namespace `{namespace}` has no member `{member}`")]
+    UnknownNamespaceMember { namespace: String, member: String },
+    #[error("type `{0}` already owns a function namespace")]
+    DuplicateTypeNamespace(String),
     #[error("configuration `{0}` is already registered")]
     DuplicateConfiguration(String),
     #[error("configuration object `{0}` already defines `None` behavior")]

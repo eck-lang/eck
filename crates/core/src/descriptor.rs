@@ -74,3 +74,14 @@ pub struct FunctionDescriptor {
     pub output: Option<TypeId>,
     pub execute: NativeFunction,
 }
+
+/// Describes one kind of symbol exported by a registered namespace.
+///
+/// Function exports refer to a registered overload family by its canonical
+/// registry name. Additional variants can be added as constants, types, and
+/// nested namespaces become compiler-visible symbols.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NamespaceSymbol {
+    /// Exposes a native function overload family under a namespace member name.
+    Function { function_name: &'static str },
+}

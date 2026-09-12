@@ -16,7 +16,7 @@ pub use configuration::{
 pub use descriptor::{
     BinaryOperatorDescriptor, BinaryOperatorExecutor, BooleanEvaluator, ComparisonDescriptor,
     ComparisonExecutor, ContextBinaryOperatorExecutor, FunctionDescriptor, FunctionSignature,
-    LiteralParser, NativeFunction, TypeDescriptor, ValueFormatter,
+    LiteralParser, NamespaceSymbol, NativeFunction, TypeDescriptor, ValueFormatter,
 };
 pub use error::CoreError;
 pub use extension::Extension;

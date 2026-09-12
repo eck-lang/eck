@@ -20,6 +20,7 @@ use crate::{
 mod comparisons;
 mod configurations;
 mod functions;
+mod namespaces;
 mod operators;
 mod subtypes;
 #[cfg(test)]
@@ -86,6 +87,13 @@ pub struct Registry {
     functions_by_name: HashMap<&'static str, Vec<FunctionId>>,
     /// Stores executable function descriptors in ID order.
     functions: Vec<FunctionDescriptor>,
+    /// Names whose overload families may be called without a lexical import.
+    global_functions: HashSet<&'static str>,
+
+    /// Stores public namespace surfaces independently from native functions.
+    namespaces: HashMap<&'static str, namespaces::RegisteredNamespace>,
+    /// Associates a receiver base type with the namespace used by pipe lookup.
+    namespaces_by_receiver_type: HashMap<TypeId, &'static str>,
 
     /// Validates and supplies defaults for registered runtime configuration leaves.
     configurations: HashMap<&'static str, ConfigurationDescriptor>,
@@ -130,6 +138,9 @@ impl Default for Registry {
             comparison_declarations: Vec::new(),
             functions_by_name: HashMap::new(),
             functions: Vec::new(),
+            global_functions: HashSet::new(),
+            namespaces: HashMap::new(),
+            namespaces_by_receiver_type: HashMap::new(),
             configurations: HashMap::new(),
             configuration_none_objects: HashMap::new(),
             type_configurations: HashMap::new(),

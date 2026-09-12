@@ -5,6 +5,24 @@ use crate::{CoreError, FunctionDescriptor, FunctionId, FunctionSignature, Native
 use super::Registry;
 
 impl Registry {
+    /// Registers a native function overload that source may call without an import.
+    pub fn register_global_function(
+        &mut self,
+        name: &'static str,
+        signature: FunctionSignature,
+        output: Option<TypeId>,
+        execute: NativeFunction,
+    ) -> Result<FunctionId, CoreError> {
+        let function = self.register_function(name, signature, output, execute)?;
+        self.global_functions.insert(name);
+        Ok(function)
+    }
+
+    /// Returns whether a native function family belongs to the small global surface.
+    pub fn is_global_function(&self, name: &str) -> bool {
+        self.global_functions.contains(name)
+    }
+
     /// Registers a native function overload and returns its stable dense ID.
     ///
     /// Multiple overloads may share a name, but each signature may be
