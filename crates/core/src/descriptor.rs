@@ -7,6 +7,13 @@ pub type LiteralParser = fn(&str, TypeId) -> Result<Value, crate::CoreError>;
 pub type ValueFormatter = fn(&Value) -> Result<String, crate::CoreError>;
 pub type BooleanEvaluator = fn(&Value) -> Result<bool, crate::CoreError>;
 pub type BinaryOperatorExecutor = fn(&Value, &Value) -> Result<Value, crate::CoreError>;
+/// Mutates an exclusively owned left operand with one same-type binary operation.
+///
+/// Implementations must leave the left operand as the operation result and may
+/// only be registered when the result has the same base type as the left
+/// operand. The runtime uses this optional contract only after proving that no
+/// later expression can observe the original value.
+pub type InPlaceBinaryOperatorExecutor = fn(&mut Value, &Value) -> Result<(), crate::CoreError>;
 /// Registry-aware binary operator implementation with access to execution services.
 ///
 /// The context exposes the owning registry so an executor can resolve related
@@ -46,6 +53,8 @@ pub struct BinaryOperatorDescriptor {
     pub right_operand_type: TypeId,
     pub result_type: TypeId,
     pub execute: BinaryOperatorExecutor,
+    /// Optional allocation-avoiding executor for an exclusively owned left operand.
+    pub in_place_execute: Option<InPlaceBinaryOperatorExecutor>,
     /// Registry-aware override preferred by the runtime when present.
     ///
     /// The plain `execute` callback remains the context-free implementation so

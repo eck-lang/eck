@@ -39,6 +39,18 @@ pub(super) fn execute_operator(left_operand: &Value, _: &Value) -> Result<Value,
     Ok(left_operand.clone())
 }
 
+/// Mutates a uniquely owned integer payload for in-place registration tests.
+pub(super) fn execute_in_place_operator(
+    left_operand: &mut Value,
+    _: &Value,
+) -> Result<(), CoreError> {
+    let integer = left_operand
+        .downcast_mut::<i64>()
+        .ok_or_else(|| CoreError::InvalidValueRepresentation("test integer".into()))?;
+    *integer += 1;
+    Ok(())
+}
+
 /// A registry-aware operator callback that returns its left operand unchanged.
 ///
 /// Tests use this as the context override when their subject is context-aware

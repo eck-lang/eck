@@ -1,7 +1,8 @@
 use super::*;
 
 use super::super::test_support::{
-    execute_context_operator, execute_operator, foreign_type_id, register_type,
+    execute_context_operator, execute_in_place_operator, execute_operator, foreign_type_id,
+    register_type,
 };
 
 #[test]
@@ -103,4 +104,37 @@ fn context_operator_registration_rejects_duplicate_signatures() {
         ),
         Err(CoreError::DuplicateOperator { .. })
     ));
+}
+
+/// Verifies in-place registration augments an existing same-type descriptor.
+#[test]
+fn in_place_operator_registration_enables_the_optional_executor() {
+    let mut registry = Registry::new();
+    let type_id = register_type(&mut registry, "int");
+    let operator = registry
+        .register_binary_operator(
+            BinaryOperator::Addition,
+            type_id,
+            type_id,
+            type_id,
+            execute_operator,
+        )
+        .unwrap();
+
+    registry
+        .register_in_place_binary_operator(
+            BinaryOperator::Addition,
+            type_id,
+            type_id,
+            execute_in_place_operator,
+        )
+        .unwrap();
+
+    assert!(
+        registry
+            .operator(operator)
+            .unwrap()
+            .in_place_execute
+            .is_some()
+    );
 }

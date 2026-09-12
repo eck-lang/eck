@@ -2,7 +2,7 @@
 
 use crate::{
     BinaryOperator, BinaryOperatorDescriptor, BinaryOperatorExecutor,
-    ContextBinaryOperatorExecutor, CoreError, OperatorId, TypeId,
+    ContextBinaryOperatorExecutor, CoreError, InPlaceBinaryOperatorExecutor, OperatorId, TypeId,
 };
 
 use super::Registry;
@@ -47,6 +47,7 @@ impl Registry {
             right_operand_type,
             result_type,
             execute,
+            in_place_execute: None,
             context_execute: None,
         });
         self.operator_index.insert(key, id);
@@ -96,10 +97,40 @@ impl Registry {
             right_operand_type,
             result_type,
             execute,
+            in_place_execute: None,
             context_execute: Some(context_execute),
         });
         self.operator_index.insert(key, id);
         Ok(id)
+    }
+
+    /// Adds an allocation-avoiding executor to an existing same-type operator.
+    ///
+    /// The registered operator must already have the exact operand types and a
+    /// result type equal to its left operand. Runtime execution invokes this
+    /// callback only for a uniquely owned left value, preserving normal value
+    /// sharing semantics. Returns the same resolution errors as
+    /// [`Registry::resolve_binary_operator`] and rejects incompatible result
+    /// types with [`CoreError::Runtime`].
+    pub fn register_in_place_binary_operator(
+        &mut self,
+        operator: BinaryOperator,
+        left_operand_type: TypeId,
+        right_operand_type: TypeId,
+        execute: InPlaceBinaryOperatorExecutor,
+    ) -> Result<(), CoreError> {
+        let id = self.resolve_binary_operator(operator, left_operand_type, right_operand_type)?;
+        let descriptor = self
+            .operators
+            .get_mut(id.index)
+            .ok_or(CoreError::UnknownOperatorId(id))?;
+        if descriptor.result_type != left_operand_type {
+            return Err(CoreError::Runtime(format!(
+                "in-place `{operator:?}` must return its left operand type"
+            )));
+        }
+        descriptor.in_place_execute = Some(execute);
+        Ok(())
     }
 
     /// Resolves a binary operator for an exact pair of base types.
