@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/core",
   "crates/language/*",
+  "crates/ir",
   "crates/parser",
   "crates/primitives",
   "crates/test-runner",
