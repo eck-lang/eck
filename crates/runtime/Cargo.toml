@@ -1,0 +1,11 @@
+[package]
+name = "eck-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+language_core = { package = "eck-core", path = "../core" }
+ir = { package = "eck-ir", path = "../ir" }
+syntax = { package = "eck-syntax", path = "../syntax" }
+thiserror.workspace = true
