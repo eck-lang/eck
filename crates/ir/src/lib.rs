@@ -6,8 +6,10 @@
 
 mod binding;
 mod expression;
+mod statement;
 
 pub use binding::{BindingId, BindingMetadata, LocalVariableSlot};
 pub use expression::{
     TypedBinaryExecutionPlan, TypedExpression, TypedExpressionKind, TypedScalePlan, TypedScaleStep,
 };
+pub use statement::{TypedBlock, TypedRangePlan, TypedStatement};
