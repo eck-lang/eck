@@ -78,6 +78,14 @@ pub enum CoreError {
     #[error("subtype operator `{0}` cannot register a rule for two plain operands")]
     UnreachableSubtypeOperatorRule(BinaryOperator),
     #[error(
+        "in-place operator `{operator}` for `{left_operand_type}` and `{right_operand_type}` must produce its left operand type"
+    )]
+    InvalidInPlaceOperator {
+        operator: BinaryOperator,
+        left_operand_type: String,
+        right_operand_type: String,
+    },
+    #[error(
         "subtype relative operator `{operator}` is already registered for `{left_operand_subtype}` and `{right_operand_subtype}`"
     )]
     DuplicateSubtypeRelativeOperator {

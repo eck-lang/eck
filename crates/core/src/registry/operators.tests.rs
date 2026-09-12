@@ -138,3 +138,39 @@ fn in_place_operator_registration_enables_the_optional_executor() {
             .is_some()
     );
 }
+
+/// Verifies in-place registration rejects a result type it cannot support.
+#[test]
+fn in_place_operator_registration_rejects_a_different_result_type() {
+    let mut registry = Registry::new();
+    let integer = register_type(&mut registry, "int");
+    let decimal = register_type(&mut registry, "decimal");
+    registry
+        .register_binary_operator(
+            BinaryOperator::Addition,
+            integer,
+            integer,
+            decimal,
+            execute_operator,
+        )
+        .unwrap();
+
+    assert!(matches!(
+        registry.register_in_place_binary_operator(
+            BinaryOperator::Addition,
+            integer,
+            integer,
+            execute_in_place_operator,
+        ),
+        Err(CoreError::InvalidInPlaceOperator {
+            operator: BinaryOperator::Addition,
+            ref left_operand_type,
+            ref right_operand_type,
+        }) if left_operand_type == "int" && right_operand_type == "int"
+    ));
+    assert!(
+        registry
+            .resolve_binary_operator(BinaryOperator::Addition, integer, integer)
+            .is_ok()
+    );
+}

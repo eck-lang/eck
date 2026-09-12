@@ -111,7 +111,7 @@ impl Registry {
     /// callback only for a uniquely owned left value, preserving normal value
     /// sharing semantics. Returns the same resolution errors as
     /// [`Registry::resolve_binary_operator`] and rejects incompatible result
-    /// types with [`CoreError::Runtime`].
+    /// types with [`CoreError::InvalidInPlaceOperator`].
     pub fn register_in_place_binary_operator(
         &mut self,
         operator: BinaryOperator,
@@ -120,15 +120,17 @@ impl Registry {
         execute: InPlaceBinaryOperatorExecutor,
     ) -> Result<(), CoreError> {
         let id = self.resolve_binary_operator(operator, left_operand_type, right_operand_type)?;
+        if self.operator(id)?.result_type != left_operand_type {
+            return Err(CoreError::InvalidInPlaceOperator {
+                operator,
+                left_operand_type: self.type_name(left_operand_type).to_string(),
+                right_operand_type: self.type_name(right_operand_type).to_string(),
+            });
+        }
         let descriptor = self
             .operators
             .get_mut(id.index)
             .ok_or(CoreError::UnknownOperatorId(id))?;
-        if descriptor.result_type != left_operand_type {
-            return Err(CoreError::Runtime(format!(
-                "in-place `{operator:?}` must return its left operand type"
-            )));
-        }
         descriptor.in_place_execute = Some(execute);
         Ok(())
     }
