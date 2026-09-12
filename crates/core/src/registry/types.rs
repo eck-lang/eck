@@ -55,12 +55,49 @@ impl Registry {
         self.types_by_name.get(name).copied()
     }
 
+    /// Returns all registered type names in deterministic sorted order.
+    ///
+    /// The iterator includes both primary names and aliases (e.g. `bool` and
+    /// `boolean` point to the same `TypeId` but both are returned). This makes
+    /// editor completion dynamic: adding a new primitive automatically appears
+    /// without hardcoding.
+    pub fn registered_type_names(&self) -> impl Iterator<Item = &'static str> {
+        let mut names: Vec<&'static str> = self.types_by_name.keys().copied().collect();
+        names.sort_unstable();
+        names.into_iter()
+    }
+
+    /// Returns all registered type entries `(name, id)` in name-sorted order.
+    pub fn registered_type_entries(&self) -> impl Iterator<Item = (&'static str, TypeId)> {
+        let mut entries: Vec<(&'static str, TypeId)> = self
+            .types_by_name
+            .iter()
+            .map(|(name, id)| (*name, *id))
+            .collect();
+        entries.sort_unstable_by_key(|(name, _)| *name);
+        entries.into_iter()
+    }
+
+    /// Returns the number of registered type names (including aliases).
+    pub fn registered_type_count(&self) -> usize {
+        self.types_by_name.len()
+    }
+
     /// Returns the descriptor for a registered base type ID.
     ///
     /// The error preserves the unresolved ID so callers can report an internal
     /// registration or resolution failure precisely.
     pub fn type_descriptor(&self, id: TypeId) -> Result<&TypeDescriptor, CoreError> {
         self.types.get(&id).ok_or(CoreError::UnknownTypeId(id))
+    }
+
+    /// Returns whether a registered base type represents integral magnitudes.
+    ///
+    /// This capability is declared by the type extension and is independent of
+    /// the literal parser's accepted spellings. Returns
+    /// [`CoreError::UnknownTypeId`] when `id` is not registered.
+    pub fn is_integer_type(&self, id: TypeId) -> Result<bool, CoreError> {
+        Ok(self.type_descriptor(id)?.is_integer)
     }
 
     /// Returns a registered type name, or a stable placeholder for an unknown ID.
@@ -120,6 +157,21 @@ impl Registry {
     pub fn default_string(&self) -> Result<TypeId, CoreError> {
         self.default_string
             .ok_or(CoreError::MissingDefault("string"))
+    }
+
+    /// Configures the type selected for regex literals without explicit context.
+    ///
+    /// Returns [`CoreError::UnknownTypeId`] when `id` is not registered, leaving
+    /// the previously configured default unchanged.
+    pub fn set_default_regex(&mut self, id: TypeId) -> Result<(), CoreError> {
+        self.type_descriptor(id)?;
+        self.default_regex = Some(id);
+        Ok(())
+    }
+
+    /// Returns the configured default regex type.
+    pub fn default_regex(&self) -> Result<TypeId, CoreError> {
+        self.default_regex.ok_or(CoreError::MissingDefault("regex"))
     }
 
     /// Configures the type used by boolean literals and conditional evaluation.
@@ -220,6 +272,24 @@ impl Registry {
                 .ok_or_else(|| CoreError::UnsupportedLiteral {
                     type_name: type_descriptor.name.to_string(),
                     literal_kind: "string",
+                })?;
+        parser(raw_text, type_id)
+    }
+
+    /// Parses a regex token through its expected or default registered type.
+    pub fn parse_regex(
+        &self,
+        raw_text: &str,
+        expected: Option<TypeId>,
+    ) -> Result<Value, CoreError> {
+        let type_id = expected.unwrap_or(self.default_regex()?);
+        let type_descriptor = self.type_descriptor(type_id)?;
+        let parser =
+            type_descriptor
+                .parse_regex_literal
+                .ok_or_else(|| CoreError::UnsupportedLiteral {
+                    type_name: type_descriptor.name.to_string(),
+                    literal_kind: "regex",
                 })?;
         parser(raw_text, type_id)
     }

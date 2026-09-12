@@ -108,6 +108,8 @@ pub struct Registry {
     default_fractional: Option<TypeId>,
     /// Selects the base type for uncontextualized string literals.
     default_string: Option<TypeId>,
+    /// Selects the base type for uncontextualized regex literals.
+    default_regex: Option<TypeId>,
     /// Selects and evaluates the base type for boolean language semantics.
     default_boolean: Option<(TypeId, BooleanEvaluator)>,
     /// Selects the base type for null language semantics.
@@ -147,6 +149,7 @@ impl Default for Registry {
             default_integer: None,
             default_fractional: None,
             default_string: None,
+            default_regex: None,
             default_boolean: None,
             default_null: None,
         }

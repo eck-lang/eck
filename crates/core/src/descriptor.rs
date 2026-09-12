@@ -23,8 +23,16 @@ pub type NativeFunction =
 pub struct TypeDescriptor {
     pub id: TypeId,
     pub name: &'static str,
+    /// Declares whether values of this type represent integral magnitudes.
+    ///
+    /// Integer-only language constructs, such as range iteration, use this
+    /// semantic capability instead of inferring it from a particular literal
+    /// spelling. Extension authors must set it only when every valid value of
+    /// the type has no fractional component.
+    pub is_integer: bool,
     pub parse_numeric_literal: Option<LiteralParser>,
     pub parse_string_literal: Option<LiteralParser>,
+    pub parse_regex_literal: Option<LiteralParser>,
     pub parse_boolean_literal: Option<LiteralParser>,
     pub parse_null_literal: Option<LiteralParser>,
     pub format: ValueFormatter,

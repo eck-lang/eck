@@ -70,3 +70,25 @@ fn default_boolean_evaluation_uses_the_registered_type_contract() {
         Err(CoreError::InvalidValueRepresentation(name)) if name == "test bool"
     ));
 }
+
+/// Verifies integer-only language features can use an explicit type capability.
+#[test]
+fn reports_the_registered_integer_capability() {
+    let mut registry = Registry::new();
+    let integer = registry.allocate_type_id();
+    let fractional = registry.allocate_type_id();
+    let mut integer_descriptor = type_descriptor(integer, "int");
+    integer_descriptor.is_integer = true;
+
+    registry.register_type(integer_descriptor).unwrap();
+    registry
+        .register_type(type_descriptor(fractional, "decimal"))
+        .unwrap();
+
+    assert!(registry.is_integer_type(integer).unwrap());
+    assert!(!registry.is_integer_type(fractional).unwrap());
+    assert!(matches!(
+        registry.is_integer_type(foreign_type_id()),
+        Err(CoreError::UnknownTypeId(_))
+    ));
+}
