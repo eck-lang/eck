@@ -357,6 +357,25 @@ impl Registry {
             None => self.type_name(value_type.base).to_string(),
         }
     }
+
+    /// Verifies that an extension-produced value names registered capabilities.
+    ///
+    /// Extensions may legitimately produce a value whose base type depends on
+    /// the operands, such as an overflow promotion to a wider integer, so Core
+    /// cannot require one fixed result type per operation. It can still reject
+    /// a value naming a type or subtype this registry never registered, which
+    /// would otherwise surface later as an unrelated formatting, comparison,
+    /// or conversion failure.
+    pub fn validate_value(&self, value: &Value) -> Result<(), CoreError> {
+        self.type_descriptor(value.type_id())?;
+        match value.subtype_id() {
+            Some(subtype_id) => {
+                self.subtype_descriptor(subtype_id)?;
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
 }
 
 #[cfg(test)]

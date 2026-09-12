@@ -1,7 +1,8 @@
 use super::*;
 
 use super::super::test_support::{
-    evaluate_boolean, foreign_type_id, register_type, type_descriptor,
+    evaluate_boolean, foreign_subtype_id, foreign_type_id, register_subtype, register_type,
+    type_descriptor,
 };
 
 #[test]
@@ -90,5 +91,31 @@ fn reports_the_registered_integer_capability() {
     assert!(matches!(
         registry.is_integer_type(foreign_type_id()),
         Err(CoreError::UnknownTypeId(_))
+    ));
+}
+
+/// Verifies validation accepts registered capabilities and rejects unknown ones.
+#[test]
+fn value_validation_rejects_unregistered_types_and_subtypes() {
+    let mut registry = Registry::new();
+    let integer = register_type(&mut registry, "int");
+    let subtype_id = register_subtype(&mut registry, "unit");
+
+    let plain = crate::Value::new(integer, 1_i64);
+    let qualified = crate::Value::new(integer, 1_i64).with_subtype(Some(subtype_id));
+    assert!(registry.validate_value(&plain).is_ok());
+    assert!(registry.validate_value(&qualified).is_ok());
+
+    let unknown_type = crate::Value::new(foreign_type_id(), 1_i64);
+    assert!(matches!(
+        registry.validate_value(&unknown_type),
+        Err(CoreError::UnknownTypeId(_))
+    ));
+
+    let unknown_subtype =
+        crate::Value::new(integer, 1_i64).with_subtype(Some(foreign_subtype_id()));
+    assert!(matches!(
+        registry.validate_value(&unknown_subtype),
+        Err(CoreError::UnknownSubtypeId(_))
     ));
 }
