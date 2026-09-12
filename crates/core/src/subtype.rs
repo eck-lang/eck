@@ -112,7 +112,6 @@ pub struct SubtypeBinaryRule {
     pub left_operand_scale: Scale,
     pub right_operand_scale: Scale,
 }
-
 impl SubtypeBinaryRule {
     pub const fn new(output: Option<SubtypeId>) -> Self {
         Self {
@@ -133,12 +132,40 @@ impl SubtypeBinaryRule {
     }
 }
 
+/// Defines how a qualified right operand scales into a fraction of the left
+/// operand for relative addition and subtraction.
+///
+/// A relative rule interprets `left_operand + right_operand` as
+/// `left_operand + (left_operand * scaled_right_operand)` (and symmetrically
+/// for subtraction), where `scaled_right_operand` is the right magnitude
+/// divided by `right_operand_scale`. The result preserves the left operand
+/// subtype: a plain left operand yields a plain result, while a qualified
+/// left operand such as a length keeps its unit.
+#[derive(Clone, Copy, Debug)]
+pub struct SubtypeRelativeRule {
+    pub right_operand_scale: Scale,
+}
+
+impl SubtypeRelativeRule {
+    pub const fn new(right_operand_scale: Scale) -> Self {
+        Self {
+            right_operand_scale,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ResolvedBinaryOperator {
     pub operator: OperatorId,
     pub output: ValueType,
     pub left_operand_scale: Scale,
     pub right_operand_scale: Scale,
+    /// Scales the right operand into a fraction of the left operand before
+    /// combining them. `None` evaluates `scaled_left operator scaled_right`
+    /// directly; `Some` first multiplies the left magnitude by the scaled
+    /// right magnitude and then applies the operator to the left magnitude
+    /// and that adjustment, so `100 - 50%` reads as `100 - (100 * 50 / 100)`.
+    pub relative_adjustment: Option<Scale>,
 }
 
 #[derive(Clone, Copy, Debug)]

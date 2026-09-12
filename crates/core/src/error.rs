@@ -77,6 +77,20 @@ pub enum CoreError {
     },
     #[error("subtype operator `{0}` cannot register a rule for two plain operands")]
     UnreachableSubtypeOperatorRule(BinaryOperator),
+    #[error(
+        "subtype relative operator `{operator}` is already registered for `{left_operand_subtype}` and `{right_operand_subtype}`"
+    )]
+    DuplicateSubtypeRelativeOperator {
+        operator: BinaryOperator,
+        left_operand_subtype: String,
+        right_operand_subtype: String,
+    },
+    #[error("subtype relative operator `{0}` cannot register a rule for two plain operands")]
+    UnreachableSubtypeRelativeRule(BinaryOperator),
+    #[error("subtype relative operator `{0}` is only defined for addition and subtraction")]
+    InvalidRelativeOperator(BinaryOperator),
+    #[error("subtype relative operator `{0}` requires a qualified right operand")]
+    RelativeRuleRequiresQualifiedRightOperand(BinaryOperator),
     #[error("subtype comparison `{0}` cannot register a rule for two plain operands")]
     UnreachableSubtypeComparisonRule(ComparisonOperator),
     #[error("conversion from subtype `{from}` to `{to}` is already registered")]
@@ -89,6 +103,14 @@ pub enum CoreError {
         "operator `{operator}` is not defined for `{left_operand_type}` and `{right_operand_type}`"
     )]
     SubtypeOperatorNotDefined {
+        operator: BinaryOperator,
+        left_operand_type: String,
+        right_operand_type: String,
+    },
+    #[error(
+        "relative operator `{operator}` is not defined for `{left_operand_type}` and `{right_operand_type}`"
+    )]
+    SubtypeRelativeOperatorNotDefined {
         operator: BinaryOperator,
         left_operand_type: String,
         right_operand_type: String,

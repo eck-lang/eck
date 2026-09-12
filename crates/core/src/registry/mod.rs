@@ -14,7 +14,8 @@ use crate::configuration::RegisteredTypeConfiguration;
 use crate::{
     BinaryOperator, BinaryOperatorDescriptor, BooleanEvaluator, ComparisonDescriptor, ComparisonId,
     ComparisonOperator, ConfigurationDescriptor, FunctionDescriptor, FunctionId, OperatorId, Scale,
-    SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeId, TypeDescriptor, TypeId,
+    SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeId, SubtypeRelativeRule,
+    TypeDescriptor, TypeId,
 };
 
 mod comparisons;
@@ -63,6 +64,9 @@ pub struct Registry {
     /// Resolves subtype-aware arithmetic rules by operator and operand subtype.
     subtype_operator_index:
         HashMap<(BinaryOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeBinaryRule>,
+    /// Resolves relative addition and subtraction rules by operator and operand subtype.
+    subtype_relative_index:
+        HashMap<(BinaryOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeRelativeRule>,
     /// Resolves subtype-aware comparison rules by operator and operand subtype.
     subtype_comparison_index:
         HashMap<(ComparisonOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeComparisonRule>,
@@ -130,6 +134,7 @@ impl Default for Registry {
             subtypes_by_suffix: HashMap::new(),
             subtypes: HashMap::new(),
             subtype_operator_index: HashMap::new(),
+            subtype_relative_index: HashMap::new(),
             subtype_comparison_index: HashMap::new(),
             subtype_conversion_index: HashMap::new(),
             operator_index: HashMap::new(),

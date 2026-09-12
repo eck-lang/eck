@@ -26,6 +26,6 @@ pub use operator::{BinaryOperator, ComparisonOperator};
 pub use registry::Registry;
 pub use subtype::{
     ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion, Scale,
-    SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, ValueType,
+    SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeRelativeRule, ValueType,
 };
 pub use value::Value;

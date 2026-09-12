@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use crate::{
     BinaryOperator, CoreError, ResolvedBinaryOperator, ResolvedSubtypeConversion, Scale,
-    SubtypeBinaryRule, SubtypeDescriptor, SubtypeId, ValueType,
+    SubtypeBinaryRule, SubtypeDescriptor, SubtypeId, SubtypeRelativeRule, ValueType,
 };
 
 use super::Registry;
@@ -71,6 +71,20 @@ impl Registry {
         subtype_ids.into_iter()
     }
 
+    /// Returns all registered subtype names in sorted order (e.g. `meter`, `percentage`).
+    pub fn registered_subtype_names(&self) -> impl Iterator<Item = &'static str> {
+        let mut names: Vec<&'static str> = self.subtypes_by_name.keys().copied().collect();
+        names.sort_unstable();
+        names.into_iter()
+    }
+
+    /// Returns all registered literal suffixes in sorted order (e.g. `mm`, `m`, `kg`, `%`).
+    pub fn registered_suffixes(&self) -> impl Iterator<Item = &'static str> {
+        let mut suffixes: Vec<&'static str> = self.subtypes_by_suffix.keys().copied().collect();
+        suffixes.sort_unstable();
+        suffixes.into_iter()
+    }
+
     /// Returns the descriptor for a registered subtype ID.
     pub fn subtype_descriptor(&self, id: SubtypeId) -> Result<&SubtypeDescriptor, CoreError> {
         self.subtypes
@@ -120,6 +134,119 @@ impl Registry {
         Ok(())
     }
 
+    /// Registers how a qualified right operand reads as a fraction of the left
+    /// operand for relative addition and subtraction.
+    ///
+    /// The rule interprets `left_operand + right_operand` as
+    /// `left_operand + (left_operand * scaled_right_operand)` (and
+    /// symmetrically for subtraction), where the right magnitude is divided
+    /// by the rule scale. The result preserves the left operand subtype, so
+    /// extensions register one rule per left subtype they compose with,
+    /// including a plain (`None`) left operand. Only addition and subtraction
+    /// accept relative rules because only they combine a magnitude with a
+    /// fraction of itself.
+    ///
+    /// Every present input subtype must already be registered. Returns
+    /// [`CoreError::UnknownSubtypeId`] for an unknown subtype,
+    /// [`CoreError::InvalidRelativeOperator`] for any other operator,
+    /// [`CoreError::UnreachableSubtypeRelativeRule`] when both inputs are
+    /// plain, [`CoreError::RelativeRuleRequiresQualifiedRightOperand`] for a
+    /// plain right operand, [`CoreError::InvalidScale`] for a zero
+    /// denominator, or [`CoreError::DuplicateSubtypeRelativeOperator`] for an
+    /// existing rule.
+    pub fn register_subtype_relative_rule(
+        &mut self,
+        operator: BinaryOperator,
+        left_operand_subtype: Option<SubtypeId>,
+        right_operand_subtype: Option<SubtypeId>,
+        rule: SubtypeRelativeRule,
+    ) -> Result<(), CoreError> {
+        if !matches!(
+            operator,
+            BinaryOperator::Addition | BinaryOperator::Subtraction
+        ) {
+            return Err(CoreError::InvalidRelativeOperator(operator));
+        }
+        if left_operand_subtype.is_none() && right_operand_subtype.is_none() {
+            return Err(CoreError::UnreachableSubtypeRelativeRule(operator));
+        }
+        if right_operand_subtype.is_none() {
+            return Err(CoreError::RelativeRuleRequiresQualifiedRightOperand(
+                operator,
+            ));
+        }
+        self.validate_optional_subtype(left_operand_subtype)?;
+        self.validate_optional_subtype(right_operand_subtype)?;
+        if rule.right_operand_scale.denominator == 0 {
+            return Err(CoreError::InvalidScale);
+        }
+
+        let key = (operator, left_operand_subtype, right_operand_subtype);
+        if self.subtype_relative_index.contains_key(&key) {
+            return Err(CoreError::DuplicateSubtypeRelativeOperator {
+                operator,
+                left_operand_subtype: self.optional_subtype_name(left_operand_subtype),
+                right_operand_subtype: self.optional_subtype_name(right_operand_subtype),
+            });
+        }
+        self.subtype_relative_index.insert(key, rule);
+        Ok(())
+    }
+
+    /// Resolves a relative addition or subtraction for fully qualified operand types.
+    ///
+    /// A relative rule first scales the right magnitude into a fraction of the
+    /// left operand, then multiplies it by the left magnitude to form the
+    /// adjustment, and finally applies the requested operator to the left
+    /// magnitude and that adjustment. The executable operation is the outer
+    /// addition or subtraction selected for the resulting base types, while
+    /// the output preserves the left operand subtype. Integer operands scaled
+    /// by a fractional rule promote through the configured default fractional
+    /// type, following the same sequence the runtime uses. No fallback or
+    /// implicit subtype conversion is attempted.
+    pub fn resolve_subtype_relative_rule(
+        &self,
+        operator: BinaryOperator,
+        left_operand_type: ValueType,
+        right_operand_type: ValueType,
+    ) -> Result<ResolvedBinaryOperator, CoreError> {
+        let rule = self
+            .subtype_relative_index
+            .get(&(
+                operator,
+                left_operand_type.subtype,
+                right_operand_type.subtype,
+            ))
+            .copied()
+            .ok_or_else(|| CoreError::SubtypeRelativeOperatorNotDefined {
+                operator,
+                left_operand_type: self.value_type_name(left_operand_type),
+                right_operand_type: self.value_type_name(right_operand_type),
+            })?;
+        let scaled_right_operand_type =
+            self.resolve_scaled_base_type(right_operand_type.base, rule.right_operand_scale)?;
+        let adjustment_operator = self.resolve_binary_operator(
+            BinaryOperator::Multiplication,
+            left_operand_type.base,
+            scaled_right_operand_type,
+        )?;
+        let adjustment_base_type = self.operator(adjustment_operator)?.result_type;
+        let resolved_operator =
+            self.resolve_binary_operator(operator, left_operand_type.base, adjustment_base_type)?;
+        let result_base_type = self.operator(resolved_operator)?.result_type;
+
+        Ok(ResolvedBinaryOperator {
+            operator: resolved_operator,
+            output: ValueType {
+                base: result_base_type,
+                subtype: left_operand_type.subtype,
+            },
+            left_operand_scale: Scale::IDENTITY,
+            right_operand_scale: rule.right_operand_scale,
+            relative_adjustment: Some(rule.right_operand_scale),
+        })
+    }
+
     /// Resolves a binary operation for fully qualified operand types.
     ///
     /// Plain operands resolve directly to their exact base-type operator. For
@@ -144,6 +271,7 @@ impl Registry {
                 output: ValueType::plain(result_base_type),
                 left_operand_scale: Scale::IDENTITY,
                 right_operand_scale: Scale::IDENTITY,
+                relative_adjustment: None,
             });
         }
 
@@ -179,6 +307,7 @@ impl Registry {
             },
             left_operand_scale: rule.left_operand_scale,
             right_operand_scale: rule.right_operand_scale,
+            relative_adjustment: None,
         })
     }
 

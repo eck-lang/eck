@@ -148,6 +148,206 @@ fn subtype_conversion_resolution_rejects_unknown_references() {
 }
 
 #[test]
+fn relative_rules_reject_invalid_registrations() {
+    let mut registry = Registry::new();
+    let percentage = register_subtype(&mut registry, "percentage");
+    let unknown = foreign_subtype_id();
+
+    assert!(matches!(
+        registry.register_subtype_relative_rule(
+            BinaryOperator::Multiplication,
+            None,
+            Some(percentage),
+            SubtypeRelativeRule::new(Scale::new(1, 100)),
+        ),
+        Err(CoreError::InvalidRelativeOperator(
+            BinaryOperator::Multiplication
+        ))
+    ));
+    assert!(matches!(
+        registry.register_subtype_relative_rule(
+            BinaryOperator::Addition,
+            None,
+            None,
+            SubtypeRelativeRule::new(Scale::new(1, 100)),
+        ),
+        Err(CoreError::UnreachableSubtypeRelativeRule(
+            BinaryOperator::Addition
+        ))
+    ));
+    assert!(matches!(
+        registry.register_subtype_relative_rule(
+            BinaryOperator::Subtraction,
+            None,
+            Some(percentage),
+            SubtypeRelativeRule::new(Scale::new(1, 0)),
+        ),
+        Err(CoreError::InvalidScale)
+    ));
+    assert!(matches!(
+        registry.register_subtype_relative_rule(
+            BinaryOperator::Addition,
+            None,
+            Some(unknown),
+            SubtypeRelativeRule::new(Scale::new(1, 100)),
+        ),
+        Err(CoreError::UnknownSubtypeId(id)) if id == unknown
+    ));
+}
+
+#[test]
+fn relative_rules_require_a_qualified_right_operand() {
+    let mut registry = Registry::new();
+    let unit = register_subtype(&mut registry, "meter");
+
+    assert!(matches!(
+        registry.register_subtype_relative_rule(
+            BinaryOperator::Addition,
+            Some(unit),
+            None,
+            SubtypeRelativeRule::new(Scale::new(1, 100)),
+        ),
+        Err(CoreError::RelativeRuleRequiresQualifiedRightOperand(
+            BinaryOperator::Addition
+        ))
+    ));
+}
+
+#[test]
+fn relative_rules_reject_duplicates() {
+    let mut registry = Registry::new();
+    let percentage = register_subtype(&mut registry, "percentage");
+    let rule = SubtypeRelativeRule::new(Scale::new(1, 100));
+
+    registry
+        .register_subtype_relative_rule(BinaryOperator::Addition, None, Some(percentage), rule)
+        .unwrap();
+    assert!(matches!(
+        registry.register_subtype_relative_rule(BinaryOperator::Addition, None, Some(percentage), rule),
+        Err(CoreError::DuplicateSubtypeRelativeOperator { operator, .. })
+            if operator == BinaryOperator::Addition
+    ));
+}
+
+#[test]
+fn relative_resolution_computes_the_adjusted_output_type() {
+    let mut registry = Registry::new();
+    let integer = register_type(&mut registry, "int");
+    let fractional = register_type(&mut registry, "decimal");
+    registry.set_default_integer(integer).unwrap();
+    registry.set_default_fractional(fractional).unwrap();
+    let percentage = register_subtype(&mut registry, "percentage");
+
+    for operator in [
+        BinaryOperator::Division,
+        BinaryOperator::Multiplication,
+        BinaryOperator::Addition,
+        BinaryOperator::Subtraction,
+    ] {
+        registry
+            .register_binary_operator(
+                operator,
+                integer,
+                fractional,
+                fractional,
+                super::super::test_support::execute_operator,
+            )
+            .unwrap();
+    }
+    registry
+        .register_subtype_relative_rule(
+            BinaryOperator::Subtraction,
+            None,
+            Some(percentage),
+            SubtypeRelativeRule::new(Scale::new(1, 100)),
+        )
+        .unwrap();
+
+    let resolution = registry
+        .resolve_subtype_relative_rule(
+            BinaryOperator::Subtraction,
+            ValueType::plain(integer),
+            ValueType::qualified(integer, percentage),
+        )
+        .unwrap();
+
+    assert_eq!(resolution.output, ValueType::plain(fractional));
+    assert_eq!(resolution.left_operand_scale, Scale::IDENTITY);
+    assert_eq!(resolution.right_operand_scale, Scale::new(1, 100));
+    assert_eq!(resolution.relative_adjustment, Some(Scale::new(1, 100)));
+}
+
+#[test]
+fn relative_resolution_preserves_the_left_operand_subtype() {
+    let mut registry = Registry::new();
+    let integer = register_type(&mut registry, "int");
+    let fractional = register_type(&mut registry, "decimal");
+    registry.set_default_integer(integer).unwrap();
+    registry.set_default_fractional(fractional).unwrap();
+    let unit = register_subtype(&mut registry, "meter");
+    let percentage = registry.allocate_subtype_id();
+    registry
+        .register_subtype(SubtypeDescriptor {
+            id: percentage,
+            name: "percentage",
+            suffixes: &["%"],
+        })
+        .unwrap();
+
+    for operator in [
+        BinaryOperator::Division,
+        BinaryOperator::Multiplication,
+        BinaryOperator::Addition,
+    ] {
+        registry
+            .register_binary_operator(
+                operator,
+                fractional,
+                fractional,
+                fractional,
+                super::super::test_support::execute_operator,
+            )
+            .unwrap();
+    }
+    registry
+        .register_subtype_relative_rule(
+            BinaryOperator::Addition,
+            Some(unit),
+            Some(percentage),
+            SubtypeRelativeRule::new(Scale::new(1, 100)),
+        )
+        .unwrap();
+
+    let resolution = registry
+        .resolve_subtype_relative_rule(
+            BinaryOperator::Addition,
+            ValueType::qualified(fractional, unit),
+            ValueType::qualified(fractional, percentage),
+        )
+        .unwrap();
+
+    assert_eq!(resolution.output, ValueType::qualified(fractional, unit));
+    assert_eq!(resolution.relative_adjustment, Some(Scale::new(1, 100)));
+}
+
+#[test]
+fn relative_resolution_reports_missing_rules() {
+    let mut registry = Registry::new();
+    let type_id = register_type(&mut registry, "int");
+    let subtype = register_subtype(&mut registry, "percentage");
+
+    assert!(matches!(
+        registry.resolve_subtype_relative_rule(
+            BinaryOperator::Addition,
+            ValueType::plain(type_id),
+            ValueType::qualified(type_id, subtype),
+        ),
+        Err(CoreError::SubtypeRelativeOperatorNotDefined { operator, .. })
+            if operator == BinaryOperator::Addition
+    ));
+}
+
+#[test]
 fn fractional_subtype_scales_resolve_the_promoted_operator() {
     let mut registry = Registry::new();
     let integer = register_type(&mut registry, "int");
