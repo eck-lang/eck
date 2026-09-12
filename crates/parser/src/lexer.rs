@@ -94,8 +94,16 @@ enum RawTokenKind {
 
     #[token("if")]
     If,
+    #[token("else")]
+    Else,
     #[token("for")]
     For,
+    #[token("while")]
+    While,
+    #[token("break")]
+    Break,
+    #[token("continue")]
+    Continue,
     #[token("in")]
     In,
 
@@ -133,7 +141,7 @@ enum RawTokenKind {
 /// divergent list. The list includes `@config` with its leading `@`.
 pub const ECK_KEYWORDS: &[&str] = &[
     "type", "frame", "relation", "on", "one", "many", "use", "as", "from", "@config", "if", "for",
-    "in", "true", "false", "null",
+    "else", "in", "while", "break", "continue", "true", "false", "null",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -167,7 +175,11 @@ pub(crate) enum TokenKind {
     RightBracket,
     Comma,
     If,
+    Else,
     For,
+    While,
+    Break,
+    Continue,
     In,
     Newline,
     Config,
@@ -292,7 +304,11 @@ fn convert_raw_token(
         RawTokenKind::AmpersandAmpersand => TokenKind::AmpersandAmpersand,
         RawTokenKind::PipePipe => TokenKind::PipePipe,
         RawTokenKind::If => TokenKind::If,
+        RawTokenKind::Else => TokenKind::Else,
         RawTokenKind::For => TokenKind::For,
+        RawTokenKind::While => TokenKind::While,
+        RawTokenKind::Break => TokenKind::Break,
+        RawTokenKind::Continue => TokenKind::Continue,
         RawTokenKind::In => TokenKind::In,
         RawTokenKind::Number => TokenKind::Number(raw_text.into()),
         RawTokenKind::Ident => TokenKind::Ident(raw_text.into()),

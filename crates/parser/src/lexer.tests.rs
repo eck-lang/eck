@@ -159,6 +159,31 @@ fn lexes_if_and_braces_without_claiming_prefixed_identifiers() {
     ));
 }
 
+/// Verifies conditional and loop keywords do not claim longer identifiers.
+#[test]
+fn lexes_conditional_and_loop_control_keywords() {
+    let tokens = lex("else while break continue elsewhere meanwhile breaker continued").unwrap();
+    let kinds = tokens.iter().map(|token| &token.kind).collect::<Vec<_>>();
+
+    assert!(matches!(
+        kinds.as_slice(),
+        [
+            TokenKind::Else,
+            TokenKind::While,
+            TokenKind::Break,
+            TokenKind::Continue,
+            TokenKind::Ident(elsewhere),
+            TokenKind::Ident(meanwhile_name),
+            TokenKind::Ident(breaker),
+            TokenKind::Ident(continued),
+            TokenKind::Eof,
+        ] if elsewhere == "elsewhere"
+            && meanwhile_name == "meanwhile"
+            && breaker == "breaker"
+            && continued == "continued"
+    ));
+}
+
 /// Verifies `for (i in 0..10) {}` lexes `..` as one token with exact spans.
 ///
 /// The range operator must not split into two dots, the bounds must not

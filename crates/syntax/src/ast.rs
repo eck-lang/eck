@@ -45,6 +45,12 @@ pub enum Statement {
     If {
         condition: Expression,
         body: Block,
+        else_body: Option<Block>,
+        span: Span,
+    },
+    While {
+        condition: Expression,
+        body: Block,
         span: Span,
     },
     For {
@@ -52,6 +58,12 @@ pub enum Statement {
         start: Expression,
         end: Expression,
         body: Block,
+        span: Span,
+    },
+    Break {
+        span: Span,
+    },
+    Continue {
         span: Span,
     },
     Expression(Expression),

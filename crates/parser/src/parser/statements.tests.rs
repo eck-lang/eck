@@ -46,6 +46,48 @@ fn accepts_an_empty_block_and_preserves_if_and_block_spans() {
     assert_eq!(body.span, syntax::Span { start: 10, end: 12 });
 }
 
+/// Verifies `else if` chains are represented as nested conditional branches.
+#[test]
+fn parses_else_if_chains_and_a_final_else_branch() {
+    let program = parse("if (false) {} else if (true) { print(1) } else { print(2) }\n").unwrap();
+
+    let Statement::If {
+        else_body: Some(else_body),
+        span,
+        ..
+    } = &program.statements[0]
+    else {
+        panic!("expected an if statement with an else branch");
+    };
+    assert_eq!(*span, syntax::Span { start: 0, end: 59 });
+    let [
+        Statement::If {
+            else_body: Some(final_else),
+            ..
+        },
+    ] = else_body.statements.as_slice()
+    else {
+        panic!("expected a nested else-if statement");
+    };
+    assert_eq!(final_else.statements.len(), 1);
+}
+
+/// Verifies `while`, `continue`, and `break` produce their control-flow nodes.
+#[test]
+fn parses_while_loops_and_loop_control_statements() {
+    let program = parse("while (true) {\ncontinue\nbreak\n}\n").unwrap();
+
+    let Statement::While {
+        condition, body, ..
+    } = &program.statements[0]
+    else {
+        panic!("expected a while statement");
+    };
+    assert!(matches!(condition, Expression::Boolean { raw_text, .. } if raw_text == "true"));
+    assert!(matches!(body.statements[0], Statement::Continue { .. }));
+    assert!(matches!(body.statements[1], Statement::Break { .. }));
+}
+
 #[test]
 fn rejects_unclosed_and_non_separated_blocks() {
     let unclosed = parse("if (true) {\nprint(1)\n").unwrap_err();
@@ -59,12 +101,15 @@ fn rejects_unclosed_and_non_separated_blocks() {
     );
 }
 
+/// Verifies malformed conditional syntax reports the missing delimiter.
 #[test]
-fn rejects_missing_condition_parentheses_and_opening_brace() {
+fn rejects_malformed_conditions_and_missing_opening_braces() {
     for (source, expected) in [
-        ("if true) {}", "expected LeftParenthesis"),
+        ("if true {}", "expected LeftParenthesis"),
         ("if (true {}", "expected RightParenthesis"),
         ("if (true)\nprint(1)", "expected LeftBrace"),
+        ("if (true) {} else if false {}", "expected LeftParenthesis"),
+        ("while true {}", "expected LeftParenthesis"),
     ] {
         let error = parse(source).unwrap_err();
         assert!(

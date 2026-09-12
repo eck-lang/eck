@@ -31,6 +31,17 @@ impl Parser {
         if matches!(&self.peek().kind, TokenKind::For) {
             return self.parse_for_statement();
         }
+        if matches!(&self.peek().kind, TokenKind::While) {
+            return self.parse_while_statement();
+        }
+        if matches!(&self.peek().kind, TokenKind::Break) {
+            let span = self.advance().span;
+            return Ok(Statement::Break { span });
+        }
+        if matches!(&self.peek().kind, TokenKind::Continue) {
+            let span = self.advance().span;
+            return Ok(Statement::Continue { span });
+        }
         if self.starts_frame_declaration() {
             return self.parse_frame_declaration();
         }
@@ -409,7 +420,7 @@ impl Parser {
         }
     }
 
-    /// Parses an `if (condition) { statements }` control-flow statement.
+    /// Parses an `if` statement with optional `else if` and final `else` branches.
     fn parse_if_statement(&mut self) -> Result<Statement, ParseError> {
         let start = self.advance().span.start;
         self.expect_simple(TokenKind::LeftParenthesis)?;
@@ -417,13 +428,41 @@ impl Parser {
         self.expect_simple(TokenKind::RightParenthesis)?;
         self.skip_newlines();
         let body = self.parse_block()?;
+        let after_body = self.pos;
+        self.skip_newlines();
+        let else_body = if matches!(&self.peek().kind, TokenKind::Else) {
+            self.advance();
+            self.skip_newlines();
+            if matches!(&self.peek().kind, TokenKind::If) {
+                let nested_if = self.parse_if_statement()?;
+                let Statement::If {
+                    span: nested_span, ..
+                } = &nested_if
+                else {
+                    unreachable!("parse_if_statement always returns an if statement")
+                };
+                let nested_span = *nested_span;
+                Some(Block {
+                    statements: vec![nested_if],
+                    span: nested_span,
+                })
+            } else {
+                Some(self.parse_block()?)
+            }
+        } else {
+            self.pos = after_body;
+            None
+        };
         let span = Span {
             start,
-            end: body.span.end,
+            end: else_body
+                .as_ref()
+                .map_or(body.span.end, |body| body.span.end),
         };
         Ok(Statement::If {
             condition,
             body,
+            else_body,
             span,
         })
     }
@@ -455,6 +494,24 @@ impl Parser {
             end: range_end,
             body,
             span,
+        })
+    }
+
+    /// Parses a parenthesized `while` loop condition and its body.
+    fn parse_while_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.advance().span.start;
+        self.expect_simple(TokenKind::LeftParenthesis)?;
+        let condition = self.parse_expression(0)?;
+        self.expect_simple(TokenKind::RightParenthesis)?;
+        self.skip_newlines();
+        let body = self.parse_block()?;
+        Ok(Statement::While {
+            condition,
+            span: Span {
+                start,
+                end: body.span.end,
+            },
+            body,
         })
     }
 
