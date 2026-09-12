@@ -1,9 +1,9 @@
 //! Statement recognition and variable declaration parsing.
 
 use syntax::{
-    Block, ConfigurationEntry, ConfigurationValue, RelationBinding, RelationCardinality,
-    RelationDefinition, RelationRole, RelationRoleBinding, SourceIdentifier, Span, Statement,
-    TypeDefinition, TypeField, UseClause, UseDeclaration, UseMember,
+    BindingKind, Block, ConfigurationEntry, ConfigurationValue, RelationBinding,
+    RelationCardinality, RelationDefinition, RelationRole, RelationRoleBinding, SourceIdentifier,
+    Span, Statement, TypeDefinition, TypeField, UseClause, UseDeclaration, UseMember,
 };
 
 use crate::{ParseError, lexer::TokenKind};
@@ -45,8 +45,14 @@ impl Parser {
         if self.starts_frame_declaration() {
             return self.parse_frame_declaration();
         }
-        if self.starts_variable_declaration() {
-            return self.parse_variable_declaration();
+        if matches!(&self.peek().kind, TokenKind::Let | TokenKind::Const) {
+            return self.parse_binding_declaration();
+        }
+        if self.starts_assignment() {
+            return self.parse_assignment();
+        }
+        if matches!(&self.peek().kind, TokenKind::LeftBrace) {
+            return self.parse_block().map(Statement::Block);
         }
         Ok(Statement::Expression(self.parse_expression(0)?))
     }
@@ -476,6 +482,9 @@ impl Parser {
     fn parse_for_statement(&mut self) -> Result<Statement, ParseError> {
         let start = self.advance().span.start;
         self.expect_simple(TokenKind::LeftParenthesis)?;
+        if matches!(&self.peek().kind, TokenKind::Let) {
+            self.advance();
+        }
         let variable = self.expect_identifier("expected loop variable after `(`")?;
         self.expect_simple(TokenKind::In)?;
         let range_start = self.parse_expression(0)?;
@@ -547,12 +556,12 @@ impl Parser {
         })
     }
 
-    /// Reports whether the cursor begins the `name: type = expression` form.
-    fn starts_variable_declaration(&self) -> bool {
+    /// Reports whether the cursor begins `name = expression`.
+    fn starts_assignment(&self) -> bool {
         matches!(&self.peek().kind, TokenKind::Ident(_))
             && matches!(
                 self.peek_n(1).map(|token| &token.kind),
-                Some(TokenKind::Colon)
+                Some(TokenKind::Equal)
             )
     }
 
@@ -569,20 +578,55 @@ impl Parser {
             )
     }
 
-    /// Parses a typed variable declaration after its leading identifier was found.
-    fn parse_variable_declaration(&mut self) -> Result<Statement, ParseError> {
+    /// Parses a `let` or `const` binding with an optional type annotation.
+    fn parse_binding_declaration(&mut self) -> Result<Statement, ParseError> {
         let start = self.peek().span.start;
-        let name = self.expect_identifier("expected variable name")?;
-        self.expect_simple(TokenKind::Colon)?;
-        let type_name = self.expect_type_name("expected type name")?;
+        let kind = match self.advance().kind {
+            TokenKind::Let => BindingKind::Let,
+            TokenKind::Const => BindingKind::Const,
+            _ => unreachable!("binding declaration dispatch validates the keyword"),
+        };
+        let name = self.expect_identifier("expected binding name after declaration keyword")?;
+        let type_name = if matches!(&self.peek().kind, TokenKind::Colon) {
+            self.advance();
+            Some(self.expect_type_name("expected type name after `:`")?)
+        } else {
+            None
+        };
+        let nullable = if type_name.is_some() && matches!(&self.peek().kind, TokenKind::Question) {
+            self.advance();
+            true
+        } else {
+            false
+        };
         self.expect_simple(TokenKind::Equal)?;
         let expression = self.parse_expression(0)?;
-        let end = expression.span().end;
-        Ok(Statement::VariableDeclaration {
+        Ok(Statement::BindingDeclaration {
+            kind,
             name,
             type_name,
+            nullable,
+            span: Span {
+                start,
+                end: expression.span().end,
+            },
             expression,
-            span: Span { start, end },
+        })
+    }
+
+    /// Parses an assignment after recognizing its identifier and equals sign.
+    fn parse_assignment(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span.start;
+        let name = self.expect_identifier("expected assignment target")?;
+        self.expect_simple(TokenKind::Equal)?;
+        let expression = self.parse_expression(0)?;
+        Ok(Statement::Assignment {
+            name,
+            span: Span {
+                start,
+                end: expression.span().end,
+            },
+            expression,
         })
     }
 }

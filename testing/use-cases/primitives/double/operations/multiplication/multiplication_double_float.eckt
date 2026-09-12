@@ -5,16 +5,16 @@ between float and double to verify the float operand is promoted and the
 result stays a double, producing 3.375 either way.
 
 >>> source
-float_value: float = 2.25
-double_value: double = 1.5
-double_first: double = 2.25
-float_second: float = 1.5
+const float_value: float = 2.25
+const double_value: double = 1.5
+const double_first: double = 2.25
+const float_second: float = 1.5
 
-float_times_double: double = float_value * double_value
+const float_times_double: double = float_value * double_value
 print(float_times_double)
 
 // Verifies the same promotion with the operand order reversed.
-double_times_float: double = double_first * float_second
+const double_times_float: double = double_first * float_second
 print(double_times_float)
 
 <<< stdout

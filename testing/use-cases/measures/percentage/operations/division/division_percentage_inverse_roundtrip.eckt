@@ -3,9 +3,9 @@
 Verifies division by and with a percentage in both operand orders. Dividing decimal 100% by plain 3 keeps the percentage subtype and its decimal precision, while dividing plain 100 by that percentage scales the divisor by hundredths and returns the plain decimal inverse.
 
 >>> source
-third: decimal = 100% / 3
+const third: decimal = 100% / 3
 print(third)
-restored: decimal = 100 / third
+const restored: decimal = 100 / third
 print(restored)
 
 <<< stdout

@@ -3,13 +3,13 @@
 Verifies mixed-unit comparisons scale the coarser frequency to the finer unit. One kilohertz equals one thousand hertz, and one megahertz equals one thousand kilohertz across all equality boundaries.
 
 >>> source
-kilo: int = 1khz
-thousand: int = 1000hz
+const kilo: int = 1khz
+const thousand: int = 1000hz
 print(kilo == thousand)
 print(kilo != thousand)
 print(kilo <= thousand)
 print(kilo >= thousand)
-mega: int = 1mhz
+const mega: int = 1mhz
 print(mega > 1000khz)
 print(mega == 1000khz)
 

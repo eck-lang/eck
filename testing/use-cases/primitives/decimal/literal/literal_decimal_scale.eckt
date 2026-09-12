@@ -4,9 +4,9 @@ Verifies decimal literals keep their source scale and accept exponent
 notation through the complete CLI pipeline.
 
 >>> source
-scaled: decimal = 1.50
-plain: decimal = 2.5
-big: decimal = 1e3
+const scaled: decimal = 1.50
+const plain: decimal = 2.5
+const big: decimal = 1e3
 
 // Verifies a trailing zero survives parsing and printing.
 print(scaled)

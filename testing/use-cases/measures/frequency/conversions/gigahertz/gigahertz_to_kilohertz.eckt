@@ -3,13 +3,13 @@
 Verifies direct conversion between gigahertz and kilohertz in both directions. Gigahertz converts to kilohertz with an integer scale, while kilohertz converts to the coarser unit through decimal promotion and four-place rounding.
 
 >>> source
-forward_whole: int = 1ghz
+const forward_whole: int = 1ghz
 print(forward_whole->to(khz))
-forward_fractional: decimal = 1.5ghz
+const forward_fractional: decimal = 1.5ghz
 print(forward_fractional->to(khz))
-backward_whole: int = 1khz
+const backward_whole: int = 1khz
 print(backward_whole->to(ghz))
-backward_fractional: decimal = 1.5khz
+const backward_fractional: decimal = 1.5khz
 print(backward_fractional->to(ghz))
 
 <<< stdout

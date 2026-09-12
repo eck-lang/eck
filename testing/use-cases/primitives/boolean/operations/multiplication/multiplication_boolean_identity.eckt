@@ -5,11 +5,11 @@ an integer keeps its value whether the flag appears on the left or the right,
 and a decimal operand likewise survives unchanged.
 
 >>> source
-flag: bool = true
-count: int = 5
+const flag: bool = true
+const count: int = 5
 print(count * flag)
 print(flag * count)
-price: decimal = 12.5
+const price: decimal = 12.5
 print(price * flag)
 
 <<< stdout

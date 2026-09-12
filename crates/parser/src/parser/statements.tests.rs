@@ -10,7 +10,7 @@ fn parse(source: &str) -> Result<Program, ParseError> {
 fn parses_multiline_and_nested_if_statements() {
     let program = parse(
         "if (true) {\n\
-         value: int = 1\n\
+         const value: int = 1\n\
          if (value == 1) { print(value) }\n\
          }\n",
     )
@@ -44,6 +44,39 @@ fn accepts_an_empty_block_and_preserves_if_and_block_spans() {
     assert!(body.statements.is_empty());
     assert_eq!(*span, syntax::Span { start: 0, end: 12 });
     assert_eq!(body.span, syntax::Span { start: 10, end: 12 });
+}
+
+/// Verifies binding keywords, optional annotations, assignments, blocks, and else bodies parse.
+#[test]
+fn parses_bindings_assignments_blocks_and_else_bodies() {
+    let program = parse(
+        "let count: int = 1\n\
+         count = 2\n\
+         { const message = 'ok' }\n\
+         if (count == 2) { print(count) } else { print(0) }\n",
+    )
+    .unwrap();
+
+    assert!(matches!(
+        &program.statements[0],
+        Statement::BindingDeclaration {
+            kind: syntax::BindingKind::Let,
+            type_name: Some(type_name),
+            ..
+        } if type_name == "int"
+    ));
+    assert!(matches!(
+        program.statements[1],
+        Statement::Assignment { .. }
+    ));
+    assert!(matches!(program.statements[2], Statement::Block(_)));
+    assert!(matches!(
+        &program.statements[3],
+        Statement::If {
+            else_body: Some(_),
+            ..
+        }
+    ));
 }
 
 /// Verifies `else if` chains are represented as nested conditional branches.
@@ -444,4 +477,37 @@ fn rejects_invalid_for_range_syntax() {
             "unexpected error for `{source}`: {error}"
         );
     }
+}
+
+/// Verifies nullable binding annotations retain their constrained marker.
+#[test]
+fn parses_nullable_binding_type_annotations() {
+    let program = parse("let value: int? = null\nconst label: string? = 'x'\n").unwrap();
+    assert!(matches!(
+        &program.statements[0],
+        Statement::BindingDeclaration {
+            name,
+            type_name: Some(type_name),
+            nullable: true,
+            expression: Expression::Null { .. },
+            ..
+        } if name == "value" && type_name == "int"
+    ));
+    assert!(matches!(
+        &program.statements[1],
+        Statement::BindingDeclaration {
+            name,
+            type_name: Some(type_name),
+            nullable: true,
+            ..
+        } if name == "label" && type_name == "string"
+    ));
+}
+
+/// Verifies declarations without `let` or `const` are rejected.
+#[test]
+fn rejects_legacy_variable_declaration_syntax() {
+    let error = parse("value: int = 1\n").unwrap_err();
+
+    assert!(error.message.contains("expected end of line"));
 }

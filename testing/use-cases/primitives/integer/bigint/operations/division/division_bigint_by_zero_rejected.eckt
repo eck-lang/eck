@@ -4,10 +4,10 @@ Divides 100 by zero to verify the failure surfaces as a language-level
 division-by-zero error with exit code 1 instead of producing a value.
 
 >>> source
-dividend: bigint = 100
-divisor: bigint = 0
+const dividend: bigint = 100
+const divisor: bigint = 0
 
-quotient: bigint = dividend / divisor
+const quotient: bigint = dividend / divisor
 print(quotient)
 
 <<< stdout

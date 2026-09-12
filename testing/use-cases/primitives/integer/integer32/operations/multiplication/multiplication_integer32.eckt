@@ -4,16 +4,16 @@ Verifies int32 multiplication with operands chosen to stay inside the 32-bit
 range through the complete CLI pipeline.
 
 >>> source
-left: int32 = 40000
-right: int32 = 50000
-neg_left: int32 = -40000
+const left: int32 = 40000
+const right: int32 = 50000
+const neg_left: int32 = -40000
 
 // Verifies multiplication of two positive operands.
-pos_product: int32 = left * right
+const pos_product: int32 = left * right
 print(pos_product)
 
 // Verifies multiplication with opposite signs.
-mixed_product: int32 = neg_left * right
+const mixed_product: int32 = neg_left * right
 print(mixed_product)
 
 <<< stdout

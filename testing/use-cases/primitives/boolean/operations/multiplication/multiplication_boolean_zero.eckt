@@ -5,13 +5,13 @@ integer product becomes `0`, and decimal and float products likewise collapse
 to zero rather than keeping their magnitude.
 
 >>> source
-flag: bool = false
-count: int = 5
+const flag: bool = false
+const count: int = 5
 print(count * flag)
 print(flag * count)
-price: decimal = 12.5
+const price: decimal = 12.5
 print(price * flag)
-measure: float = 2.5
+const measure: float = 2.5
 print(measure * flag)
 
 <<< stdout

@@ -4,16 +4,16 @@ Verifies int16 multiplication with operands chosen to stay inside the 16-bit
 range through the complete CLI pipeline.
 
 >>> source
-left: int16 = 200
-right: int16 = 150
-neg_left: int16 = -200
+const left: int16 = 200
+const right: int16 = 150
+const neg_left: int16 = -200
 
 // Verifies multiplication of two positive operands.
-pos_product: int16 = left * right
+const pos_product: int16 = left * right
 print(pos_product)
 
 // Verifies multiplication with opposite signs.
-mixed_product: int16 = neg_left * right
+const mixed_product: int16 = neg_left * right
 print(mixed_product)
 
 <<< stdout

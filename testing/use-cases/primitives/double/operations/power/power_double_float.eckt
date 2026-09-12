@@ -5,16 +5,16 @@ power to verify the float operand is promoted and the result stays a
 double, producing 4 and 3.375.
 
 >>> source
-float_base: float = 2.0
-double_exponent: double = 2.0
-double_base: double = 2.25
-float_exponent: float = 1.5
+const float_base: float = 2.0
+const double_exponent: double = 2.0
+const double_base: double = 2.25
+const float_exponent: float = 1.5
 
-power: double = float_base ** double_exponent
+const power: double = float_base ** double_exponent
 print(power)
 
 // Verifies the same promotion with the operand order reversed.
-reversed_power: double = double_base ** float_exponent
+const reversed_power: double = double_base ** float_exponent
 print(reversed_power)
 
 <<< stdout

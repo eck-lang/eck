@@ -3,8 +3,8 @@
 Verifies an integer frequency and a decimal frequency combine representation promotion with unit scaling. The fractional kilohertz value orders above one thousand hertz and equals fifteen hundred hertz exactly.
 
 >>> source
-whole: int = 1000hz
-fractional: decimal = 1.5khz
+const whole: int = 1000hz
+const fractional: decimal = 1.5khz
 print(fractional > whole)
 print(fractional == 1500hz)
 print(whole < fractional)

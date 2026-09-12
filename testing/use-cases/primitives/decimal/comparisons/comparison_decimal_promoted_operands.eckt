@@ -5,10 +5,10 @@ operand orders without losing precision. Every value is exactly
 representable in all three representations.
 
 >>> source
-narrow_int: int = 5
-narrow_double: double = 5
-narrow_float: float = 5
-wide: decimal = 10
+const narrow_int: int = 5
+const narrow_double: double = 5
+const narrow_float: float = 5
+const wide: decimal = 10
 
 print(narrow_int < wide)
 print(wide <= narrow_double)

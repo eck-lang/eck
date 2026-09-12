@@ -3,7 +3,7 @@
 Verifies that normalizing a zero percentage still reaches the Decimal division-by-zero guard instead of producing an invalid or infinite magnitude.
 
 >>> source
-value: decimal = 12.50
+const value: decimal = 12.50
 print(value / 0%)
 
 <<< stdout

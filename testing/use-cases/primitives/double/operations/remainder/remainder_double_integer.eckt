@@ -5,17 +5,17 @@ promoted and the result stays a double, producing 1.5 when the double is
 the dividend and 1 when the integer is the dividend.
 
 >>> source
-double_value: double = 10.5
-integer_divisor: int = 3
-integer_dividend: int = 10
-double_divisor: double = 3
+const double_value: double = 10.5
+const integer_divisor: int = 3
+const integer_dividend: int = 10
+const double_divisor: double = 3
 
 // Verifies the Int-to-Double promotion with the double dividend first.
-double_remainder: double = double_value % integer_divisor
+const double_remainder: double = double_value % integer_divisor
 print(double_remainder)
 
 // Verifies the same promotion with the operand order reversed.
-integer_remainder: double = integer_dividend % double_divisor
+const integer_remainder: double = integer_dividend % double_divisor
 print(integer_remainder)
 
 <<< stdout

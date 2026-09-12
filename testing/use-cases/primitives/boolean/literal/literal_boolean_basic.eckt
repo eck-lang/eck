@@ -4,9 +4,9 @@ Verifies the `true` and `false` literals parse into boolean values and print
 back in their canonical lowercase representation.
 
 >>> source
-enabled: bool = true
+const enabled: bool = true
 print(enabled)
-disabled: bool = false
+const disabled: bool = false
 print(disabled)
 
 <<< stdout

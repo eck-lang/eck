@@ -5,13 +5,13 @@ range is rejected with a compile-time diagnostic through the complete CLI
 pipeline, consistent with int8 and int64.
 
 >>> source
-too_small: int16 = -32768
+const too_small: int16 = -32768
 print(too_small)
 
 <<< stdout
 
 <<< stderr
-eck: invalid literal `32768` for type `int16`: number too large to fit in target type at Span { start: 20, end: 25 }
+eck: invalid literal `32768` for type `int16`: number too large to fit in target type at Span { start: 26, end: 31 }
 
 <<< exit
 1

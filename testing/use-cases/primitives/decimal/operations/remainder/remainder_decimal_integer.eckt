@@ -5,17 +5,17 @@ promoted and the result stays an exact decimal, producing 1.5 when the
 decimal is the dividend and 1 when the integer is the dividend.
 
 >>> source
-decimal_value: decimal = 10.5
-integer_divisor: int = 3
-integer_dividend: int = 10
-decimal_divisor: decimal = 3
+const decimal_value: decimal = 10.5
+const integer_divisor: int = 3
+const integer_dividend: int = 10
+const decimal_divisor: decimal = 3
 
 // Verifies the Decimal/Int promotion with the decimal dividend first.
-decimal_remainder: decimal = decimal_value % integer_divisor
+const decimal_remainder: decimal = decimal_value % integer_divisor
 print(decimal_remainder)
 
 // Verifies the same promotion with the operand order reversed.
-integer_remainder: decimal = integer_dividend % decimal_divisor
+const integer_remainder: decimal = integer_dividend % decimal_divisor
 print(integer_remainder)
 
 <<< stdout

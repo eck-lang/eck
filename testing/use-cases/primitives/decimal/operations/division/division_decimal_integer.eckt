@@ -4,17 +4,17 @@ Divides 7 by 2 in both operand orders to verify the integer is promoted
 and the result stays an exact decimal, producing 3.50 either way.
 
 >>> source
-integer_value: int = 7
-integer_divisor: int = 2
-dividend: decimal = 7
-decimal_divisor: decimal = 2
+const integer_value: int = 7
+const integer_divisor: int = 2
+const dividend: decimal = 7
+const decimal_divisor: decimal = 2
 
 // Verifies the Decimal/Int promotion with the decimal operand first.
-decimal_divided_by_integer: decimal = dividend / integer_divisor
+const decimal_divided_by_integer: decimal = dividend / integer_divisor
 print(decimal_divided_by_integer)
 
 // Verifies the same promotion with the operand order reversed.
-integer_divided_by_decimal: decimal = integer_value / decimal_divisor
+const integer_divided_by_decimal: decimal = integer_value / decimal_divisor
 print(integer_divided_by_decimal)
 
 <<< stdout

@@ -6,15 +6,15 @@ result stays a double whose sign follows the operand order, producing
 0.75 and -0.75.
 
 >>> source
-float_value: float = 2.25
-double_value: double = 1.5
+const float_value: float = 2.25
+const double_value: double = 1.5
 
 // Verifies the Float-to-Double promotion.
-float_minus_double: double = float_value - double_value
+const float_minus_double: double = float_value - double_value
 print(float_minus_double)
 
 // Verifies the same promotion with the operand order reversed.
-double_minus_float: double = double_value - float_value
+const double_minus_float: double = double_value - float_value
 print(double_minus_float)
 
 <<< stdout

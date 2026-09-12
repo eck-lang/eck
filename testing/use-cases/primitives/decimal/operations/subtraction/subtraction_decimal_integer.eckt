@@ -5,15 +5,15 @@ promoted and the result stays an exact decimal whose sign follows the
 operand order, producing -2.70 and 2.70.
 
 >>> source
-integer_right: int = 5
-decimal_left: decimal = 2.30
+const integer_right: int = 5
+const decimal_left: decimal = 2.30
 
 // Verifies the Decimal/Int promotion.
-decimal_minus_integer: decimal = decimal_left - integer_right
+const decimal_minus_integer: decimal = decimal_left - integer_right
 print(decimal_minus_integer)
 
 // Verifies the same promotion with the operand order reversed.
-integer_minus_decimal: decimal = integer_right - decimal_left
+const integer_minus_decimal: decimal = integer_right - decimal_left
 print(integer_minus_decimal)
 
 <<< stdout

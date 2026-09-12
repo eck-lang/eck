@@ -4,13 +4,13 @@ Verifies a repeated `g` flag is rejected at compile time: no regex value is
 produced and the diagnostic names the duplicated flag with its source span.
 
 >>> source
-bad: regex = /abc/gg
+const bad: regex = /abc/gg
 print(bad)
 
 <<< stdout
 
 <<< stderr
-eck: invalid literal `/abc/gg` for type `regex`: duplicate `g` flag in regex literal at Span { start: 13, end: 20 }
+eck: invalid literal `/abc/gg` for type `regex`: duplicate `g` flag in regex literal at Span { start: 19, end: 26 }
 
 <<< exit
 1

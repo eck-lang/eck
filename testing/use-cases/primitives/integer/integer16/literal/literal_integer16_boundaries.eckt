@@ -6,15 +6,15 @@ one from the largest negative literal because a negated minimum-magnitude
 literal is validated unsigned first, consistent with int8 and int64.
 
 >>> source
-ceiling: int16 = 32767
-floor: int16 = -32767
-unit: int16 = 1
+const ceiling: int16 = 32767
+const floor: int16 = -32767
+const unit: int16 = 1
 
 // Verifies the largest int16 literal prints unchanged.
 print(ceiling)
 
 // Verifies the int16 minimum is reachable through checked arithmetic.
-minimum: int16 = floor - unit
+const minimum: int16 = floor - unit
 print(minimum)
 
 <<< stdout

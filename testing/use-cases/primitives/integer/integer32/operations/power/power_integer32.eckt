@@ -5,10 +5,10 @@ the 32-bit range through the complete CLI pipeline. Both operands are int32
 to keep this case focused on same-type power semantics.
 
 >>> source
-base: int32 = 2
-exponent: int32 = 30
+const base: int32 = 2
+const exponent: int32 = 30
 
-power: int32 = base ** exponent
+const power: int32 = base ** exponent
 print(power)
 
 <<< stdout

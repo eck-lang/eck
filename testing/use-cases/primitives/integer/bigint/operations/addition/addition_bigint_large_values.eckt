@@ -5,11 +5,11 @@ Adds two 30-digit values to verify arbitrary precision addition far beyond
 limit.
 
 >>> source
-first: bigint = 123456789012345678901234567890
-second: bigint = 987654321098765432109876543210
+const first: bigint = 123456789012345678901234567890
+const second: bigint = 987654321098765432109876543210
 
 // Verifies addition of two very large positive values.
-total: bigint = first + second
+const total: bigint = first + second
 print(total)
 
 <<< stdout

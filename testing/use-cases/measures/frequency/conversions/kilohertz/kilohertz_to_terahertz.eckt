@@ -3,13 +3,13 @@
 Verifies direct conversion between kilohertz and terahertz in both directions. Kilohertz converts to the coarser unit through decimal promotion and four-place rounding, while terahertz converts exactly to kilohertz.
 
 >>> source
-forward_whole: int = 1khz
+const forward_whole: int = 1khz
 print(forward_whole->to(thz))
-forward_fractional: decimal = 1.5khz
+const forward_fractional: decimal = 1.5khz
 print(forward_fractional->to(thz))
-backward_whole: int = 1thz
+const backward_whole: int = 1thz
 print(backward_whole->to(khz))
-backward_fractional: decimal = 1.5thz
+const backward_fractional: decimal = 1.5thz
 print(backward_fractional->to(khz))
 
 <<< stdout

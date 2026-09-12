@@ -4,7 +4,7 @@ Verifies an escaped `\/` inside the pattern is accepted and preserved verbatim
 when the value prints, so the literal text stays stable across parsing.
 
 >>> source
-escaped: regex = /a\/b/
+const escaped: regex = /a\/b/
 print(escaped)
 
 <<< stdout

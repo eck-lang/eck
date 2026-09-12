@@ -4,11 +4,11 @@ Verifies int8 and int16 multiplication in both operand orders produces an
 int16 result.
 
 >>> source
-narrow: int8 = 5
-wide: int16 = 10
+const narrow: int8 = 5
+const wide: int16 = 10
 
-narrow_left: int16 = narrow * wide
-wide_left: int16 = wide * narrow
+const narrow_left: int16 = narrow * wide
+const wide_left: int16 = wide * narrow
 print(narrow_left)
 print(wide_left)
 

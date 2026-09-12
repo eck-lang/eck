@@ -4,15 +4,15 @@ Verifies int8 subtraction in both operand orders through the complete CLI
 pipeline.
 
 >>> source
-left: int8 = 100
-right: int8 = 27
+const left: int8 = 100
+const right: int8 = 27
 
 // Verifies subtraction with the larger operand first.
-forward_diff: int8 = left - right
+const forward_diff: int8 = left - right
 print(forward_diff)
 
 // Verifies subtraction with the smaller operand first.
-reversed_diff: int8 = right - left
+const reversed_diff: int8 = right - left
 print(reversed_diff)
 
 <<< stdout

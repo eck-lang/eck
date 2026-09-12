@@ -5,7 +5,7 @@ time: the unclosed character class surfaces the engine error with its source
 span instead of producing a value.
 
 >>> source
-bad: regex = /[unclosed/
+const bad: regex = /[unclosed/
 print(bad)
 
 <<< stdout
@@ -14,7 +14,7 @@ print(bad)
 eck: invalid literal `/[unclosed/` for type `regex`: regex parse error:
     [unclosed
     ^
-error: unclosed character class at Span { start: 13, end: 24 }
+error: unclosed character class at Span { start: 19, end: 30 }
 
 <<< exit
 1

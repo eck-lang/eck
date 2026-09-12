@@ -3,13 +3,13 @@
 Verifies direct conversion between hertz and terahertz in both directions. Hertz converts to the coarser unit through decimal promotion and four-place rounding, while terahertz converts exactly to hertz.
 
 >>> source
-forward_whole: int = 1hz
+const forward_whole: int = 1hz
 print(forward_whole->to(thz))
-forward_fractional: decimal = 1.5hz
+const forward_fractional: decimal = 1.5hz
 print(forward_fractional->to(thz))
-backward_whole: int = 1thz
+const backward_whole: int = 1thz
 print(backward_whole->to(hz))
-backward_fractional: decimal = 1.5thz
+const backward_fractional: decimal = 1.5thz
 print(backward_fractional->to(hz))
 
 <<< stdout

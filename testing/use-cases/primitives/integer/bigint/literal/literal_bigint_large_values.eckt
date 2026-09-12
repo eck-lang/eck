@@ -5,8 +5,8 @@ literals have no 128-bit size limit. Both parse directly into arbitrary
 precision without an intermediate fixed-width conversion.
 
 >>> source
-above: bigint = 170141183460469231731687303715884105728
-below: bigint = -170141183460469231731687303715884105729
+const above: bigint = 170141183460469231731687303715884105728
+const below: bigint = -170141183460469231731687303715884105729
 
 // Verifies a positive value one past the 128-bit maximum.
 print(above)

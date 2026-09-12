@@ -3,8 +3,8 @@
 Verifies equality and ordering between hertz values without unit scaling. Distinct operands exercise `==`, `!=`, `<`, and `>`, while reflexive operands pin the inclusive ordering boundaries.
 
 >>> source
-small: int = 500hz
-large: int = 1000hz
+const small: int = 500hz
+const large: int = 1000hz
 print(small == large)
 print(small != large)
 print(small < large)

@@ -6,17 +6,17 @@ integer 2 to a decimal 2nd power to verify the base is promoted and still
 returns a decimal, producing 4.
 
 >>> source
-integer_base: int = 2
-decimal_base: decimal = 2
-integer_exponent: int = 10
-decimal_exponent: decimal = 2
+const integer_base: int = 2
+const decimal_base: decimal = 2
+const integer_exponent: int = 10
+const decimal_exponent: decimal = 2
 
 // Verifies a Decimal base with an Int exponent.
-decimal_power: decimal = decimal_base ** integer_exponent
+const decimal_power: decimal = decimal_base ** integer_exponent
 print(decimal_power)
 
 // Verifies an Int base with a Decimal exponent promotes the base and returns Decimal.
-integer_power: decimal = integer_base ** decimal_exponent
+const integer_power: decimal = integer_base ** decimal_exponent
 print(integer_power)
 
 <<< stdout

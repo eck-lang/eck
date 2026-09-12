@@ -4,9 +4,9 @@ Verifies all comparison operators accept every narrower signed integer width
 with int32 while preserving exact ordering.
 
 >>> source
-narrow8: int8 = 5
-narrow16: int16 = 5
-wide: int32 = 10
+const narrow8: int8 = 5
+const narrow16: int16 = 5
+const wide: int32 = 10
 
 print(narrow8 < wide)
 print(wide <= narrow16)

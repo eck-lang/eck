@@ -5,17 +5,17 @@ decimal and double to verify the f64 value converts into an exact decimal
 result in both operand orders, producing 4 either way.
 
 >>> source
-double_base: double = 2.0
-decimal_base: decimal = 2
-double_exponent: double = 2.0
-decimal_exponent: decimal = 2
+const double_base: double = 2.0
+const decimal_base: decimal = 2
+const double_exponent: double = 2.0
+const decimal_exponent: decimal = 2
 
 // Verifies a Decimal base with a Double exponent.
-decimal_power: decimal = decimal_base ** double_exponent
+const decimal_power: decimal = decimal_base ** double_exponent
 print(decimal_power)
 
 // Verifies a Double base with a Decimal exponent promotes the base and returns Decimal.
-double_power: decimal = double_base ** decimal_exponent
+const double_power: decimal = double_base ** decimal_exponent
 print(double_power)
 
 <<< stdout

@@ -4,20 +4,20 @@ Verifies every narrower signed integer width participates in int128 power in
 both operand orders and produces an int128 result.
 
 >>> source
-narrow8: int8 = 2
-narrow16: int16 = 2
-narrow32: int32 = 2
-narrow64: int64 = 2
-wide: int128 = 3
+const narrow8: int8 = 2
+const narrow16: int16 = 2
+const narrow32: int32 = 2
+const narrow64: int64 = 2
+const wide: int128 = 3
 
-result8_base: int128 = narrow8 ** wide
-result8_exponent: int128 = wide ** narrow8
-result16_base: int128 = narrow16 ** wide
-result16_exponent: int128 = wide ** narrow16
-result32_base: int128 = narrow32 ** wide
-result32_exponent: int128 = wide ** narrow32
-result64_base: int128 = narrow64 ** wide
-result64_exponent: int128 = wide ** narrow64
+const result8_base: int128 = narrow8 ** wide
+const result8_exponent: int128 = wide ** narrow8
+const result16_base: int128 = narrow16 ** wide
+const result16_exponent: int128 = wide ** narrow16
+const result32_base: int128 = narrow32 ** wide
+const result32_exponent: int128 = wide ** narrow32
+const result64_base: int128 = narrow64 ** wide
+const result64_exponent: int128 = wide ** narrow64
 print(result8_base)
 print(result8_exponent)
 print(result16_base)

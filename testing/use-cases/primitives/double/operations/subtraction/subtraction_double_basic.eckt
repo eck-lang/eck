@@ -4,10 +4,10 @@ Subtracts 1.5 from 2.25 to verify native double-precision subtraction for
 values exactly representable in f64, producing 0.75.
 
 >>> source
-double_left: double = 2.25
-double_right: double = 1.5
+const double_left: double = 2.25
+const double_right: double = 1.5
 
-double_diff: double = double_left - double_right
+const double_diff: double = double_left - double_right
 print(double_diff)
 
 <<< stdout

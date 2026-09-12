@@ -5,17 +5,17 @@ decimal and float to verify the f32 value converts into an exact decimal
 result in both operand orders, producing 4 either way.
 
 >>> source
-float_base: float = 2.0
-decimal_base: decimal = 2
-float_exponent: float = 2.0
-decimal_exponent: decimal = 2
+const float_base: float = 2.0
+const decimal_base: decimal = 2
+const float_exponent: float = 2.0
+const decimal_exponent: decimal = 2
 
 // Verifies a Decimal base with a Float exponent.
-decimal_power: decimal = decimal_base ** float_exponent
+const decimal_power: decimal = decimal_base ** float_exponent
 print(decimal_power)
 
 // Verifies a Float base with a Decimal exponent promotes the base and returns Decimal.
-float_power: decimal = float_base ** decimal_exponent
+const float_power: decimal = float_base ** decimal_exponent
 print(float_power)
 
 <<< stdout

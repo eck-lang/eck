@@ -6,16 +6,16 @@ to a double 2.0 power to verify the base is promoted and still returns a
 double, producing 4.
 
 >>> source
-integer_base: int = 2
-integer_exponent: int = 10
-double_base: double = 2.0
+const integer_base: int = 2
+const integer_exponent: int = 10
+const double_base: double = 2.0
 
 // Verifies a Double base with an Int exponent.
-double_power: double = double_base ** integer_exponent
+const double_power: double = double_base ** integer_exponent
 print(double_power)
 
 // Verifies an Int base with a Double exponent promotes the base and returns Double.
-integer_power: double = integer_base ** double_base
+const integer_power: double = integer_base ** double_base
 print(integer_power)
 
 <<< stdout

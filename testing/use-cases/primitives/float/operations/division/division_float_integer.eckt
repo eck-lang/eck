@@ -5,18 +5,18 @@ result keeps single-precision representation in both operand orders,
 producing 4.6666665 and 1.5.
 
 >>> source
-integer_left: int = 7
-integer_right: int = 2
-float_left: float = 1.5
-float_right: float = 3.0
+const integer_left: int = 7
+const integer_right: int = 2
+const float_left: float = 1.5
+const float_right: float = 3.0
 
 // Verifies the Int-to-Float promotion. The f32 result carries the expected
 // single-precision representation.
-integer_divided_by_float: float = integer_left / float_left
+const integer_divided_by_float: float = integer_left / float_left
 print(integer_divided_by_float)
 
 // Verifies the same promotion with the operand order reversed.
-float_divided_by_integer: float = float_right / integer_right
+const float_divided_by_integer: float = float_right / integer_right
 print(float_divided_by_integer)
 
 <<< stdout

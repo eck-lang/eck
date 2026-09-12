@@ -4,10 +4,10 @@ Multiplies 2.25 by 1.5 to verify native double-precision multiplication
 for values exactly representable in f64, producing 3.375.
 
 >>> source
-double_left: double = 2.25
-double_right: double = 1.5
+const double_left: double = 2.25
+const double_right: double = 1.5
 
-double_product: double = double_left * double_right
+const double_product: double = double_left * double_right
 print(double_product)
 
 <<< stdout

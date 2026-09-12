@@ -5,12 +5,12 @@ literal: the body runs for the true variable and is skipped for the false one,
 after which execution continues normally.
 
 >>> source
-flag: bool = true
+const flag: bool = true
 if (flag) {
     print(1)
 }
 
-other: bool = false
+const other: bool = false
 if (other) {
     print(2)
 }

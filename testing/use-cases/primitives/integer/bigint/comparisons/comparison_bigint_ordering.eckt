@@ -6,9 +6,9 @@ Every operand is bigint: comparisons are only defined between equal
 types.
 
 >>> source
-low: bigint = -170141183460469231731687303715884105729
-high: bigint = 170141183460469231731687303715884105728
-same: bigint = 170141183460469231731687303715884105728
+const low: bigint = -170141183460469231731687303715884105729
+const high: bigint = 170141183460469231731687303715884105728
+const same: bigint = 170141183460469231731687303715884105728
 
 // Verifies the equality family on equal and distinct operands.
 print(high == same)

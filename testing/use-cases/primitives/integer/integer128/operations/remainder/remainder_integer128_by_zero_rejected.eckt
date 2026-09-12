@@ -4,10 +4,10 @@ Takes 100 modulo zero to verify the failure surfaces as a language-level
 division-by-zero error with exit code 1 instead of producing a value.
 
 >>> source
-dividend: int128 = 100
-divisor: int128 = 0
+const dividend: int128 = 100
+const divisor: int128 = 0
 
-remainder: int128 = dividend % divisor
+const remainder: int128 = dividend % divisor
 print(remainder)
 
 <<< stdout

@@ -3,13 +3,13 @@
 Verifies direct conversion between gigahertz and megahertz in both directions. Gigahertz converts to megahertz with an integer scale, while megahertz converts to the coarser unit through decimal promotion.
 
 >>> source
-forward_whole: int = 1ghz
+const forward_whole: int = 1ghz
 print(forward_whole->to(mhz))
-forward_fractional: decimal = 1.5ghz
+const forward_fractional: decimal = 1.5ghz
 print(forward_fractional->to(mhz))
-backward_whole: int = 1mhz
+const backward_whole: int = 1mhz
 print(backward_whole->to(ghz))
-backward_fractional: decimal = 1.5mhz
+const backward_fractional: decimal = 1.5mhz
 print(backward_fractional->to(ghz))
 
 <<< stdout

@@ -5,16 +5,16 @@ right operand, to verify the products stay inside the 128-bit range in
 both signs, producing 100000000000000000000000000000 and its negation.
 
 >>> source
-left: int128 = 10000000000000000000
-right: int128 = 10000000000
-neg_left: int128 = -10000000000000000000
+const left: int128 = 10000000000000000000
+const right: int128 = 10000000000
+const neg_left: int128 = -10000000000000000000
 
 // Verifies multiplication of two positive operands.
-pos_product: int128 = left * right
+const pos_product: int128 = left * right
 print(pos_product)
 
 // Verifies multiplication with opposite signs.
-mixed_product: int128 = neg_left * right
+const mixed_product: int128 = neg_left * right
 print(mixed_product)
 
 <<< stdout

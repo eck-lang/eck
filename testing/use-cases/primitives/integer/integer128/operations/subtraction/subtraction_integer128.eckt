@@ -5,15 +5,15 @@ verify the difference keeps its magnitude with the sign following the
 operand order.
 
 >>> source
-left: int128 = 170141183460469231731687303715884105727
-right: int128 = 123456789
+const left: int128 = 170141183460469231731687303715884105727
+const right: int128 = 123456789
 
 // Verifies subtraction with the larger operand first.
-forward_diff: int128 = left - right
+const forward_diff: int128 = left - right
 print(forward_diff)
 
 // Verifies subtraction with the smaller operand first.
-reversed_diff: int128 = right - left
+const reversed_diff: int128 = right - left
 print(reversed_diff)
 
 <<< stdout

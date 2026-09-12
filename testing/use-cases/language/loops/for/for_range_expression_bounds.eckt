@@ -6,8 +6,8 @@ follows the existing arithmetic precedence to iterate `2..6`. Both cases
 run through the complete CLI pipeline.
 
 >>> source
-start: int = 2
-end: int = 5
+const start: int = 2
+const end: int = 5
 for (i in start..end) {
     print(i)
 }

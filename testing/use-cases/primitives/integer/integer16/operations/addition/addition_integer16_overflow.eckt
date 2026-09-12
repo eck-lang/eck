@@ -6,13 +6,13 @@ promoted representation. Both declarations keep the static int16 type while
 the runtime values use the wider precision.
 
 >>> source
-maximum: int16 = 32767
-unit: int16 = 1
+const maximum: int16 = 32767
+const unit: int16 = 1
 
-overflow: int16 = maximum + unit
+const overflow: int16 = maximum + unit
 print(overflow)
 
-chained: int16 = overflow + unit
+const chained: int16 = overflow + unit
 print(chained)
 
 <<< stdout

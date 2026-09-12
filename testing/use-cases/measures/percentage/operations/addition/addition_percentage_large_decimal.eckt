@@ -3,7 +3,7 @@
 Verifies that a small relative percentage can adjust a twenty-four-digit decimal without a binary floating-point conversion or loss of significant integer digits.
 
 >>> source
-value: decimal = 999999999999999999999999
+const value: decimal = 999999999999999999999999
 print(value + 0.0001%)
 
 <<< stdout

@@ -4,13 +4,13 @@ Verifies an int32 literal one past the 32-bit maximum is rejected with a
 compile-time diagnostic through the complete CLI pipeline.
 
 >>> source
-too_large: int32 = 2147483648
+const too_large: int32 = 2147483648
 print(too_large)
 
 <<< stdout
 
 <<< stderr
-eck: invalid literal `2147483648` for type `int32`: number too large to fit in target type at Span { start: 19, end: 29 }
+eck: invalid literal `2147483648` for type `int32`: number too large to fit in target type at Span { start: 25, end: 35 }
 
 <<< exit
 1

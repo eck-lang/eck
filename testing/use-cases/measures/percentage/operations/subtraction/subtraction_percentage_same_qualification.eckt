@@ -3,8 +3,8 @@
 Verifies subtracting two percentages keeps the percentage subtype without any scaling. Subtracting decimal 25% from 50% exercises same-subtype subtraction and returns the plain face-value difference qualified with percent.
 
 >>> source
-low: decimal = 25%
-high: decimal = 50%
+const low: decimal = 25%
+const high: decimal = 50%
 print(high - low)
 
 <<< stdout

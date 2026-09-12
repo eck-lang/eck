@@ -184,6 +184,24 @@ fn lexes_conditional_and_loop_control_keywords() {
     ));
 }
 
+/// Verifies binding keywords do not claim identifiers with longer names.
+#[test]
+fn lexes_binding_keywords() {
+    let tokens = lex("let const letter constant").unwrap();
+    let kinds = tokens.iter().map(|token| &token.kind).collect::<Vec<_>>();
+
+    assert!(matches!(
+        kinds.as_slice(),
+        [
+            TokenKind::Let,
+            TokenKind::Const,
+            TokenKind::Ident(letter),
+            TokenKind::Ident(constant),
+            TokenKind::Eof,
+        ] if letter == "letter" && constant == "constant"
+    ));
+}
+
 /// Verifies `for (i in 0..10) {}` lexes `..` as one token with exact spans.
 ///
 /// The range operator must not split into two dots, the bounds must not

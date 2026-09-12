@@ -4,16 +4,16 @@ Verifies int8 multiplication with operands chosen to stay inside the 8-bit
 range through the complete CLI pipeline.
 
 >>> source
-left: int8 = 10
-right: int8 = 12
-neg_left: int8 = -10
+const left: int8 = 10
+const right: int8 = 12
+const neg_left: int8 = -10
 
 // Verifies multiplication of two positive operands.
-pos_product: int8 = left * right
+const pos_product: int8 = left * right
 print(pos_product)
 
 // Verifies multiplication with opposite signs.
-mixed_product: int8 = neg_left * right
+const mixed_product: int8 = neg_left * right
 print(mixed_product)
 
 <<< stdout

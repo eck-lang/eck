@@ -6,21 +6,21 @@ adds an f64 hundredth to 0.02 to verify the inexact binary value still
 converts exactly, producing 0.03.
 
 >>> source
-decimal_left: decimal = 1.20
-double_right: double = 2.25
+const decimal_left: decimal = 1.20
+const double_right: double = 2.25
 
 // Verifies the Decimal/Double conversion.
-decimal_plus_double: decimal = decimal_left + double_right
+const decimal_plus_double: decimal = decimal_left + double_right
 print(decimal_plus_double)
 
 // Verifies the same conversion with the operand order reversed.
-double_plus_decimal: decimal = double_right + decimal_left
+const double_plus_decimal: decimal = double_right + decimal_left
 print(double_plus_decimal)
 
-hundredth_double: double = 0.01
+const hundredth_double: double = 0.01
 
 // Verifies an f64 hundredth converts exactly when added to a decimal.
-mixed_hundredth: decimal = hundredth_double + 0.02
+const mixed_hundredth: decimal = hundredth_double + 0.02
 print(mixed_hundredth)
 
 <<< stdout

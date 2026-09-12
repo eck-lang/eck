@@ -6,15 +6,15 @@ minimum-magnitude literal is validated unsigned first, consistent with
 int8 and int64.
 
 >>> source
-ceiling: int128 = 170141183460469231731687303715884105727
-floor: int128 = -170141183460469231731687303715884105727
-unit: int128 = 1
+const ceiling: int128 = 170141183460469231731687303715884105727
+const floor: int128 = -170141183460469231731687303715884105727
+const unit: int128 = 1
 
 // Verifies the largest int128 literal prints unchanged.
 print(ceiling)
 
 // Verifies the int128 minimum is reachable through checked arithmetic.
-minimum: int128 = floor - unit
+const minimum: int128 = floor - unit
 print(minimum)
 
 <<< stdout

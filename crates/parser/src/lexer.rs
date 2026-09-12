@@ -41,6 +41,8 @@ enum RawTokenKind {
 
     #[token(":")]
     Colon,
+    #[token("?")]
+    Question,
     #[token("==")]
     EqualEqual,
     #[token("!=")]
@@ -106,6 +108,10 @@ enum RawTokenKind {
     Continue,
     #[token("in")]
     In,
+    #[token("let")]
+    Let,
+    #[token("const")]
+    Const,
 
     // Preserve the source spelling: each concrete type validates the numeric
     // literal only after the compiler resolves its expected type. `lex`
@@ -141,7 +147,7 @@ enum RawTokenKind {
 /// divergent list. The list includes `@config` with its leading `@`.
 pub const ECK_KEYWORDS: &[&str] = &[
     "type", "frame", "relation", "on", "one", "many", "use", "as", "from", "@config", "if", "for",
-    "else", "in", "while", "break", "continue", "true", "false", "null",
+    "else", "in", "let", "const", "while", "break", "continue", "true", "false", "null",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -153,6 +159,7 @@ pub(crate) enum TokenKind {
     Boolean(String),
     Null,
     Colon,
+    Question,
     Equal,
     EqualEqual,
     BangEqual,
@@ -181,6 +188,8 @@ pub(crate) enum TokenKind {
     Break,
     Continue,
     In,
+    Let,
+    Const,
     Newline,
     Config,
     Type,
@@ -279,6 +288,7 @@ fn convert_raw_token(
         RawTokenKind::From => TokenKind::From,
         RawTokenKind::Colon => TokenKind::Colon,
         RawTokenKind::Equal => TokenKind::Equal,
+        RawTokenKind::Question => TokenKind::Question,
         RawTokenKind::EqualEqual => TokenKind::EqualEqual,
         RawTokenKind::BangEqual => TokenKind::BangEqual,
         RawTokenKind::Less => TokenKind::Less,
@@ -310,6 +320,8 @@ fn convert_raw_token(
         RawTokenKind::Break => TokenKind::Break,
         RawTokenKind::Continue => TokenKind::Continue,
         RawTokenKind::In => TokenKind::In,
+        RawTokenKind::Let => TokenKind::Let,
+        RawTokenKind::Const => TokenKind::Const,
         RawTokenKind::Number => TokenKind::Number(raw_text.into()),
         RawTokenKind::Ident => TokenKind::Ident(raw_text.into()),
         RawTokenKind::DoubleQuotedString => TokenKind::String(decode_string(raw_text, '"', span)?),

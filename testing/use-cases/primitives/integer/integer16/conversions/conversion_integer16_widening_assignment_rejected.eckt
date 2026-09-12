@@ -5,14 +5,14 @@ not introduce implicit widening when assigning an int8 value directly to an
 int16 variable.
 
 >>> source
-narrow: int8 = 127
-wide: int16 = narrow
+const narrow: int8 = 127
+const wide: int16 = narrow
 print(wide)
 
 <<< stdout
 
 <<< stderr
-eck: type mismatch: variable `wide` expects `int16`, expression produces `int8` at Span { start: 33, end: 39 }
+eck: type mismatch: binding `wide` expects `int16`, expression produces `int8` at Span { start: 45, end: 51 }
 
 <<< exit
 1

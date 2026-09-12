@@ -5,10 +5,10 @@ multiplication far beyond 64 bits, producing the full 60-digit product
 without any overflow limit.
 
 >>> source
-first: bigint = 123456789012345678901234567890
-second: bigint = 987654321098765432109876543210
+const first: bigint = 123456789012345678901234567890
+const second: bigint = 987654321098765432109876543210
 
-product: bigint = first * second
+const product: bigint = first * second
 print(product)
 
 <<< stdout

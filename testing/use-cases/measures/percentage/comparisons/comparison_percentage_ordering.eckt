@@ -3,8 +3,8 @@
 Verifies equality and ordering between two percentage values without any scaling. Comparing 10% against 25% exercises `==`, `!=`, `<`, and `>`, while the reflexive `<=` and `>=` cases pin the boundary where both operands are equal.
 
 >>> source
-low: decimal = 10%
-high: decimal = 25%
+const low: decimal = 10%
+const high: decimal = 25%
 print(low == high)
 print(low != high)
 print(low < high)

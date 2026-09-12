@@ -5,16 +5,16 @@ truncates toward zero in both signs, producing 142857142857142857142857142857
 and -142857142857142857142857142857.
 
 >>> source
-dividend: bigint = 1000000000000000000000000000000
-neg_dividend: bigint = -1000000000000000000000000000000
-divisor: bigint = 7
+const dividend: bigint = 1000000000000000000000000000000
+const neg_dividend: bigint = -1000000000000000000000000000000
+const divisor: bigint = 7
 
 // Verifies the quotient truncates the fractional part.
-truncated_quotient: bigint = dividend / divisor
+const truncated_quotient: bigint = dividend / divisor
 print(truncated_quotient)
 
 // Verifies truncation of a negative dividend toward zero.
-neg_quotient: bigint = neg_dividend / divisor
+const neg_quotient: bigint = neg_dividend / divisor
 print(neg_quotient)
 
 <<< stdout

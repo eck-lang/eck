@@ -5,10 +5,10 @@ result far beyond 128 bits. The exponent is bigint as well: the type has
 no mixed-type operations.
 
 >>> source
-base: bigint = 2
-exponent: bigint = 130
+const base: bigint = 2
+const exponent: bigint = 130
 
-power: bigint = base ** exponent
+const power: bigint = base ** exponent
 print(power)
 
 <<< stdout

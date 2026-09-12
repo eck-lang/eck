@@ -4,20 +4,20 @@ Verifies every narrower signed integer width divides with int128 in both
 operand orders, producing int128 with integer truncation.
 
 >>> source
-narrow8: int8 = 20
-narrow16: int16 = 20
-narrow32: int32 = 20
-narrow64: int64 = 20
-wide: int128 = 5
+const narrow8: int8 = 20
+const narrow16: int16 = 20
+const narrow32: int32 = 20
+const narrow64: int64 = 20
+const wide: int128 = 5
 
-result8_left: int128 = narrow8 / wide
-result8_right: int128 = wide / narrow8
-result16_left: int128 = narrow16 / wide
-result16_right: int128 = wide / narrow16
-result32_left: int128 = narrow32 / wide
-result32_right: int128 = wide / narrow32
-result64_left: int128 = narrow64 / wide
-result64_right: int128 = wide / narrow64
+const result8_left: int128 = narrow8 / wide
+const result8_right: int128 = wide / narrow8
+const result16_left: int128 = narrow16 / wide
+const result16_right: int128 = wide / narrow16
+const result32_left: int128 = narrow32 / wide
+const result32_right: int128 = wide / narrow32
+const result64_left: int128 = narrow64 / wide
+const result64_right: int128 = wide / narrow64
 print(result8_left)
 print(result8_right)
 print(result16_left)

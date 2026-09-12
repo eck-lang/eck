@@ -5,8 +5,8 @@ only when its relation holds, so the true relations print while the false ones
 leave no output.
 
 >>> source
-a: int = 3
-b: int = 5
+const a: int = 3
+const b: int = 5
 
 if (a < b) {
     print(1)

@@ -3,13 +3,13 @@
 Verifies direct conversion between kilohertz and megahertz in both directions. Kilohertz converts to the coarser unit through decimal promotion, while megahertz converts to kilohertz with an integer scale.
 
 >>> source
-forward_whole: int = 1khz
+const forward_whole: int = 1khz
 print(forward_whole->to(mhz))
-forward_fractional: decimal = 1.5khz
+const forward_fractional: decimal = 1.5khz
 print(forward_fractional->to(mhz))
-backward_whole: int = 1mhz
+const backward_whole: int = 1mhz
 print(backward_whole->to(khz))
-backward_fractional: decimal = 1.5mhz
+const backward_fractional: decimal = 1.5mhz
 print(backward_fractional->to(khz))
 
 <<< stdout

@@ -3,13 +3,13 @@
 Verifies direct conversion between hertz and kilohertz in both directions. Hertz converts to the coarser unit through decimal promotion, while kilohertz converts to hertz with an integer scale.
 
 >>> source
-forward_whole: int = 1hz
+const forward_whole: int = 1hz
 print(forward_whole->to(khz))
-forward_fractional: decimal = 1.5hz
+const forward_fractional: decimal = 1.5hz
 print(forward_fractional->to(khz))
-backward_whole: int = 1khz
+const backward_whole: int = 1khz
 print(backward_whole->to(hz))
-backward_fractional: decimal = 1.5khz
+const backward_fractional: decimal = 1.5khz
 print(backward_fractional->to(hz))
 
 <<< stdout

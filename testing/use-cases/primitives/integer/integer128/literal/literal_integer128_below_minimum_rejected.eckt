@@ -5,13 +5,13 @@ the 128-bit range, to verify the literal is rejected with a compile-time
 diagnostic, consistent with int8 and int64.
 
 >>> source
-too_small: int128 = -170141183460469231731687303715884105728
+const too_small: int128 = -170141183460469231731687303715884105728
 print(too_small)
 
 <<< stdout
 
 <<< stderr
-eck: invalid literal `170141183460469231731687303715884105728` for type `int128`: number too large to fit in target type at Span { start: 21, end: 60 }
+eck: invalid literal `170141183460469231731687303715884105728` for type `int128`: number too large to fit in target type at Span { start: 27, end: 66 }
 
 <<< exit
 1

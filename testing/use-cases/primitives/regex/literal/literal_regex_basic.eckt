@@ -5,9 +5,9 @@ printing: `/hello/` denotes a literal match and `/cat|dog/` an alternation,
 and both print back verbatim.
 
 >>> source
-word: regex = /hello/
+const word: regex = /hello/
 print(word)
-alternation: regex = /cat|dog/
+const alternation: regex = /cat|dog/
 print(alternation)
 
 <<< stdout

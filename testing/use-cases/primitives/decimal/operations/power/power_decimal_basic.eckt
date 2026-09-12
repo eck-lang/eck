@@ -4,10 +4,10 @@ Raises 2 to the 10th power with both operands annotated as decimal to
 verify same-type exponentiation stays exact, producing 1024.
 
 >>> source
-base: decimal = 2
-exponent: decimal = 10
+const base: decimal = 2
+const exponent: decimal = 10
 
-power: decimal = base ** exponent
+const power: decimal = base ** exponent
 print(power)
 
 <<< stdout

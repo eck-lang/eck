@@ -5,10 +5,10 @@ the 16-bit range through the complete CLI pipeline. Both operands are int16
 to keep this case focused on same-type power semantics.
 
 >>> source
-base: int16 = 2
-exponent: int16 = 14
+const base: int16 = 2
+const exponent: int16 = 14
 
-power: int16 = base ** exponent
+const power: int16 = base ** exponent
 print(power)
 
 <<< stdout

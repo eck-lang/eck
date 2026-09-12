@@ -5,16 +5,16 @@ producing 1.5. A negative dividend verifies the remainder keeps the
 dividend sign, producing -1.5.
 
 >>> source
-dividend: decimal = 10.5
-divisor: decimal = 3
-negative_dividend: decimal = -10.5
+const dividend: decimal = 10.5
+const divisor: decimal = 3
+const negative_dividend: decimal = -10.5
 
 // Verifies the remainder of two positive decimals.
-positive_remainder: decimal = dividend % divisor
+const positive_remainder: decimal = dividend % divisor
 print(positive_remainder)
 
 // Verifies the remainder takes the dividend sign.
-negative_remainder: decimal = negative_dividend % divisor
+const negative_remainder: decimal = negative_dividend % divisor
 print(negative_remainder)
 
 <<< stdout

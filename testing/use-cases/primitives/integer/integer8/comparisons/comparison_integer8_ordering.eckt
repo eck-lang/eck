@@ -5,9 +5,9 @@ pipeline. Every operand is int8: comparisons are only defined between equal
 types.
 
 >>> source
-low: int8 = -100
-high: int8 = 100
-same: int8 = 100
+const low: int8 = -100
+const high: int8 = 100
+const same: int8 = 100
 
 // Verifies the equality family on equal and distinct operands.
 print(high == same)

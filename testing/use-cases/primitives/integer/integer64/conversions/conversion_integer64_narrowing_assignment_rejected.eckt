@@ -6,14 +6,14 @@ narrowing conversion, so the assignment fails instead of silently truncating
 a value that may not fit.
 
 >>> source
-wide: bigint = 170141183460469231731687303715884105728
-narrow: int64 = wide
+const wide: bigint = 170141183460469231731687303715884105728
+const narrow: int64 = wide
 print(narrow)
 
 <<< stdout
 
 <<< stderr
-eck: type mismatch: variable `narrow` expects `int64`, expression produces `bigint` at Span { start: 71, end: 75 }
+eck: type mismatch: binding `narrow` expects `int64`, expression produces `bigint` at Span { start: 83, end: 87 }
 
 <<< exit
 1

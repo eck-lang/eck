@@ -5,7 +5,7 @@ true, the directly nested condition is false, and the sibling nested condition
 is true, so only the outer and sibling bodies print.
 
 >>> source
-outer: int = 10
+const outer: int = 10
 if (outer > 5) {
     print(1)
     if (outer > 15) {

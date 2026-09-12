@@ -5,15 +5,15 @@ into a decimal result. Both quotients display truncated to four fractional
 digits, producing 4.6666 and 0.2142.
 
 >>> source
-float_value: float = 1.5
-dividend: decimal = 7
+const float_value: float = 1.5
+const dividend: decimal = 7
 
 // Verifies the Decimal/Float conversion.
-decimal_divided_by_float: decimal = dividend / float_value
+const decimal_divided_by_float: decimal = dividend / float_value
 print(decimal_divided_by_float)
 
 // Verifies the same conversion with the operand order reversed.
-float_divided_by_decimal: decimal = float_value / dividend
+const float_divided_by_decimal: decimal = float_value / dividend
 print(float_divided_by_decimal)
 
 <<< stdout

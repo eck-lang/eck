@@ -6,17 +6,17 @@ to verify an exact quotient keeps its own scale. Every divisor carries a
 decimal annotation so both cases exercise same-type division.
 
 >>> source
-repeating_dividend: decimal = 1
-repeating_divisor: decimal = 3
-quarters_dividend: decimal = 10
-quarters_divisor: decimal = 4
+const repeating_dividend: decimal = 1
+const repeating_divisor: decimal = 3
+const quarters_dividend: decimal = 10
+const quarters_divisor: decimal = 4
 
 // Verifies a repeating quotient displays truncated to four fractional digits.
-repeating: decimal = repeating_dividend / repeating_divisor
+const repeating: decimal = repeating_dividend / repeating_divisor
 print(repeating)
 
 // Verifies an exact quotient keeps its scale.
-exact_quarters: decimal = quarters_dividend / quarters_divisor
+const exact_quarters: decimal = quarters_dividend / quarters_divisor
 print(exact_quarters)
 
 <<< stdout

@@ -3,7 +3,7 @@
 Verifies that multiplying a fractional decimal by a repeating-style percentage normalizes the rate once without losing configured four-place output precision.
 
 >>> source
-value: decimal = 12.345
+const value: decimal = 12.345
 print(value * 33.3333%)
 
 <<< stdout

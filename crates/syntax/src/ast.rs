@@ -11,6 +11,15 @@ pub struct Block {
     pub span: Span,
 }
 
+/// Declares whether a source binding may be reassigned after initialization.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BindingKind {
+    /// Introduces a mutable binding through the `let` keyword.
+    Let,
+    /// Introduces an immutable binding through the `const` keyword.
+    Const,
+}
+
 #[derive(Clone, Debug)]
 pub enum Statement {
     Use(UseDeclaration),
@@ -42,6 +51,20 @@ pub enum Statement {
         expression: Expression,
         span: Span,
     },
+    BindingDeclaration {
+        kind: BindingKind,
+        name: String,
+        type_name: Option<String>,
+        nullable: bool,
+        expression: Expression,
+        span: Span,
+    },
+    Assignment {
+        name: String,
+        expression: Expression,
+        span: Span,
+    },
+    Block(Block),
     If {
         condition: Expression,
         body: Block,

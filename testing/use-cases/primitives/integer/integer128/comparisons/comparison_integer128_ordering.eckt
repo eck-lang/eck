@@ -5,9 +5,9 @@ magnitudes far beyond 64 bits. Every operand is int128, keeping this case
 focused on same-type relations; mixed widths are covered separately.
 
 >>> source
-low: int128 = -100000000000000000000000000000
-high: int128 = 100000000000000000000000000000
-same: int128 = 100000000000000000000000000000
+const low: int128 = -100000000000000000000000000000
+const high: int128 = 100000000000000000000000000000
+const same: int128 = 100000000000000000000000000000
 
 // Verifies the equality family on equal and distinct operands.
 print(high == same)

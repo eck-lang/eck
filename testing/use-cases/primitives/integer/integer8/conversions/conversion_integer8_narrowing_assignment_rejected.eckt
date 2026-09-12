@@ -5,14 +5,14 @@ assignments, so assigning an int16 value to an int8 variable remains a
 compile-time type mismatch.
 
 >>> source
-wide: int16 = 127
-narrow: int8 = wide
+const wide: int16 = 127
+const narrow: int8 = wide
 print(narrow)
 
 <<< stdout
 
 <<< stderr
-eck: type mismatch: variable `narrow` expects `int8`, expression produces `int16` at Span { start: 33, end: 37 }
+eck: type mismatch: binding `narrow` expects `int8`, expression produces `int16` at Span { start: 45, end: 49 }
 
 <<< exit
 1

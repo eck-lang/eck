@@ -3,8 +3,8 @@
 Verifies that a negative percentage reverses the direction of relative addition. Adding negative twenty percent to 12.50 therefore produces the same magnitude as subtracting positive twenty percent.
 
 >>> source
-value: decimal = 12.50
-negative_rate: decimal = -20%
+const value: decimal = 12.50
+const negative_rate: decimal = -20%
 print(value + negative_rate)
 
 <<< stdout

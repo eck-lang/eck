@@ -3,13 +3,13 @@
 Verifies direct conversion between hertz and megahertz in both directions. Hertz converts to the coarser unit through decimal promotion and four-place rounding, while megahertz converts exactly to hertz.
 
 >>> source
-forward_whole: int = 1hz
+const forward_whole: int = 1hz
 print(forward_whole->to(mhz))
-forward_fractional: decimal = 1.5hz
+const forward_fractional: decimal = 1.5hz
 print(forward_fractional->to(mhz))
-backward_whole: int = 1mhz
+const backward_whole: int = 1mhz
 print(backward_whole->to(hz))
-backward_fractional: decimal = 1.5mhz
+const backward_fractional: decimal = 1.5mhz
 print(backward_fractional->to(hz))
 
 <<< stdout

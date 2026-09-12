@@ -5,8 +5,8 @@ an end-exclusive `int16` bound remains reachable without repeating or
 overflowing an iteration value.
 
 >>> source
-start: int8 = 126
-end: int16 = 130
+const start: int8 = 126
+const end: int16 = 130
 for (index in start..end) {
     print(index)
 }

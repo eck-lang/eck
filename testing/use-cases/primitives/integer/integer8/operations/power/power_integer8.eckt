@@ -5,10 +5,10 @@ the 8-bit range through the complete CLI pipeline. Both operands are int8 to
 keep this case focused on same-type power semantics.
 
 >>> source
-base: int8 = 2
-exponent: int8 = 6
+const base: int8 = 2
+const exponent: int8 = 6
 
-power: int8 = base ** exponent
+const power: int8 = base ** exponent
 print(power)
 
 <<< stdout
