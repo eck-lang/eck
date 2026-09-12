@@ -109,3 +109,18 @@ fn parses_field_access_and_logical_predicates() {
         }
     ));
 }
+
+/// Verifies prefix `!` produces a logical-not unary expression.
+#[test]
+fn parses_logical_not_expressions() {
+    let expression = parse_expression("!enabled");
+
+    assert!(matches!(
+        expression,
+        Expression::Unary {
+            operator: UnaryOperator::LogicalNot,
+            operand,
+            ..
+        } if matches!(operand.as_ref(), Expression::Variable { name, .. } if name == "enabled")
+    ));
+}

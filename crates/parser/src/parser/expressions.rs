@@ -215,6 +215,7 @@ impl Parser {
         match token.kind {
             TokenKind::Number(raw_text) => Ok(self.parse_number_literal(token.span, raw_text)),
             TokenKind::Minus => self.parse_negation(token.span),
+            TokenKind::Bang => self.parse_logical_not(token.span),
             TokenKind::String(value) => Ok(Expression::String {
                 value,
                 span: token.span,
@@ -330,6 +331,20 @@ impl Parser {
         };
         Ok(Expression::Unary {
             operator: UnaryOperator::Negation,
+            operand: Box::new(operand),
+            span,
+        })
+    }
+
+    /// Parses a prefix logical negation with primary-expression precedence.
+    fn parse_logical_not(&mut self, start: Span) -> Result<Expression, ParseError> {
+        let operand = self.parse_primary()?;
+        let span = Span {
+            start: start.start,
+            end: operand.span().end,
+        };
+        Ok(Expression::Unary {
+            operator: UnaryOperator::LogicalNot,
             operand: Box::new(operand),
             span,
         })

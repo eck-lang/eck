@@ -162,7 +162,7 @@ fn lexes_if_and_braces_without_claiming_prefixed_identifiers() {
 /// Verifies conditional and loop keywords do not claim longer identifiers.
 #[test]
 fn lexes_conditional_and_loop_control_keywords() {
-    let tokens = lex("else while break continue elsewhere meanwhile breaker continued").unwrap();
+    let tokens = lex("else while break continue elsewhere meanwhile breaker continued !").unwrap();
     let kinds = tokens.iter().map(|token| &token.kind).collect::<Vec<_>>();
 
     assert!(matches!(
@@ -176,6 +176,7 @@ fn lexes_conditional_and_loop_control_keywords() {
             TokenKind::Ident(meanwhile_name),
             TokenKind::Ident(breaker),
             TokenKind::Ident(continued),
+            TokenKind::Bang,
             TokenKind::Eof,
         ] if elsewhere == "elsewhere"
             && meanwhile_name == "meanwhile"

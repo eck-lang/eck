@@ -30,4 +30,5 @@ pub enum LogicalOperator {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOperator {
     Negation,
+    LogicalNot,
 }

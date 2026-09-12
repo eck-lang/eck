@@ -112,6 +112,8 @@ enum RawTokenKind {
     Let,
     #[token("const")]
     Const,
+    #[token("!")]
+    Bang,
 
     // Preserve the source spelling: each concrete type validates the numeric
     // literal only after the compiler resolves its expected type. `lex`
@@ -190,6 +192,7 @@ pub(crate) enum TokenKind {
     In,
     Let,
     Const,
+    Bang,
     Newline,
     Config,
     Type,
@@ -322,6 +325,7 @@ fn convert_raw_token(
         RawTokenKind::In => TokenKind::In,
         RawTokenKind::Let => TokenKind::Let,
         RawTokenKind::Const => TokenKind::Const,
+        RawTokenKind::Bang => TokenKind::Bang,
         RawTokenKind::Number => TokenKind::Number(raw_text.into()),
         RawTokenKind::Ident => TokenKind::Ident(raw_text.into()),
         RawTokenKind::DoubleQuotedString => TokenKind::String(decode_string(raw_text, '"', span)?),
