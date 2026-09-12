@@ -1,10 +1,14 @@
-use super::{Expression, FrameLiteralColumn, SourceIdentifier};
-use crate::{BinaryOperator, ComparisonOperator, LogicalOperator, Span, UnaryOperator};
+use super::{Expression, FrameLiteralColumn};
+use crate::{
+    BinaryOperator, ComparisonOperator, LogicalOperator, SourceIdentifier, Span, UnaryOperator,
+};
 
+/// Creates a concise source span for expression fixtures.
 fn span(start: usize, end: usize) -> Span {
     Span { start, end }
 }
 
+/// Creates a numeric expression with the requested span.
 fn number_expression(span: Span) -> Expression {
     Expression::Number {
         raw_text: "42".into(),
@@ -13,6 +17,7 @@ fn number_expression(span: Span) -> Expression {
     }
 }
 
+/// Verifies that every expression variant reports its stored source span.
 #[test]
 fn every_expression_variant_returns_its_span() {
     let expected_span = span(2, 11);
