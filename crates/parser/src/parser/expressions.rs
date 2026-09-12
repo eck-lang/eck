@@ -1,4 +1,4 @@
-//! Pratt parsing for expressions, postfix conversions, and calls.
+//! Pratt parsing for expressions, postfix pipes, and calls.
 
 use syntax::{
     BinaryOperator, ComparisonOperator, Expression, FrameLiteralColumn, LogicalOperator,
@@ -141,7 +141,7 @@ impl Parser {
         })
     }
 
-    /// Parses a postfix `->unit` conversion or `->function(args)` pipe.
+    /// Parses a postfix `->function(args)` pipe, including `->to(...)` conversions.
     fn parse_postfix_arrow(&mut self, expression: Expression) -> Result<Expression, ParseError> {
         self.advance();
         let target_start = self.peek().span.start;
@@ -187,7 +187,7 @@ impl Parser {
         }
     }
 
-    /// Parses a postfix `->unit` conversion when the cursor is at an arrow.
+    /// Parses a postfix `->function(args)` pipe when the cursor is at an arrow.
     #[allow(dead_code)]
     fn parse_postfix_conversion(
         &mut self,

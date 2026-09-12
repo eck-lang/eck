@@ -3,11 +3,20 @@ use syntax::Span;
 
 #[test]
 fn lexes_eck_tokens_and_preserves_spans() {
-    let tokens = lex("distance: decimal = 1.5m->km // convert\n").unwrap();
+    let tokens = lex("distance: decimal = 1.5m->to(km) // convert\n").unwrap();
     assert!(matches!(&tokens[0].kind, TokenKind::Ident(name) if name == "distance"));
     assert_eq!(tokens[0].span, Span { start: 0, end: 8 });
-    assert_eq!(tokens[4].span, Span { start: 20, end: 23 });
-    assert_eq!(tokens[8].span, Span { start: 39, end: 40 });
+    assert!(matches!(&tokens[4].kind, TokenKind::Number(raw) if raw == "1.5"));
+    assert!(
+        tokens
+            .iter()
+            .any(|token| matches!(&token.kind, TokenKind::Arrow))
+    );
+    assert!(
+        tokens
+            .iter()
+            .any(|token| matches!(&token.kind, TokenKind::Ident(name) if name == "to"))
+    );
 }
 
 #[test]

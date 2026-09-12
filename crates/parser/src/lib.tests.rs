@@ -153,13 +153,13 @@ fn parses_space_separated_numeric_suffix() {
 
 #[test]
 fn parses_postfix_measure_conversion() {
-    let program = parse("print(distance->km)\n").unwrap();
+    let program = parse("print(distance->to(km))\n").unwrap();
     let Statement::Expression(Expression::Call { arguments, .. }) = &program.statements[0] else {
         panic!("expected a call expression");
     };
     assert!(matches!(
         &arguments[0],
-        Expression::Convert { expression, target, .. }
-            if target == "km" && matches!(expression.as_ref(), Expression::Variable { name, .. } if name == "distance")
+        Expression::Pipe { expression, function, arguments, .. }
+            if function == "to" && arguments.len() == 1 && matches!(expression.as_ref(), Expression::Variable { name, .. } if name == "distance")
     ));
 }

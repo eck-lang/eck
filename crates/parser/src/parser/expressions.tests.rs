@@ -55,7 +55,7 @@ fn keeps_spaced_percent_as_the_remainder_operator() {
 
 #[test]
 fn comparisons_have_lower_precedence_than_arithmetic_and_conversions() {
-    let expression = parse_expression("distance->cm + 1cm >= 101cm");
+    let expression = parse_expression("distance->to(cm) + 1cm >= 101cm");
     let Expression::Comparison {
         operator,
         left_operand,
@@ -66,7 +66,7 @@ fn comparisons_have_lower_precedence_than_arithmetic_and_conversions() {
     };
     assert_eq!(operator, ComparisonOperator::GreaterOrEqual);
     assert!(
-        matches!(left_operand.as_ref(), Expression::Binary { operator: BinaryOperator::Addition, left_operand, .. } if matches!(left_operand.as_ref(), Expression::Convert { .. }))
+        matches!(left_operand.as_ref(), Expression::Binary { operator: BinaryOperator::Addition, left_operand, .. } if matches!(left_operand.as_ref(), Expression::Pipe { function, .. } if function == "to"))
     );
 }
 
