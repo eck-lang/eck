@@ -1,4 +1,3 @@
-use frame_model::{Frame, FrameType, RecordType, RelationBinding, RelationDefinition};
 use language_core::{
     ConfigurationOverride, ResolvedBinaryOperator, ResolvedComparison, Value, ValueType,
 };
@@ -31,25 +30,6 @@ pub struct TypedRangePlan {
 /// compiler has already resolved.
 #[derive(Clone)]
 pub enum TypedStatement {
-    /// Declares a structural row type.
-    TypeDeclaration { definition: RecordType, span: Span },
-    /// Declares a native frame, optionally initialized from a frame literal.
-    FrameDeclaration {
-        name: String,
-        frame_type: FrameType,
-        frame: Option<Frame>,
-        span: Span,
-    },
-    /// Declares a reusable relation role and predicate definition.
-    RelationDefinition {
-        definition: RelationDefinition,
-        span: Span,
-    },
-    /// Binds a frame variable to a relation definition.
-    RelationBinding {
-        binding: RelationBinding,
-        span: Span,
-    },
     /// Applies a validated `@config` override to subsequent statements.
     Configuration {
         configuration_override: ConfigurationOverride,

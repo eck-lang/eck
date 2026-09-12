@@ -1,4 +1,3 @@
-use frame_model::{AggregateFunction, ColumnExpression};
 use language_core::{
     FunctionId, OperatorId, ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion,
     TypeId, Value, ValueType,
@@ -108,11 +107,5 @@ pub enum TypedExpressionKind {
         function: FunctionId,
         base: Box<TypedExpression>,
         arguments: Vec<TypedExpression>,
-    },
-    /// Aggregates one frame column with a resolved aggregate function.
-    FrameAggregate {
-        function: AggregateFunction,
-        frame_name: String,
-        expression: ColumnExpression,
     },
 }
