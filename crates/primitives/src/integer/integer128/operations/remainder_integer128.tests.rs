@@ -86,10 +86,7 @@ fn promotes_overflowed_context_remainder_to_bigint() {
     let promoted = descriptor.context_execute.unwrap()(&context, &minimum, &negative_one).unwrap();
 
     assert_eq!(promoted.type_id(), bigint_id);
-    assert_eq!(
-        promoted.downcast_ref::<BigInt>().unwrap(),
-        &(BigInt::from(i128::MIN) % -1)
-    );
+    assert_eq!(promoted.downcast_ref::<BigInt>().unwrap(), &BigInt::from(0));
 }
 
 /// Verifies context-aware mixed remainder promotes the `MIN % -1` overflow to `bigint`.
