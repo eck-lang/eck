@@ -102,18 +102,16 @@ impl Registry {
         descriptor: TypeConfigurationDescriptor,
     ) -> Result<(), CoreError> {
         self.type_descriptor(type_id)?;
-        if self.type_configurations.contains_key(&type_id) {
+        if self.type_configuration(type_id).is_some() {
             return Err(CoreError::DuplicateTypeConfiguration(
                 self.type_name(type_id).to_string(),
             ));
         }
-        self.type_configurations.insert(
-            type_id,
-            RegisteredTypeConfiguration {
-                type_id,
-                descriptor,
-            },
-        );
+        let slot = type_id.index as usize;
+        if self.type_configurations.len() <= slot {
+            self.type_configurations.resize_with(slot + 1, || None);
+        }
+        self.type_configurations[slot] = Some(RegisteredTypeConfiguration { type_id, descriptor });
         Ok(())
     }
 
@@ -124,8 +122,7 @@ impl Registry {
     pub fn initial_result_transform_is_identity(&self, type_id: TypeId) -> Result<bool, CoreError> {
         self.type_descriptor(type_id)?;
         Ok(self
-            .type_configurations
-            .get(&type_id)
+            .type_configuration(type_id)
             .map(|registered| registered.descriptor.initial_result_transform_is_identity)
             .unwrap_or(true))
     }
@@ -136,7 +133,7 @@ impl Registry {
         value: &Value,
         configuration: &RuntimeConfiguration,
     ) -> Result<Value, CoreError> {
-        match self.type_configurations.get(&value.type_id()) {
+        match self.type_configuration(value.type_id()) {
             Some(registered) => {
                 debug_assert_eq!(registered.type_id, value.type_id());
                 match registered.descriptor.transform_result {
@@ -158,7 +155,7 @@ impl Registry {
         value: Value,
         configuration: &RuntimeConfiguration,
     ) -> Result<Value, CoreError> {
-        match self.type_configurations.get(&value.type_id()) {
+        match self.type_configuration(value.type_id()) {
             Some(registered) => {
                 debug_assert_eq!(registered.type_id, value.type_id());
                 match (
@@ -180,7 +177,7 @@ impl Registry {
         value: &Value,
         configuration: &RuntimeConfiguration,
     ) -> Result<String, CoreError> {
-        let formatted = match self.type_configurations.get(&value.type_id()) {
+        let formatted = match self.type_configuration(value.type_id()) {
             Some(registered) => match registered.descriptor.format {
                 Some(format) => format(value, configuration)?,
                 None => (self.type_descriptor(value.type_id())?.format)(value)?,
@@ -194,6 +191,19 @@ impl Registry {
             )),
             None => Ok(formatted),
         }
+    }
+
+    /// Returns the configuration-aware hooks registered for one base type.
+    ///
+    /// The dense index is only meaningful for types allocated by this
+    /// registry, so a foreign registry id never matches a local hook.
+    fn type_configuration(&self, type_id: TypeId) -> Option<&RegisteredTypeConfiguration> {
+        if type_id.registry_id != self.registry_id {
+            return None;
+        }
+        self.type_configurations
+            .get(type_id.index as usize)
+            .and_then(Option::as_ref)
     }
 }
 

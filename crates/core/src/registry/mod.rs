@@ -104,7 +104,10 @@ pub struct Registry {
     /// Resolves source object paths that define explicit `None` behavior to their leaves.
     configuration_none_objects: HashMap<&'static str, &'static str>,
     /// Associates configuration-aware result and formatting hooks with base types.
-    type_configurations: HashMap<TypeId, RegisteredTypeConfiguration>,
+    ///
+    /// Result transformation is consulted for every produced value, so the
+    /// hooks are stored densely by type index instead of behind a hash lookup.
+    type_configurations: Vec<Option<RegisteredTypeConfiguration>>,
 
     /// Selects the base type for uncontextualized integer literals.
     default_integer: Option<TypeId>,
@@ -150,7 +153,7 @@ impl Default for Registry {
             namespaces_by_receiver_type: HashMap::new(),
             configurations: HashMap::new(),
             configuration_none_objects: HashMap::new(),
-            type_configurations: HashMap::new(),
+            type_configurations: Vec::new(),
             default_integer: None,
             default_fractional: None,
             default_string: None,
