@@ -1,0 +1,17 @@
+# Regex replace first-only versus global
+
+Verifies the `g` flag controls how many occurrences `String.replace` rewrites:
+without it only the first `a` in `aaa` becomes `b`, while `/a/g` rewrites all
+three.
+
+>>> source
+const first_only: string = "aaa"->replace(/a/, "b")
+print(first_only)
+const all: string = "aaa"->replace(/a/g, "b")
+print(all)
+
+<<< stdout
+baa
+bbb
+
+<<< stderr

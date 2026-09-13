@@ -1,0 +1,14 @@
+# Regex replace case-insensitive global
+
+Verifies the `i` flag makes the pattern match regardless of case, so a single
+`/hello/gi` rewrite normalizes the mixed-case words in `Hello HELLO hello`
+to `hi hi hi`.
+
+>>> source
+const greeting: string = "Hello HELLO hello"->replace(/hello/gi, "hi")
+print(greeting)
+
+<<< stdout
+hi hi hi
+
+<<< stderr

@@ -1,0 +1,17 @@
+# Regex replace capture group expansion
+
+Verifies replacement strings expand capture groups: numbered groups swap the
+two words of `hello world`, and named groups reformat the hyphenated pair in
+`foo-bar`.
+
+>>> source
+const swapped: string = "hello world"->replace(/(\w+) (\w+)/, "$2 $1")
+print(swapped)
+const named: string = "foo-bar"->replace(/(?P<first>\w+)-(?P<second>\w+)/g, "$second:$first")
+print(named)
+
+<<< stdout
+world hello
+bar:foo
+
+<<< stderr
