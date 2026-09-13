@@ -1,0 +1,19 @@
+# Nullable narrowing remains branch-local
+
+Verifies a direct non-null guard enables arithmetic only in its true branch and
+does not change the binding's effective type after the branch.
+
+>>> source
+let value: int? = 10
+if (value != null) {
+    print(value + 1)
+}
+print(value + 2)
+
+<<< stdout
+
+<<< stderr
+eck: nullable value must be narrowed before this operation at Span { start: 71, end: 76 }
+
+<<< exit
+1

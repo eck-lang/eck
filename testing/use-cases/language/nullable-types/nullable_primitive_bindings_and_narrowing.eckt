@@ -1,0 +1,29 @@
+# Nullable primitive bindings and non-null narrowing
+
+Verifies nullable integer, string, boolean, and decimal bindings, null checks,
+and arithmetic after a direct non-null guard through the complete CLI pipeline.
+
+>>> source
+let missing: int? = null
+let count: int? = 10
+let label: string? = null
+let enabled: bool? = true
+let amount: decimal? = 1.5
+
+if (count != null) {
+    print(count + 5)
+}
+
+print(missing == null)
+print(label == null)
+print(enabled != null)
+print(amount != null)
+
+<<< stdout
+15
+true
+true
+true
+true
+
+<<< stderr

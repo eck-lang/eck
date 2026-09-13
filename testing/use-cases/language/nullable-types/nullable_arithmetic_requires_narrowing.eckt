@@ -1,0 +1,16 @@
+# Nullable arithmetic requires narrowing
+
+Verifies a nullable integer cannot enter arithmetic before control flow proves
+that its current value is non-null.
+
+>>> source
+let value: int? = 10
+print(value + 1)
+
+<<< stdout
+
+<<< stderr
+eck: nullable value must be narrowed before this operation at Span { start: 27, end: 32 }
+
+<<< exit
+1

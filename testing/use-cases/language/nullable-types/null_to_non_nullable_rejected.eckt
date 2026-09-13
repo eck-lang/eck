@@ -1,0 +1,15 @@
+# Null assignment to a non-nullable binding is rejected
+
+Verifies the null literal cannot initialize an explicitly non-nullable integer
+binding.
+
+>>> source
+let value: int = null
+
+<<< stdout
+
+<<< stderr
+eck: cannot assign null to non-nullable type `int` at Span { start: 17, end: 21 }
+
+<<< exit
+1
