@@ -14,4 +14,4 @@ io_input_output = { package = "eck-std-io", path = "../std/io" }
 thiserror.workspace = true
 
 [dev-dependencies]
-compiler = { package = "eck-compiler", path = "../language/compiler" }
+compiler = { package = "eck-compiler", path = "../compiler" }

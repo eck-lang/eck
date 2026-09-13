@@ -7,6 +7,11 @@ members = [
   "crates/parser",
   "crates/primitives",
   "crates/measures",
+  "crates/runtime",
+  "crates/std/*",
+  "crates/cli",
+  "crates/lsp",
+  "crates/dialect",
   "crates/test-runner",
 ]
 
@@ -17,8 +22,8 @@ version = "0.0.1"
 
 [workspace.dependencies]
 thiserror = "2"
-rust_decimal = "1.42"
-regex = "1.11"
+rust_decimal = "1.43"
+regex = "1.13"
 num-bigint = "0.5"
 
 [profile.release]
