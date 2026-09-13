@@ -1,0 +1,21 @@
+# Integer64 remainder promotes signed overflow
+
+Verifies that the signed minimum remainder negative one widens to int128 and
+continues to use the widened representation for a later remainder.
+
+>>> source
+const near_minimum: int = -9223372036854775800
+const minimum: int = near_minimum - 8
+const negative_one: int = -1
+
+const overflow: int = minimum % negative_one
+print(overflow)
+
+const continued: int = overflow % negative_one
+print(continued)
+
+<<< stdout
+0
+0
+
+<<< stderr

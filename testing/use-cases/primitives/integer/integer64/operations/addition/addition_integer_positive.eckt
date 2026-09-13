@@ -1,0 +1,15 @@
+# Integer addition of positive operands
+
+Adds 7 and 5 to establish the ordinary result for two positive integers.
+
+>>> source
+const pos_left: int = 7
+const pos_right: int = 5
+
+const pos_sum: int = pos_left + pos_right
+print(pos_sum)
+
+<<< stdout
+12
+
+<<< stderr

@@ -1,0 +1,33 @@
+# Integer64 power promotes mixed operands
+
+Verifies every narrower signed integer width participates in int64 power in
+both operand orders and produces an int64 result.
+
+>>> source
+const narrow8: int8 = 2
+const narrow16: int16 = 2
+const narrow32: int32 = 2
+const wide: int64 = 3
+
+const result8_base: int64 = narrow8 ** wide
+const result8_exponent: int64 = wide ** narrow8
+const result16_base: int64 = narrow16 ** wide
+const result16_exponent: int64 = wide ** narrow16
+const result32_base: int64 = narrow32 ** wide
+const result32_exponent: int64 = wide ** narrow32
+print(result8_base)
+print(result8_exponent)
+print(result16_base)
+print(result16_exponent)
+print(result32_base)
+print(result32_exponent)
+
+<<< stdout
+8
+9
+8
+9
+8
+9
+
+<<< stderr

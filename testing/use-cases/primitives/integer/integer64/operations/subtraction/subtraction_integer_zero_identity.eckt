@@ -1,0 +1,22 @@
+# Integer subtraction with zero
+
+Subtracts zero from a non-zero integer and a non-zero integer from zero to
+verify the distinct identity and negation cases.
+
+>>> source
+const pos_left: int = 7
+const zero: int = 0
+
+// Verifies subtracting zero leaves the operand unchanged.
+const zero_right: int = pos_left - zero
+print(zero_right)
+
+// Verifies subtracting from zero negates the operand.
+const zero_left: int = zero - pos_left
+print(zero_left)
+
+<<< stdout
+7
+-7
+
+<<< stderr

@@ -1,0 +1,33 @@
+# Integer64 division promotes mixed operands
+
+Verifies every narrower signed integer width divides with int64 in both
+operand orders, producing int64 with integer truncation.
+
+>>> source
+const narrow8: int8 = 20
+const narrow16: int16 = 20
+const narrow32: int32 = 20
+const wide: int64 = 5
+
+const result8_left: int64 = narrow8 / wide
+const result8_right: int64 = wide / narrow8
+const result16_left: int64 = narrow16 / wide
+const result16_right: int64 = wide / narrow16
+const result32_left: int64 = narrow32 / wide
+const result32_right: int64 = wide / narrow32
+print(result8_left)
+print(result8_right)
+print(result16_left)
+print(result16_right)
+print(result32_left)
+print(result32_right)
+
+<<< stdout
+4
+0
+4
+0
+4
+0
+
+<<< stderr

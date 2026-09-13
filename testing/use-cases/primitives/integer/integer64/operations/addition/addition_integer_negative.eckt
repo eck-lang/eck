@@ -1,0 +1,16 @@
+# Integer addition of negative operands
+
+Adds -7 and -5 to verify that combining two negative integers produces their
+negative sum.
+
+>>> source
+const neg_left: int = -7
+const neg_right: int = -5
+
+const neg_sum: int = neg_left + neg_right
+print(neg_sum)
+
+<<< stdout
+-12
+
+<<< stderr

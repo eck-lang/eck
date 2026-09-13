@@ -1,0 +1,16 @@
+# Integer power with a positive exponent
+
+Raises 2 to 10 to verify that a positive integer exponent produces its
+integer power.
+
+>>> source
+const base: int = 2
+const exponent: int = 10
+
+const power: int = base ** exponent
+print(power)
+
+<<< stdout
+1024
+
+<<< stderr

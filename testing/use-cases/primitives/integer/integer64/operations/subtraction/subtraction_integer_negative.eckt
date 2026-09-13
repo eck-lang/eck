@@ -1,0 +1,16 @@
+# Integer subtraction of negative operands
+
+Subtracts one negative integer from another to verify that the subtrahend's
+sign is reversed before calculating the difference.
+
+>>> source
+const neg_left: int = -7
+const neg_right: int = -5
+
+const neg_diff: int = neg_left - neg_right
+print(neg_diff)
+
+<<< stdout
+-2
+
+<<< stderr

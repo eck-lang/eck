@@ -1,0 +1,20 @@
+# Integer64 power promotes signed overflow
+
+Verifies that an overflowing same-type power widens to int128 and continues to
+use the widened representation for a later power.
+
+>>> source
+const base: int = 2
+const exponent: int = 63
+
+const overflow: int = base ** exponent
+print(overflow)
+
+const continued: int = overflow ** 2
+print(continued)
+
+<<< stdout
+9223372036854775808
+85070591730234615865843651857942052864
+
+<<< stderr

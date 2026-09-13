@@ -1,0 +1,16 @@
+# Integer division of a negative dividend
+
+Divides -7 by 2 to verify that truncation moves the quotient toward zero,
+yielding -3 rather than -4.
+
+>>> source
+const neg_dividend: int = -7
+const divisor: int = 2
+
+const neg_quotient: int = neg_dividend / divisor
+print(neg_quotient)
+
+<<< stdout
+-3
+
+<<< stderr

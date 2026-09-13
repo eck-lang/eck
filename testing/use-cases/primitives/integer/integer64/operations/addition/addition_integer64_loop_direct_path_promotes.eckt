@@ -1,0 +1,19 @@
+# Integer64 loop fast path preserves overflow promotion
+
+Verifies direct loop-body lowering keeps contextual int64 overflow promotion
+and redispatches a later expression that consumes the widened int128 value.
+
+>>> source
+let maximum: int = 9223372036854775807
+let increment: int = 1
+
+for (iteration in 0..1) {
+    let overflowed = maximum + increment
+    let incremented = overflowed + increment
+    print(incremented)
+}
+
+<<< stdout
+9223372036854775809
+
+<<< stderr

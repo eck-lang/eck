@@ -1,0 +1,23 @@
+# Integer addition with zero
+
+Adds zero on each side of a non-zero integer to verify that it leaves the
+other operand unchanged.
+
+>>> source
+const pos_left: int = 7
+const pos_right: int = 5
+const zero: int = 0
+
+// Verifies zero as the left identity.
+const zero_left: int = zero + pos_right
+print(zero_left)
+
+// Verifies zero as the right identity.
+const zero_right: int = pos_left + zero
+print(zero_right)
+
+<<< stdout
+5
+7
+
+<<< stderr

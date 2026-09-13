@@ -1,0 +1,21 @@
+# Integer64 addition promotes signed overflow
+
+Verifies that same-type addition widens an overflowing result to int128 and
+continues to use the widened representation for a later addition.
+
+>>> source
+const near_maximum: int = 9223372036854775800
+const maximum: int = near_maximum + 7
+const unit: int = 1
+
+const overflow: int = maximum + unit
+print(overflow)
+
+const continued: int = overflow + unit
+print(continued)
+
+<<< stdout
+9223372036854775808
+9223372036854775809
+
+<<< stderr

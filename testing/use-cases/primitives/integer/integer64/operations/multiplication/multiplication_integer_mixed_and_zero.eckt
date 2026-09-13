@@ -1,0 +1,24 @@
+# Integer multiplication with mixed signs and zero
+
+Multiplies operands with unlike signs and by zero to verify sign propagation
+and zero's absorbing behavior.
+
+>>> source
+const pos_left: int = 7
+const neg_left: int = -7
+const pos_right: int = 5
+const zero: int = 0
+
+// Verifies multiplication with opposite signs.
+const mixed_product: int = neg_left * pos_right
+print(mixed_product)
+
+// Verifies zero as the absorbing element.
+const zero_product: int = pos_left * zero
+print(zero_product)
+
+<<< stdout
+-35
+0
+
+<<< stderr

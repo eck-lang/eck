@@ -1,0 +1,23 @@
+# Integer power with a zero exponent
+
+Raises distinct non-zero bases to zero to verify that a zero exponent yields
+one independently of the base.
+
+>>> source
+const base: int = 2
+const other_base: int = 10
+const zero: int = 0
+
+// Verifies a zero exponent on a small base.
+const small_power: int = base ** zero
+print(small_power)
+
+// Verifies a zero exponent on a larger base.
+const large_power: int = other_base ** zero
+print(large_power)
+
+<<< stdout
+1
+1
+
+<<< stderr

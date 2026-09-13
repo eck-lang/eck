@@ -1,0 +1,15 @@
+# Integer subtraction of positive operands
+
+Subtracts 5 from 7 to establish the ordinary result for two positive integers.
+
+>>> source
+const pos_left: int = 7
+const pos_right: int = 5
+
+const pos_diff: int = pos_left - pos_right
+print(pos_diff)
+
+<<< stdout
+2
+
+<<< stderr

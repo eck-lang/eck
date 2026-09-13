@@ -1,0 +1,23 @@
+# Integer division with truncation
+
+Divides 7 by 2 and 5 to verify that integer quotients discard fractional
+remainders instead of producing decimal values.
+
+>>> source
+const dividend: int = 7
+const small_divisor: int = 2
+const large_divisor: int = 5
+
+// Verifies the quotient truncates the fractional part.
+const truncated_quotient: int = dividend / small_divisor
+print(truncated_quotient)
+
+// Verifies truncation with a larger fractional remainder.
+const truncated_to_zero: int = dividend / large_divisor
+print(truncated_to_zero)
+
+<<< stdout
+3
+1
+
+<<< stderr

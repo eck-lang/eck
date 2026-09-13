@@ -1,0 +1,20 @@
+# Integer64 multiplication promotes signed overflow
+
+Verifies that same-type multiplication widens an overflowing result to int128
+and continues to use the widened representation for a later multiplication.
+
+>>> source
+const half_limit: int = 4611686018427387904
+const two: int = 2
+
+const overflow: int = half_limit * two
+print(overflow)
+
+const continued: int = overflow * two
+print(continued)
+
+<<< stdout
+9223372036854775808
+18446744073709551616
+
+<<< stderr

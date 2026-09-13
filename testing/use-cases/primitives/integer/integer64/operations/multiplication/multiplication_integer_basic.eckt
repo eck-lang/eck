@@ -1,0 +1,24 @@
+# Integer multiplication of same-sign operands
+
+Multiplies two positive values and two negative values to verify that matching
+signs produce a positive product.
+
+>>> source
+const pos_left: int = 7
+const pos_right: int = 5
+const neg_left: int = -7
+const neg_right: int = -5
+
+// Verifies multiplication of two positive operands.
+const pos_product: int = pos_left * pos_right
+print(pos_product)
+
+// Verifies multiplication of two negative operands.
+const neg_product: int = neg_left * neg_right
+print(neg_product)
+
+<<< stdout
+35
+35
+
+<<< stderr

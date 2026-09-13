@@ -1,0 +1,24 @@
+# Integer subtraction with mixed signs
+
+Subtracts positive and negative operands in both orders to verify that operand
+order produces the expected signed difference.
+
+>>> source
+const pos_left: int = 7
+const pos_right: int = 5
+const neg_left: int = -7
+const neg_right: int = -5
+
+// Verifies subtraction with the negative operand first.
+const mixed_neg_first: int = neg_left - pos_right
+print(mixed_neg_first)
+
+// Verifies subtraction with the positive operand first.
+const mixed_pos_first: int = pos_left - neg_right
+print(mixed_pos_first)
+
+<<< stdout
+-12
+12
+
+<<< stderr

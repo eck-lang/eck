@@ -1,0 +1,16 @@
+# Integer subtraction near the 64-bit limit
+
+Subtracts 5 from a value just below the signed 64-bit maximum to protect
+arithmetic near the supported upper bound.
+
+>>> source
+const pos_right: int = 5
+const big: int = 9223372036854775800
+
+const big_diff: int = big - pos_right
+print(big_diff)
+
+<<< stdout
+9223372036854775795
+
+<<< stderr

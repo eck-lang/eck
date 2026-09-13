@@ -1,0 +1,27 @@
+# Integer64 comparisons promote mixed operands
+
+Verifies all comparison operators accept every narrower signed integer width
+with int64 while preserving exact ordering.
+
+>>> source
+const narrow8: int8 = 5
+const narrow16: int16 = 5
+const narrow32: int32 = 5
+const wide: int64 = 10
+
+print(narrow8 < wide)
+print(wide <= narrow16)
+print(narrow32 > wide)
+print(wide >= narrow8)
+print(narrow16 == wide)
+print(wide != narrow32)
+
+<<< stdout
+true
+false
+false
+true
+false
+true
+
+<<< stderr

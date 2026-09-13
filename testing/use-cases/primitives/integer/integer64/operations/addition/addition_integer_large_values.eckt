@@ -1,0 +1,16 @@
+# Integer addition near the 64-bit limit
+
+Adds 5 to a value just below the signed 64-bit maximum to protect arithmetic
+near the supported upper bound.
+
+>>> source
+const pos_right: int = 5
+const big: int = 9223372036854775800
+
+const big_sum: int = big + pos_right
+print(big_sum)
+
+<<< stdout
+9223372036854775805
+
+<<< stderr
