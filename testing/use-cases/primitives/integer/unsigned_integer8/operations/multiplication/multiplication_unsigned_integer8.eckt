@@ -1,0 +1,16 @@
+# UnsignedInteger8 multiplication within range
+
+Verifies uint8 multiplication with operands chosen to stay inside the 8-bit
+range through the complete CLI pipeline.
+
+>>> source
+const left: uint8 = 10
+const right: uint8 = 25
+
+const product: uint8 = left * right
+print(product)
+
+<<< stdout
+250
+
+<<< stderr

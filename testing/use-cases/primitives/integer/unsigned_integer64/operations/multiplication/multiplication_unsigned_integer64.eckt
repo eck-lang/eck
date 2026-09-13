@@ -1,0 +1,15 @@
+# UnsignedInteger64 multiplication
+
+Verifies uint multiplication through the complete CLI pipeline.
+
+>>> source
+const left: uint = 7
+const right: uint = 10
+
+const product: uint = left * right
+print(product)
+
+<<< stdout
+70
+
+<<< stderr

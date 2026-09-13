@@ -1,0 +1,16 @@
+# UnsignedInteger64 subtraction of large values
+
+Verifies uint subtraction of large values staying inside the unsigned range
+through the complete CLI pipeline.
+
+>>> source
+const left: uint = 7000000000000000000
+const right: uint = 5000000000000000000
+
+const large_diff: uint = left - right
+print(large_diff)
+
+<<< stdout
+2000000000000000000
+
+<<< stderr

@@ -1,0 +1,16 @@
+# UnsignedInteger64 division with truncation
+
+Verifies uint division truncates toward zero through the complete CLI
+pipeline.
+
+>>> source
+const dividend: uint = 7
+const divisor: uint = 2
+
+const quotient: uint = dividend / divisor
+print(quotient)
+
+<<< stdout
+3
+
+<<< stderr

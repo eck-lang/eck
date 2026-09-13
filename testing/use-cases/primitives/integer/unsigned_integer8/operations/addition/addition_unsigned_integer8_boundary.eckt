@@ -1,0 +1,17 @@
+# UnsignedInteger8 addition at the type boundary
+
+Verifies uint8 addition reaching exactly the 8-bit maximum through the
+complete CLI pipeline. Every operand is uint8: the type has no mixed-type
+operations.
+
+>>> source
+const left: uint8 = 200
+const right: uint8 = 55
+
+const boundary_sum: uint8 = left + right
+print(boundary_sum)
+
+<<< stdout
+255
+
+<<< stderr

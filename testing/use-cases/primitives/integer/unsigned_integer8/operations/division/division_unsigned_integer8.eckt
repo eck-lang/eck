@@ -1,0 +1,16 @@
+# UnsignedInteger8 division with truncation
+
+Verifies uint8 division truncates toward zero through the complete CLI
+pipeline.
+
+>>> source
+const dividend: uint8 = 200
+const divisor: uint8 = 55
+
+const quotient: uint8 = dividend / divisor
+print(quotient)
+
+<<< stdout
+3
+
+<<< stderr

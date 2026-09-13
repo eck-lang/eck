@@ -1,0 +1,16 @@
+# UnsignedInteger64 power
+
+Verifies uint exponentiation through the complete CLI pipeline. The exponent
+is uint as well: the type has no mixed-type operations.
+
+>>> source
+const base: uint = 7
+const exponent: uint = 10
+
+const power: uint = base ** exponent
+print(power)
+
+<<< stdout
+282475249
+
+<<< stderr

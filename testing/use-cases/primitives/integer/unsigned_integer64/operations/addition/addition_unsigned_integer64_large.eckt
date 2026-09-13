@@ -1,0 +1,16 @@
+# UnsignedInteger64 addition of large values
+
+Verifies uint addition of large values near the 64-bit limit through the
+complete CLI pipeline.
+
+>>> source
+const left: uint = 7000000000000000000
+const right: uint = 5000000000000000000
+
+const large_sum: uint = left + right
+print(large_sum)
+
+<<< stdout
+12000000000000000000
+
+<<< stderr

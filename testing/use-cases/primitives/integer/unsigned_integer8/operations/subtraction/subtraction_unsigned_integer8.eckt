@@ -1,0 +1,16 @@
+# UnsignedInteger8 subtraction
+
+Verifies uint8 subtraction staying inside the unsigned range through the
+complete CLI pipeline.
+
+>>> source
+const left: uint8 = 200
+const right: uint8 = 55
+
+const diff: uint8 = left - right
+print(diff)
+
+<<< stdout
+145
+
+<<< stderr

@@ -1,0 +1,17 @@
+# UnsignedInteger8 power within range
+
+Verifies uint8 exponentiation with base and exponent chosen to stay inside
+the 8-bit range through the complete CLI pipeline. The exponent is uint8 as
+well: the type has no mixed-type operations.
+
+>>> source
+const base: uint8 = 2
+const exponent: uint8 = 7
+
+const power: uint8 = base ** exponent
+print(power)
+
+<<< stdout
+128
+
+<<< stderr
