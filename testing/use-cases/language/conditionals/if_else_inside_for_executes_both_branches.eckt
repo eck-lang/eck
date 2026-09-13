@@ -1,0 +1,20 @@
+# If else inside a range loop executes both branches
+
+Verifies the range-loop execution planner preserves an else branch instead of
+using the comparison-only fast path that represents only the true branch.
+
+>>> source
+for (index in 0..3) {
+    if (index == 1) {
+        print("match")
+    } else {
+        print("other")
+    }
+}
+
+<<< stdout
+other
+match
+other
+
+<<< stderr
