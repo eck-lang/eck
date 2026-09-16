@@ -1,0 +1,16 @@
+# Array element write is bounds-checked
+
+Verifies indexed mutation cannot extend an array and reports the requested
+index together with the fixed array length.
+
+>>> source
+let values: int[] = [10]
+values[1] = 20
+
+<<< stdout
+
+<<< stderr
+eck: array index 1 is out of bounds for length 1
+
+<<< exit
+1

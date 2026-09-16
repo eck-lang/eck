@@ -1,0 +1,16 @@
+# Typed empty array compiles and bounds-checks
+
+Verifies an empty array literal is accepted when its element type is declared,
+and reading its only missing element is a runtime bounds error.
+
+>>> source
+let values: int[] = []
+print(values[0])
+
+<<< stdout
+
+<<< stderr
+eck: array index 0 is out of bounds for length 0
+
+<<< exit
+1

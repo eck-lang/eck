@@ -1,0 +1,16 @@
+# Element read past the end is out of bounds
+
+Verifies reading beyond the last element reports a bounds error carrying the
+requested index and the array length.
+
+>>> source
+let values: int[] = [1, 2]
+print(values[5])
+
+<<< stdout
+
+<<< stderr
+eck: array index 5 is out of bounds for length 2
+
+<<< exit
+1

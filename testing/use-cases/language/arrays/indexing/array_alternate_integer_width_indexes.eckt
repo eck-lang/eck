@@ -1,0 +1,17 @@
+# Alternate integer widths index an array
+
+Verifies narrow and arbitrary-width plain integer bindings both convert to
+machine-word indexes and select their corresponding elements.
+
+>>> source
+let values: int[] = [10, 20, 30]
+let narrow: int8 = 1
+let wide: bigint = 2
+print(values[narrow])
+print(values[wide])
+
+<<< stdout
+20
+30
+
+<<< stderr

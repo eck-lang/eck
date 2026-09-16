@@ -1,0 +1,16 @@
+# Inferred complete subtype constrains mutation
+
+Verifies elements with one complete type infer a constrained array, so a later
+compatible centimeter write is normalized to millimeters.
+
+>>> source
+let sizes = [10mm, 20mm]
+sizes[1] = 2cm
+print(sizes[0])
+print(sizes[1])
+
+<<< stdout
+10mm
+20mm
+
+<<< stderr

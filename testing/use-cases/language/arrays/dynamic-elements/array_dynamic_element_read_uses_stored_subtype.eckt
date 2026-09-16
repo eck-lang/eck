@@ -1,0 +1,15 @@
+# Dynamic element read without a prior write keeps its subtype
+
+Verifies a dynamic indexed read of a mixed-subtype array keeps the stored
+subtype, so `10mm` plus `2dm` is converted to the millimeter scale and yields
+`210mm`.
+
+>>> source
+let sizes: int[] = [10mm, 2cm]
+let index = 0
+print(sizes[index] + 2dm)
+
+<<< stdout
+210mm
+
+<<< stderr

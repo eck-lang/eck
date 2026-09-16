@@ -1,0 +1,16 @@
+# String array index is rejected
+
+Verifies element access requires a plain integer index and diagnoses a string
+index with its actual type.
+
+>>> source
+let values: int[] = [10]
+print(values["0"])
+
+<<< stdout
+
+<<< stderr
+eck: an array index must be a plain integer, found `string` at Span { start: 38, end: 41 }
+
+<<< exit
+1

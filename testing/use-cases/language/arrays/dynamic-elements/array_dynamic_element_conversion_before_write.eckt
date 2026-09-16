@@ -1,0 +1,15 @@
+# Dynamic element conversion before a write
+
+Verifies converting a dynamically indexed element to another unit works without
+any prior write: the stored `2cm` converts to the requested millimeters through
+the same rule a standalone centimeter value would use, yielding `20mm`.
+
+>>> source
+let sizes: int[] = [10mm, 2cm]
+let index = 1
+print(sizes[index] -> to(mm))
+
+<<< stdout
+20mm
+
+<<< stderr

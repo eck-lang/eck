@@ -1,0 +1,16 @@
+# Indexed element mutation
+
+Verifies a mutable array binding replaces one zero-based element while later
+reads observe the new value and the other elements stay unchanged.
+
+>>> source
+let values: int[] = [1, 2]
+values[0] = 5
+print(values[0])
+print(values[1])
+
+<<< stdout
+5
+2
+
+<<< stderr

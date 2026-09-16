@@ -1,0 +1,18 @@
+# Logical negation of a dynamic element
+
+Verifies `!` binds its operand tighter than the element access, so the logical
+negation applies to the extracted element rather than to the array. The first
+stored element is `true`, so the negation is `false`, and the conjunction of the
+element with itself stays `true`.
+
+>>> source
+let flags: bool[] = [true, false]
+let index = 0
+print(!flags[index])
+print(flags[index] && flags[index])
+
+<<< stdout
+false
+true
+
+<<< stderr

@@ -1,0 +1,16 @@
+# Negative array index is rejected
+
+Verifies a negative integer cannot be converted to a zero-based machine-word
+index and reports the offending magnitude without truncation.
+
+>>> source
+let values: int[] = [10]
+print(values[-1])
+
+<<< stdout
+
+<<< stderr
+eck: runtime error: array index -1 must be a non-negative integer that fits in a machine word
+
+<<< exit
+1

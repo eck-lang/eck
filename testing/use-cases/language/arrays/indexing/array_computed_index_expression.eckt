@@ -1,0 +1,13 @@
+# Computed integer expression indexes an array
+
+Verifies an integer arithmetic expression may supply the zero-based index and
+selects the element at its computed position.
+
+>>> source
+let values: int[] = [10, 20, 30]
+print(values[1 + 1])
+
+<<< stdout
+30
+
+<<< stderr

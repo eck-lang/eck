@@ -1,0 +1,16 @@
+# Unconstrained mutation rejects an incompatible base
+
+Verifies an unconstrained `int[]` still enforces its base-type contract and
+rejects replacing an integer element with a string.
+
+>>> source
+let values: int[] = [1]
+values[0] = "hello"
+
+<<< stdout
+
+<<< stderr
+eck: string literals are not supported by type `int64` at Span { start: 36, end: 43 }
+
+<<< exit
+1

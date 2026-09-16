@@ -1,0 +1,15 @@
+# Unannotated empty array cannot infer an element type
+
+Verifies an empty array literal without an element type annotation is rejected,
+because no element determines the array's element type.
+
+>>> source
+let values = []
+
+<<< stdout
+
+<<< stderr
+eck: cannot infer the element type of an empty array; add an element type annotation such as `int[]` at Span { start: 13, end: 15 }
+
+<<< exit
+1

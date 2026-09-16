@@ -1,0 +1,18 @@
+# Constrained element subtype converts compatible elements
+
+Verifies an `int<mm>[]` array converts a compatible element expressed in
+another unit to the declared subtype before storage, so 2cm is stored as 20mm
+and 1dm as 100mm.
+
+>>> source
+let sizes: int<mm>[] = [10mm, 2cm, 1dm]
+print(sizes[0])
+print(sizes[1])
+print(sizes[2])
+
+<<< stdout
+10mm
+20mm
+100mm
+
+<<< stderr

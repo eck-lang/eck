@@ -1,0 +1,16 @@
+# Arithmetic on a dynamic conversion that promotes the base type
+
+Verifies a conversion that promotes a candidate magnitude to a fractional
+representation still behaves like the same value outside an array: converting a
+`10mm` element to centimeters yields a decimal centimeter magnitude, and adding
+`1cm` produces `2cm`.
+
+>>> source
+let sizes: int[] = [10mm]
+let index = 0
+print((sizes[index] -> to(cm)) + 1cm)
+
+<<< stdout
+2cm
+
+<<< stderr

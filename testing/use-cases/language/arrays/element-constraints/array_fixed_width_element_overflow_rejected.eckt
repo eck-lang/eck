@@ -1,0 +1,16 @@
+# Fixed-width element rejects an out-of-range value
+
+Verifies an `int64[]` element assignment rejects a literal that does not fit
+the declared integer width instead of widening the element.
+
+>>> source
+let values: int64[] = [1]
+values[0] = 999999999999999999999999999999
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `999999999999999999999999999999` for type `int64`: number too large to fit in target type at Span { start: 38, end: 68 }
+
+<<< exit
+1

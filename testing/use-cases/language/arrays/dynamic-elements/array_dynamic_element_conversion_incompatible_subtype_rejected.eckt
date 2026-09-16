@@ -1,0 +1,18 @@
+# Dynamic element conversion rejects an incompatible stored subtype
+
+Verifies a conversion whose stored subtype has no registered conversion to the
+target reports a clean diagnostic naming the value's complete type and the
+declared target instead of silently converting.
+
+>>> source
+let sizes: int[] = [10mm, 5kg]
+let index = 1
+print(sizes[index] -> to(mm))
+
+<<< stdout
+
+<<< stderr
+eck: conversion from `int64[kg]` to `->to(mm)` is not defined
+
+<<< exit
+1

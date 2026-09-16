@@ -1,0 +1,16 @@
+# Array cannot be an arithmetic operand
+
+Verifies an array value cannot enter scalar arithmetic even when its element
+base type supports the requested operator.
+
+>>> source
+let values: int[] = [1]
+print(values + 1)
+
+<<< stdout
+
+<<< stderr
+eck: an array cannot be used as a scalar operand at Span { start: 30, end: 36 }
+
+<<< exit
+1

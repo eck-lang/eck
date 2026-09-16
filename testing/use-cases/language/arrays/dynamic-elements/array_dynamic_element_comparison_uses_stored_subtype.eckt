@@ -1,0 +1,16 @@
+# Dynamic element comparison keeps its subtype
+
+Verifies a comparison against a dynamic element uses the stored subtype, so a
+millimeter element compares against another millimeter magnitude correctly.
+
+>>> source
+let sizes: int[] = [10mm, 2cm]
+let index = 0
+print(sizes[index] > 5mm)
+print(sizes[index] == 10mm)
+
+<<< stdout
+true
+true
+
+<<< stderr

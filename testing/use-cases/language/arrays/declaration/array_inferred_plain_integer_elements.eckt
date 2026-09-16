@@ -1,0 +1,15 @@
+# Plain integer array inference
+
+Verifies an unannotated literal of plain integers infers an adaptive integer
+array and preserves source order during element access.
+
+>>> source
+let values = [1, 2, 3]
+print(values[0])
+print(values[2])
+
+<<< stdout
+1
+3
+
+<<< stderr

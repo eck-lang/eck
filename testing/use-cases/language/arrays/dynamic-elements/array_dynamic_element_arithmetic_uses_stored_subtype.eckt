@@ -1,0 +1,16 @@
+# Dynamic element write keeps subtype-aware arithmetic
+
+Verifies a dynamic indexed write followed by a dynamic indexed read keeps the
+stored subtype: `3dm` plus `2dm` resolves through the measure rule instead of
+plain integer addition, so the result is `5dm` rather than `5`.
+
+>>> source
+let sizes: int[] = [10mm, 2cm]
+let index = 1
+sizes[index] = 3dm
+print(sizes[index] + 2dm)
+
+<<< stdout
+5dm
+
+<<< stderr

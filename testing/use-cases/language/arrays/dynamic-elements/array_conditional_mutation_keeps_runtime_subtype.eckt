@@ -1,0 +1,17 @@
+# Conditional mutation keeps the runtime element subtype
+
+Verifies a mutation in an unexecuted conditional branch does not make a later
+read assume that branch's subtype; the original millimeter value still adds as
+`11mm`.
+
+>>> source
+let sizes: int[] = [10mm]
+if (false) {
+    sizes[0] = 2cm
+}
+print(sizes[0] + 1mm)
+
+<<< stdout
+11mm
+
+<<< stderr

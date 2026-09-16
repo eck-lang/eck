@@ -1,0 +1,16 @@
+# Indexed assignment requires an array binding
+
+Verifies square-bracket assignment through a scalar binding is rejected before
+runtime because the target has no array element contract.
+
+>>> source
+let value = 10
+value[0] = 20
+
+<<< stdout
+
+<<< stderr
+eck: binding `value` is not an array at Span { start: 15, end: 28 }
+
+<<< exit
+1

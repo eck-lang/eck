@@ -1,0 +1,16 @@
+# Array cannot initialize a scalar binding
+
+Verifies an array value cannot initialize a binding annotated with a scalar
+type even though the array's element base type matches.
+
+>>> source
+let values: int[] = [1, 2]
+let total: int = values
+
+<<< stdout
+
+<<< stderr
+eck: binding `total` expects `int64`, but the initializer is an array at Span { start: 44, end: 50 }
+
+<<< exit
+1

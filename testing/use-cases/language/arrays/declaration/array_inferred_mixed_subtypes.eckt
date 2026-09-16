@@ -1,0 +1,18 @@
+# Inferred array keeps each element subtype
+
+Verifies an untyped array literal whose elements share the `int` base but use
+different measure subtypes infers an unconstrained `int[]` array while each
+element keeps its own subtype.
+
+>>> source
+let sizes = [10mm, 2cm, 3dm]
+print(sizes[0])
+print(sizes[1])
+print(sizes[2])
+
+<<< stdout
+10mm
+2cm
+3dm
+
+<<< stderr

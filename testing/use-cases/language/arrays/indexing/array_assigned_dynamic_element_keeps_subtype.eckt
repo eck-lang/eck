@@ -1,0 +1,17 @@
+# Assigned dynamic element keeps its subtype
+
+Verifies assigning a dynamically indexed element to an existing binding keeps
+the element's complete type, so later arithmetic on that binding still resolves
+through the measure rules and yields `21mm`.
+
+>>> source
+let sizes: int[] = [2cm]
+let index = 0
+let total: int = 0
+total = sizes[index]
+print(total + 1mm)
+
+<<< stdout
+21mm
+
+<<< stderr

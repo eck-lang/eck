@@ -1,0 +1,16 @@
+# Inferred const array mutation is rejected
+
+Verifies immutability applies after array type inference as well as after an
+explicit array annotation.
+
+>>> source
+const values = [1, 2]
+values[0] = 3
+
+<<< stdout
+
+<<< stderr
+eck: cannot assign through immutable binding `values` at Span { start: 22, end: 35 }
+
+<<< exit
+1

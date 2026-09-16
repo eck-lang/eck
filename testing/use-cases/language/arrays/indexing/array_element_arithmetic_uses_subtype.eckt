@@ -1,0 +1,14 @@
+# Element arithmetic uses the stored subtype
+
+Verifies a constant element read preserves the stored subtype, so adding a
+millimeter and a centimeter uses the normal measure arithmetic and yields a
+millimeter result.
+
+>>> source
+let sizes: int[] = [10mm, 2cm]
+print(sizes[0] + sizes[1])
+
+<<< stdout
+30mm
+
+<<< stderr

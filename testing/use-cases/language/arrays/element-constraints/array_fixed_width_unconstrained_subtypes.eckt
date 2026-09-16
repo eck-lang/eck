@@ -1,0 +1,15 @@
+# Fixed-width array preserves unconstrained subtypes
+
+Verifies `int64[]` fixes the integer representation without constraining the
+element subtype, so millimeter and centimeter values remain distinct.
+
+>>> source
+let values: int64[] = [10mm, 2cm]
+print(values[0])
+print(values[1])
+
+<<< stdout
+10mm
+2cm
+
+<<< stderr

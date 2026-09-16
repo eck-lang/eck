@@ -1,0 +1,15 @@
+# Nested array literal is rejected
+
+Verifies the current one-dimensional array contract rejects an array literal
+whose elements are themselves arrays instead of inferring a misleading type.
+
+>>> source
+let values = [[1, 2], [3, 4]]
+
+<<< stdout
+
+<<< stderr
+eck: nested arrays are not supported at Span { start: 14, end: 20 }
+
+<<< exit
+1

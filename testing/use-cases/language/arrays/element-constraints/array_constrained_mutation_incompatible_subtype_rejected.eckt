@@ -1,0 +1,16 @@
+# Constrained mutation rejects an incompatible subtype
+
+Verifies assigning a kilogram value to an `int<mm>[]` element is rejected
+because no conversion between the measure dimensions exists.
+
+>>> source
+let sizes: int<mm>[] = [10mm]
+sizes[0] = 5kg
+
+<<< stdout
+
+<<< stderr
+eck: conversion from `kilogram` to subtype `millimeter` is not defined at Span { start: 41, end: 44 }
+
+<<< exit
+1

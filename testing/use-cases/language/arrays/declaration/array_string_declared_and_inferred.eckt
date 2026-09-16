@@ -1,0 +1,16 @@
+# Declared and inferred string arrays
+
+Verifies string elements work with an explicit `string[]` contract and with
+element-type inference, while both forms preserve source order during reads.
+
+>>> source
+let typed: string[] = ["alice", "bob"]
+let inferred = ["carol", "dave"]
+print(typed[1])
+print(inferred[0])
+
+<<< stdout
+bob
+carol
+
+<<< stderr

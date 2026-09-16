@@ -1,0 +1,19 @@
+# A qualified dynamic index is rejected
+
+Verifies the plain-integer index rule also applies to a dynamically typed
+index, so a stored `1cm` value cannot silently act as the bare index `1`. The
+diagnostic names the value's complete type.
+
+>>> source
+let values: int[] = [10, 20, 30]
+let sizes: int[] = [1cm]
+let index = 0
+print(values[sizes[index]])
+
+<<< stdout
+
+<<< stderr
+eck: an array index must be a plain integer, found `int64[cm]`
+
+<<< exit
+1

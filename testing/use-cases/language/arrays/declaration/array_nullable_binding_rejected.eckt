@@ -1,0 +1,15 @@
+# Nullable array binding is rejected
+
+Verifies an array type cannot carry the scalar nullable marker, keeping the
+array element contract separate from nullable scalar semantics.
+
+>>> source
+let values: int[]? = []
+
+<<< stdout
+
+<<< stderr
+eck: array bindings cannot be nullable at Span { start: 0, end: 23 }
+
+<<< exit
+1

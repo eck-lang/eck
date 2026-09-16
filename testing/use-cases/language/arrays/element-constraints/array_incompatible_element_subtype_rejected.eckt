@@ -1,0 +1,15 @@
+# Element subtype must be convertible to the declared subtype
+
+Verifies a kilogram element cannot initialize an `int<mm>[]` array because no
+conversion from kilogram to millimeter is registered.
+
+>>> source
+let sizes: int<mm>[] = [10mm, 5kg]
+
+<<< stdout
+
+<<< stderr
+eck: conversion from `kilogram` to subtype `millimeter` is not defined at Span { start: 30, end: 33 }
+
+<<< exit
+1

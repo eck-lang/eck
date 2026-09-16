@@ -1,0 +1,15 @@
+# Dynamic element conversion to a type keeps the stored subtype
+
+Verifies a type-only conversion changes the representation while preserving the
+element's own subtype, so a `2cm` element becomes `2cm` in the requested type
+rather than losing its unit.
+
+>>> source
+let sizes: int[] = [2cm]
+let index = 0
+print(sizes[index] -> to(decimal))
+
+<<< stdout
+2cm
+
+<<< stderr

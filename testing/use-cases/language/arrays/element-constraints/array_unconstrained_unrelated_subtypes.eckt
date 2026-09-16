@@ -1,0 +1,17 @@
+# Unconstrained array accepts unrelated subtypes
+
+Verifies a declared `int[]` accepts values from different measure dimensions
+when their base type matches and preserves every stored subtype on access.
+
+>>> source
+let values: int[] = [10mm, 5kg, 2s]
+print(values[0])
+print(values[1])
+print(values[2])
+
+<<< stdout
+10mm
+5kg
+2s
+
+<<< stderr

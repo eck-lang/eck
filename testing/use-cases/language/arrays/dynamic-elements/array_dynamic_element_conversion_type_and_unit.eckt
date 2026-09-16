@@ -1,0 +1,14 @@
+# Dynamic element conversion with a type and a unit
+
+Verifies a conversion naming both a type and a unit dispatches on the stored
+subtype, so a `2cm` element becomes `20mm` in the requested representation.
+
+>>> source
+let sizes: int[] = [2cm]
+let index = 0
+print(sizes[index] -> to(decimal, mm))
+
+<<< stdout
+20mm
+
+<<< stderr

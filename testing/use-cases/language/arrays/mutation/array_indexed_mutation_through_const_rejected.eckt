@@ -1,0 +1,16 @@
+# Indexed mutation through a const array rejected
+
+Verifies an indexed assignment through a `const` array binding is rejected as
+a write to an immutable binding.
+
+>>> source
+const values: int[] = [1]
+values[0] = 2
+
+<<< stdout
+
+<<< stderr
+eck: cannot assign through immutable binding `values` at Span { start: 26, end: 39 }
+
+<<< exit
+1

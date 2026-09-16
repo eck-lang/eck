@@ -1,0 +1,15 @@
+# Explicit-width array with a constrained subtype
+
+Verifies `int64<mm>[]` constrains both the integer representation and the
+measure subtype, converting a centimeter element to millimeters.
+
+>>> source
+let normalized: int64<mm>[] = [10mm, 2cm]
+print(normalized[0])
+print(normalized[1])
+
+<<< stdout
+10mm
+20mm
+
+<<< stderr

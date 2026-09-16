@@ -1,0 +1,14 @@
+# Constrained mutation converts a compatible subtype
+
+Verifies assigning a centimeter value through an `int<mm>[]` element target
+normalizes the value to the declared millimeter subtype before storage.
+
+>>> source
+let sizes: int<mm>[] = [10mm, 20mm]
+sizes[1] = 2cm
+print(sizes[1])
+
+<<< stdout
+20mm
+
+<<< stderr

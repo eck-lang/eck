@@ -1,0 +1,16 @@
+# Element read keeps its subtype for later arithmetic
+
+Verifies `let first = sizes[0]` keeps the stored millimeter subtype, so
+`first + 1mm` uses the normal measure arithmetic and yields 11mm.
+
+>>> source
+let sizes: int[] = [10mm, 2cm]
+let first = sizes[0]
+print(first)
+print(first + 1mm)
+
+<<< stdout
+10mm
+11mm
+
+<<< stderr

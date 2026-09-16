@@ -1,0 +1,13 @@
+# Adaptive initializer widens beyond int64
+
+Verifies an explicitly adaptive `int[]` accepts an initializer larger than
+`int64` and preserves the widened value during element access.
+
+>>> source
+let values: int[] = [999999999999999999999999999999]
+print(values[0])
+
+<<< stdout
+999999999999999999999999999999
+
+<<< stderr

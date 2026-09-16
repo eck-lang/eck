@@ -1,0 +1,15 @@
+# Two dynamic elements combine their stored subtypes
+
+Verifies adding two dynamically indexed elements resolves the operation from
+both stored subtypes, so a millimeter and a centimeter sum to `30mm`.
+
+>>> source
+let left: int[] = [10mm]
+let right: int[] = [2cm]
+let index = 0
+print(left[index] + right[index])
+
+<<< stdout
+30mm
+
+<<< stderr

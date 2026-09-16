@@ -1,0 +1,15 @@
+# Fixed-width initializer overflow is rejected
+
+Verifies an `int64[]` literal rejects an initializer that cannot be represented
+at the declared width instead of widening it.
+
+>>> source
+let values: int64[] = [999999999999999999999999999999]
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `999999999999999999999999999999` for type `int64`: number too large to fit in target type at Span { start: 23, end: 53 }
+
+<<< exit
+1

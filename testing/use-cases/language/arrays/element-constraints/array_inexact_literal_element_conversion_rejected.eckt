@@ -1,0 +1,16 @@
+# Inexact literal element conversion rejected while compiling
+
+Verifies a literal element the declared element type cannot represent is
+rejected at compile time: `5mm` divided into whole centimeters has no exact
+integer value, so `int<cm>[]` cannot store it.
+
+>>> source
+let sizes: int<cm>[] = [5mm]
+
+<<< stdout
+
+<<< stderr
+eck: array element `int64[mm]` cannot be represented as `int64[cm]` at Span { start: 24, end: 27 }
+
+<<< exit
+1

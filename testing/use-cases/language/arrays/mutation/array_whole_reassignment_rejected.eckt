@@ -1,0 +1,16 @@
+# Whole-array reassignment rejected
+
+Verifies reassigning an array binding as a whole is rejected in favor of
+assigning individual elements.
+
+>>> source
+let values: int[] = [1]
+values = [2]
+
+<<< stdout
+
+<<< stderr
+eck: whole-array reassignment is not supported; assign individual elements at Span { start: 24, end: 36 }
+
+<<< exit
+1

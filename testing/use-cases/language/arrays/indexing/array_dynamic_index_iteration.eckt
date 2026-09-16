@@ -1,0 +1,17 @@
+# Array elements read through a loop index
+
+Verifies a `for` range variable indexes the array so every element is read in
+order through a dynamic index.
+
+>>> source
+let values: int[] = [10, 20, 30]
+for (index in 0..3) {
+    print(values[index])
+}
+
+<<< stdout
+10
+20
+30
+
+<<< stderr

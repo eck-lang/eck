@@ -1,0 +1,17 @@
+# Dynamic array index is bounds-checked
+
+Verifies a computed index beyond the final element reports the same requested
+index and array length as constant access.
+
+>>> source
+let values: int[] = [10]
+let index = 2
+print(values[index])
+
+<<< stdout
+
+<<< stderr
+eck: array index 2 is out of bounds for length 1
+
+<<< exit
+1

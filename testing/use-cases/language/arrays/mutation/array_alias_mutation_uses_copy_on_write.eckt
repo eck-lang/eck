@@ -1,0 +1,17 @@
+# Array alias mutation preserves value semantics
+
+Verifies mutating an array copied into another binding uses copy-on-write, so
+the original keeps its element while the copy observes the replacement.
+
+>>> source
+let original: int[] = [10, 20]
+let copy = original
+copy[0] = 99
+print(original[0])
+print(copy[0])
+
+<<< stdout
+10
+99
+
+<<< stderr

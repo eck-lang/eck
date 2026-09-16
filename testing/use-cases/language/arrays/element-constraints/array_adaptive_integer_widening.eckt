@@ -1,0 +1,14 @@
+# Adaptive int element accepts a wider value
+
+Verifies an `int[]` element widens beyond the declared `int64` width when the
+assigned literal exceeds it, unlike a fixed-width `int64[]` element.
+
+>>> source
+let values: int[] = [1]
+values[0] = 999999999999999999999999999999
+print(values[0])
+
+<<< stdout
+999999999999999999999999999999
+
+<<< stderr

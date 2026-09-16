@@ -1,0 +1,14 @@
+# Dynamic element negation keeps its subtype
+
+Verifies negating a dynamic element subtracts from a zero of the same subtype,
+so the sign flips while the millimeter unit is preserved.
+
+>>> source
+let sizes: int[] = [10mm]
+let index = 0
+print(-sizes[index])
+
+<<< stdout
+-10mm
+
+<<< stderr
