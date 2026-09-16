@@ -124,14 +124,84 @@ impl Compiler<'_> {
                 }
             }
         };
+        // An element reaches storage only through the array it initializes, so
+        // the destination contract is applied here for both a declared and an
+        // inferred element type.
+        let elements = typed_elements
+            .into_iter()
+            .map(|element| self.prepare_element_for_storage(element, array_type))
+            .collect::<Result<Vec<_>, CompileError>>()?;
         Ok(TypedExpression {
             output: Some(array_type.element),
             kind: TypedExpressionKind::ArrayLiteral {
                 array_type,
-                elements: typed_elements,
+                elements,
             },
             span: *span,
         })
+    }
+
+    /// Applies one array element representation contract to a compiled element.
+    ///
+    /// Every value that enters array storage must satisfy the element contract
+    /// the array declared, but the value only exists after its expression has
+    /// been evaluated, and evaluating an integer expression may temporarily
+    /// promote it to a wider representation. The destination contract therefore
+    /// has to survive until the value crosses into storage, which this resolves
+    /// by wrapping the element in [`TypedExpressionKind::ElementStore`] whenever
+    /// the runtime has to enforce it.
+    ///
+    /// Three destinations need no runtime work, and their element crosses into
+    /// storage unchanged. An adaptive `int` element accepts the representation
+    /// its expression produced, an element base without a fixed integer
+    /// representation has no width to enforce, and a fixed-width element whose
+    /// expression already proves to carry the declared representation is not
+    /// checked again.
+    pub(super) fn prepare_element_for_storage(
+        &self,
+        element: TypedExpression,
+        array_type: ArrayType,
+    ) -> Result<TypedExpression, CompileError> {
+        let span = element.span;
+        if array_type.adaptive_integer
+            || !self
+                .registry
+                .is_integer_type(array_type.element.base)
+                .map_err(|error| CompileError::core(span, error))?
+            || Self::element_representation_is_exact(&element)
+        {
+            return Ok(element);
+        }
+        Ok(TypedExpression {
+            output: element.output,
+            kind: TypedExpressionKind::ElementStore {
+                element: array_type.element,
+                expression: Box::new(element),
+            },
+            span,
+        })
+    }
+
+    /// Reports whether an element already carries the declared representation.
+    ///
+    /// Only the shapes the compiler can prove leave a fixed-width store free of
+    /// runtime work. A literal is exactly the value it names, a conversion that
+    /// names a base type always produces that base, and a read of a fixed-width
+    /// array element carries the representation that array's own stores enforced.
+    /// Every other shape may have promoted to a wider integer while it was
+    /// evaluated, so its value is checked when it crosses into storage.
+    fn element_representation_is_exact(element: &TypedExpression) -> bool {
+        match &element.kind {
+            TypedExpressionKind::Literal(_) => true,
+            TypedExpressionKind::Convert {
+                target_base: Some(_),
+                ..
+            } => true,
+            TypedExpressionKind::ElementAccess { array, .. } => array
+                .array_type()
+                .is_some_and(|array_type| !array_type.adaptive_integer),
+            _ => false,
+        }
     }
 
     /// Computes the element type shared by every element of an inferred literal.

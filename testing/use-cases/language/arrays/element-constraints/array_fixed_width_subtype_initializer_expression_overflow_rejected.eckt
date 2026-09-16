@@ -1,0 +1,17 @@
+# Fixed-width subtype initializer rejects a numeric overflow
+
+Verifies an `int8<mm>[]` initializer applies the numeric representation contract
+to an evaluated element expression: the unit of `127mm + 1mm` is the declared
+one, but the resulting magnitude `128mm` cannot be stored as `int8`.
+
+>>> source
+let a: int8<mm>[] = [127mm + 1mm]
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `128mm` cannot be represented as `int8[mm]`
+
+<<< exit
+1

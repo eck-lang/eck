@@ -1,0 +1,19 @@
+# Fixed-width initializer rejects an out-of-range cast element
+
+Verifies a cast feeding a fixed-width initializer keeps the existing `->to`
+conversion semantics: converting `300` to `int8` fails because the requested
+representation cannot hold the magnitude, so the element cannot enter the
+`int8[]` array.
+
+>>> source
+let source: int64 = 300
+let a: int8[] = [source->to(int8)]
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: runtime error: cannot convert `int64` to `int8`
+
+<<< exit
+1

@@ -1,0 +1,16 @@
+# Fixed-width subtype store normalizes a promoted value
+
+Verifies an `int8<mm>[]` store accepts a millimeter value that was evaluated
+with a wider temporary representation. `2mm + 127mm` overflows `int8`, and
+subtracting `127mm` again yields `2mm`, which fits `int8` and stays the
+declared millimeter subtype.
+
+>>> source
+let a: int8<mm>[] = [2mm]
+a[0] = (a[0] + 127mm) - 127mm
+print(a[0])
+
+<<< stdout
+2mm
+
+<<< stderr

@@ -1,5 +1,5 @@
 use ir::{
-    BindingId, LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock, TypedExpression,
+    ArrayType, BindingId, LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock, TypedExpression,
     TypedExpressionKind, TypedProgram, TypedRangePlan, TypedScalePlan, TypedScaleStep,
     TypedStatement,
 };
@@ -739,4 +739,267 @@ fn for_range_rejects_non_integer_bounds() {
             .to_string()
             .contains("for range bounds must be integers")
     );
+}
+
+/// Builds a registry with a narrow and a wide integer representation.
+///
+/// The array store tests need types whose formatters and parsers round-trip a
+/// magnitude, because the store boundary normalizes a widened value by
+/// formatting it and re-parsing it as the declared representation. The narrow
+/// type also owns the index contract the store statements use.
+fn narrow_integer_registry() -> (
+    Registry,
+    language_core::TypeId,
+    language_core::TypeId,
+    language_core::SubtypeId,
+) {
+    let mut registry = Registry::new();
+    let narrow = registry.allocate_type_id();
+    let wide = registry.allocate_type_id();
+    registry
+        .register_type(TypeDescriptor {
+            id: narrow,
+            name: "narrow",
+            is_integer: true,
+            parse_numeric_literal: Some(parse_narrow_integer),
+            parse_string_literal: None,
+            parse_regex_literal: None,
+            parse_boolean_literal: None,
+            parse_null_literal: None,
+            format: format_narrow_integer,
+        })
+        .unwrap();
+    registry
+        .register_type(TypeDescriptor {
+            id: wide,
+            name: "wide",
+            is_integer: true,
+            parse_numeric_literal: Some(parse_wide_integer),
+            parse_string_literal: None,
+            parse_regex_literal: None,
+            parse_boolean_literal: None,
+            parse_null_literal: None,
+            format: format_wide_integer,
+        })
+        .unwrap();
+    let millimeter = registry.allocate_subtype_id();
+    registry
+        .register_subtype(SubtypeDescriptor {
+            id: millimeter,
+            name: "millimeter",
+            suffixes: &["mm"],
+        })
+        .unwrap();
+    (registry, narrow, wide, millimeter)
+}
+
+/// Parses one narrow magnitude, rejecting what the representation cannot hold.
+fn parse_narrow_integer(
+    raw_text: &str,
+    type_id: language_core::TypeId,
+) -> Result<Value, CoreError> {
+    raw_text
+        .parse::<i8>()
+        .map(|value| Value::new(type_id, value))
+        .map_err(|error| CoreError::InvalidLiteral {
+            raw_text: raw_text.to_string(),
+            type_name: "narrow".to_string(),
+            message: error.to_string(),
+        })
+}
+
+/// Parses one wide magnitude.
+fn parse_wide_integer(raw_text: &str, type_id: language_core::TypeId) -> Result<Value, CoreError> {
+    raw_text
+        .parse::<i16>()
+        .map(|value| Value::new(type_id, value))
+        .map_err(|error| CoreError::InvalidLiteral {
+            raw_text: raw_text.to_string(),
+            type_name: "wide".to_string(),
+            message: error.to_string(),
+        })
+}
+
+/// Formats one narrow magnitude.
+fn format_narrow_integer(value: &Value) -> Result<String, CoreError> {
+    value
+        .downcast_ref::<i8>()
+        .map(i8::to_string)
+        .ok_or_else(|| CoreError::InvalidValueRepresentation("narrow".to_string()))
+}
+
+/// Formats one wide magnitude.
+fn format_wide_integer(value: &Value) -> Result<String, CoreError> {
+    value
+        .downcast_ref::<i16>()
+        .map(i16::to_string)
+        .ok_or_else(|| CoreError::InvalidValueRepresentation("wide".to_string()))
+}
+
+/// Converts one narrow magnitude into a zero-based array index.
+fn extract_narrow_index(value: &Value) -> Result<usize, CoreError> {
+    let index = value
+        .downcast_ref::<i8>()
+        .copied()
+        .ok_or_else(|| CoreError::InvalidValueRepresentation("narrow".to_string()))?;
+    usize::try_from(index).map_err(|_| CoreError::Runtime(format!("index {index} is negative")))
+}
+
+/// Builds a program that declares `narrow[]` and stores `stored` as element 0.
+///
+/// The element expression is a literal whose declared output is `narrow` while
+/// the value it produces uses the wide representation. That is exactly the state
+/// an integer expression leaves behind after it promoted while it was evaluated,
+/// so the store boundary has to normalize or reject the value on its own.
+fn store_boundary_program(
+    narrow: language_core::TypeId,
+    element: ValueType,
+    stored: Value,
+) -> TypedProgram {
+    let initial_element = Value::new(narrow, 127_i8).with_subtype(element.subtype);
+    TypedProgram {
+        statements: vec![
+            TypedStatement::VariableDeclaration {
+                name: "values".to_string(),
+                binding: BindingId(0),
+                slot: LocalVariableSlot(0),
+                mutable: true,
+                value_type: ValueType::plain(narrow),
+                expression: TypedExpression {
+                    output: Some(ValueType::plain(narrow)),
+                    kind: TypedExpressionKind::ArrayLiteral {
+                        array_type: ArrayType {
+                            element: ValueType::plain(narrow),
+                            adaptive_integer: false,
+                        },
+                        elements: vec![TypedExpression {
+                            output: Some(ValueType::plain(narrow)),
+                            kind: TypedExpressionKind::Literal(initial_element),
+                            span: SPAN,
+                        }],
+                    },
+                    span: SPAN,
+                },
+                span: SPAN,
+            },
+            TypedStatement::IndexedAssignment {
+                name: "values".to_string(),
+                binding: BindingId(0),
+                slot: LocalVariableSlot(0),
+                index: TypedExpression {
+                    output: Some(ValueType::plain(narrow)),
+                    kind: TypedExpressionKind::Literal(Value::new(narrow, 0_i8)),
+                    span: SPAN,
+                },
+                constant_index: Some(0),
+                index_extractor: extract_narrow_index,
+                expression: TypedExpression {
+                    output: Some(ValueType::plain(narrow)),
+                    kind: TypedExpressionKind::ElementStore {
+                        element,
+                        expression: Box::new(TypedExpression {
+                            output: Some(ValueType::plain(narrow)),
+                            kind: TypedExpressionKind::Literal(stored),
+                            span: SPAN,
+                        }),
+                    },
+                    span: SPAN,
+                },
+                span: SPAN,
+            },
+        ],
+        local_slot_count: 1,
+        bindings: Vec::new(),
+    }
+}
+
+/// Executes every statement of `program` and returns the local slots it leaves.
+///
+/// A rejected store can only be checked by inspecting the array value it did not
+/// replace, which the public `execute` entry point does not expose.
+fn execute_collecting_locals(
+    program: &TypedProgram,
+    registry: &Registry,
+) -> (Result<(), RuntimeError>, Vec<Option<Value>>) {
+    let mut runtime = Runtime {
+        registry,
+        configuration: registry.default_runtime_configuration(),
+        local_values: vec![None; program.local_slot_count],
+        loop_control: None,
+    };
+    let mut result = Ok(());
+    for statement in &program.statements {
+        if let Err(error) = runtime.execute_statement(statement) {
+            result = Err(error);
+            break;
+        }
+    }
+    (result, runtime.local_values)
+}
+
+/// Returns the elements stored in one array local slot.
+fn stored_elements(slot: &Option<Value>) -> &[Value] {
+    slot.as_ref()
+        .expect("the array binding is initialized")
+        .downcast_ref::<ArrayValue>()
+        .expect("the local slot holds an array")
+        .elements()
+}
+
+/// Verifies a value that widened temporarily is normalized before storage.
+#[test]
+fn normalizes_a_temporarily_widened_element_before_storing_it() {
+    let (registry, narrow, wide, _) = narrow_integer_registry();
+    let program =
+        store_boundary_program(narrow, ValueType::plain(narrow), Value::new(wide, 100_i16));
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    result.unwrap();
+    let elements = stored_elements(&locals[0]);
+    assert_eq!(elements[0].type_id(), narrow);
+    assert_eq!(elements[0].downcast_ref::<i8>(), Some(&100));
+}
+
+/// Verifies a value the declared representation cannot hold is rejected.
+#[test]
+fn rejects_a_widened_element_the_declared_representation_cannot_hold() {
+    let (registry, narrow, wide, _) = narrow_integer_registry();
+    let program =
+        store_boundary_program(narrow, ValueType::plain(narrow), Value::new(wide, 128_i16));
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    let error = result.unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("array element `128` cannot be represented as `narrow`")
+    );
+    let elements = stored_elements(&locals[0]);
+    assert_eq!(elements[0].type_id(), narrow);
+    assert_eq!(elements[0].downcast_ref::<i8>(), Some(&127));
+}
+
+/// Verifies a normalized element keeps its unit and the declared subtype wins.
+#[test]
+fn keeps_the_element_unit_when_normalizing_a_widened_element() {
+    let (registry, narrow, wide, millimeter) = narrow_integer_registry();
+    let stored = Value::new(wide, 100_i16).with_subtype(Some(millimeter));
+    let unconstrained = store_boundary_program(narrow, ValueType::plain(narrow), stored.clone());
+
+    let (result, locals) = execute_collecting_locals(&unconstrained, &registry);
+
+    result.unwrap();
+    let elements = stored_elements(&locals[0]);
+    assert_eq!(elements[0].subtype_id(), Some(millimeter));
+    assert_eq!(elements[0].downcast_ref::<i8>(), Some(&100));
+
+    let constrained =
+        store_boundary_program(narrow, ValueType::qualified(narrow, millimeter), stored);
+    let (result, locals) = execute_collecting_locals(&constrained, &registry);
+    result.unwrap();
+    let elements = stored_elements(&locals[0]);
+    assert_eq!(elements[0].subtype_id(), Some(millimeter));
+    assert_eq!(elements[0].downcast_ref::<i8>(), Some(&100));
 }

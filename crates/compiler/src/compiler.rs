@@ -578,7 +578,10 @@ impl Compiler<'_> {
             .array_type
             .ok_or_else(|| CompileError::new(span, format!("binding `{name}` is not an array")))?;
         let (typed_index, constant_index, index_extractor) = self.compile_array_index(index)?;
-        let typed_expression = self.compile_array_element(expression, array_type)?;
+        // The element crosses into storage here, so its destination contract is
+        // applied before the store is planned.
+        let element = self.compile_array_element(expression, array_type)?;
+        let typed_expression = self.prepare_element_for_storage(element, array_type)?;
         // A written element the compiler cannot type precisely makes that slot
         // dynamic, so later reads of it keep dispatching on the stored subtype.
         let element_slot = if typed_expression.dynamic_complete_type() {

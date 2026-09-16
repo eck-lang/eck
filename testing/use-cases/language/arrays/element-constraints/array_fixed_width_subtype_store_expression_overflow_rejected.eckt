@@ -1,0 +1,19 @@
+# Fixed-width subtype store rejects a numeric overflow
+
+Verifies an `int8<mm>[]` element enforces its numeric representation as well as
+its unit. `127mm + 1mm` stays a millimeter length but its magnitude `128mm`
+does not fit `int8`, so the store is rejected instead of accepting the value
+because the unit matches.
+
+>>> source
+let a: int8<mm>[] = [127mm]
+a[0] = a[0] + 1mm
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `128mm` cannot be represented as `int8[mm]`
+
+<<< exit
+1

@@ -1,0 +1,17 @@
+# int16 element store rejects a value past its upper bound
+
+Verifies the element representation boundary holds for `int16[]`: `32767 + 1`
+is evaluated as `int32`, and storing that result is rejected.
+
+>>> source
+let a: int16[] = [32767]
+a[0] = a[0] + 1
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `32768` cannot be represented as `int16`
+
+<<< exit
+1

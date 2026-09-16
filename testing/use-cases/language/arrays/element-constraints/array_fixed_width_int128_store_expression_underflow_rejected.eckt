@@ -1,0 +1,18 @@
+# int128 element store rejects a value below its lower bound
+
+Verifies the negative `int128` bound is enforced as well: subtracting `2` from
+the `int128` minimum is evaluated as `bigint`, and storing that result into
+`int128[]` is rejected.
+
+>>> source
+let a: int128[] = [-170141183460469231731687303715884105727]
+a[0] = a[0] - 2
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `-170141183460469231731687303715884105729` cannot be represented as `int128`
+
+<<< exit
+1

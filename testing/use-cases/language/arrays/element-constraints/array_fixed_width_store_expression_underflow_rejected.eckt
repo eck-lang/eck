@@ -1,0 +1,17 @@
+# Fixed-width element store rejects an underflowed expression
+
+Verifies `a[0] = a[0] - 2` on an `int8[]` array holding `-127` is rejected
+instead of storing the promoted `int16` result `-129`.
+
+>>> source
+let a: int8[] = [-127]
+a[0] = a[0] - 2
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `-129` cannot be represented as `int8`
+
+<<< exit
+1

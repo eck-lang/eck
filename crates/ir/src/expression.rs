@@ -70,6 +70,9 @@ impl TypedExpression {
             } => *dynamic_subtype,
             TypedExpressionKind::DynamicBinary { dynamic_result, .. } => *dynamic_result,
             TypedExpressionKind::DynamicConvert { dispatch, .. } => dispatch.dynamic_result,
+            TypedExpressionKind::ElementStore { expression, .. } => {
+                expression.dynamic_complete_type()
+            }
             _ => false,
         }
     }
@@ -191,6 +194,24 @@ pub enum TypedExpressionKind {
     ArrayLiteral {
         array_type: ArrayType,
         elements: Vec<TypedExpression>,
+    },
+    /// Applies an array element representation contract to one evaluated value.
+    ///
+    /// This node marks the exact point where a value crosses from the
+    /// representation its expression produced into the representation the
+    /// destination array declared. `element` is that destination contract: the
+    /// complete element type every stored value must carry, whose base
+    /// representation the runtime enforces and whose optional subtype the stored
+    /// value keeps.
+    ///
+    /// The compiler inserts the node only when the crossing needs runtime work.
+    /// An element it proved already carries the declared representation, and
+    /// every adaptive `int` element, cross into storage without it. The node
+    /// belongs to the stored expression, so a literal initializer and an indexed
+    /// assignment reach their destination through the same prepared contract.
+    ElementStore {
+        element: ValueType,
+        expression: Box<TypedExpression>,
     },
     /// Reads one zero-based element, using an immediate index when available.
     ElementAccess {

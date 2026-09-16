@@ -1,0 +1,18 @@
+# int16 element store rejects a value below its lower bound
+
+Verifies the negative `int16` bound is enforced as well: subtracting `2` from
+`-32767` is evaluated as `int32`, and storing that result into `int16[]` is
+rejected.
+
+>>> source
+let a: int16[] = [-32767]
+a[0] = a[0] - 2
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `-32769` cannot be represented as `int16`
+
+<<< exit
+1

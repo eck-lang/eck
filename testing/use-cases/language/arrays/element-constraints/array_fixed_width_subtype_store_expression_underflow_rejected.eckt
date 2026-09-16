@@ -1,0 +1,18 @@
+# Fixed-width subtype store rejects a numeric underflow
+
+Verifies the negative magnitude bound of an `int8<mm>[]` element is enforced:
+`-127mm - 2mm` is still a millimeter length, but its magnitude `-129mm` does
+not fit `int8`.
+
+>>> source
+let a: int8<mm>[] = [-127mm]
+a[0] = a[0] - 2mm
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `-129mm` cannot be represented as `int8[mm]`
+
+<<< exit
+1

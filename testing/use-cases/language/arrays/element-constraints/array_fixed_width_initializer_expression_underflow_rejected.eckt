@@ -1,0 +1,17 @@
+# Fixed-width initializer rejects an underflowed element expression
+
+Verifies an `int8[]` initializer refuses a value below the declared range even
+though evaluating `-127 - 2` promoted the result to `int16`. The negative
+bound is checked exactly like the positive one.
+
+>>> source
+let a: int8[] = [-127 - 2]
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `-129` cannot be represented as `int8`
+
+<<< exit
+1

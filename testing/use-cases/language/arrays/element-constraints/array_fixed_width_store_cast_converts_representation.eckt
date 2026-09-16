@@ -1,0 +1,16 @@
+# Fixed-width store accepts a cast element in the declared representation
+
+Verifies a cast feeding a fixed-width store follows the same conversion rules
+as a scalar conversion: the computed `int64` magnitude `75` is cast to `int8`
+and stored in an `int8[]` element without a further representation check.
+
+>>> source
+let source: int64 = 300
+let a: int8[] = [0]
+a[0] = (source / 4)->to(int8)
+print(a[0])
+
+<<< stdout
+75
+
+<<< stderr

@@ -1,0 +1,18 @@
+# int128 element store rejects a value past its upper bound
+
+Verifies the widest fixed representation refuses a value it cannot hold:
+adding `1` to the `int128` maximum is evaluated as `bigint`, and storing that
+result into `int128[]` is rejected.
+
+>>> source
+let a: int128[] = [170141183460469231731687303715884105727]
+a[0] = a[0] + 1
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `170141183460469231731687303715884105728` cannot be represented as `int128`
+
+<<< exit
+1

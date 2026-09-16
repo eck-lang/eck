@@ -212,6 +212,7 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
             | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::ElementStore { .. }
             | TypedExpressionKind::ElementAccess { .. }
             | TypedExpressionKind::DynamicBinary { .. }
             | TypedExpressionKind::DynamicComparison { .. }
@@ -309,6 +310,7 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
             | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::ElementStore { .. }
             | TypedExpressionKind::ElementAccess { .. }
             | TypedExpressionKind::DynamicBinary { .. }
             | TypedExpressionKind::DynamicComparison { .. }
@@ -451,6 +453,9 @@ impl<'registry> Runtime<'registry> {
                 for element in elements {
                     Self::count_expression_local_uses(element, local_uses);
                 }
+            }
+            TypedExpressionKind::ElementStore { expression, .. } => {
+                Self::count_expression_local_uses(expression, local_uses);
             }
             TypedExpressionKind::ElementAccess { array, index, .. } => {
                 Self::count_expression_local_uses(array, local_uses);

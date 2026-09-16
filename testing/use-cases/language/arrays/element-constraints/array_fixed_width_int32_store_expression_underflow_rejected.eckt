@@ -1,0 +1,18 @@
+# int32 element store rejects a value below its lower bound
+
+Verifies the negative `int32` bound is enforced as well: subtracting `2` from
+`-2147483647` is evaluated as `int64`, and storing that result into `int32[]`
+is rejected.
+
+>>> source
+let a: int32[] = [-2147483647]
+a[0] = a[0] - 2
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `-2147483649` cannot be represented as `int32`
+
+<<< exit
+1

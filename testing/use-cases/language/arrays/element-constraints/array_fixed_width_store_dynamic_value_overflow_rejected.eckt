@@ -1,0 +1,21 @@
+# Fixed-width store rejects an overflowed dynamic value
+
+Verifies the representation boundary is enforced for values the compiler
+cannot fold: the element read through a dynamic index is combined with a
+`int8` binding, and the promoted `128` is rejected when it crosses into
+`int8[]` storage.
+
+>>> source
+let a: int8[] = [1]
+let limit: int8 = 127
+let i = 0
+a[i] = limit + a[i]
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `128` cannot be represented as `int8`
+
+<<< exit
+1

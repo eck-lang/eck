@@ -1,0 +1,18 @@
+# int64 element store rejects a value below its lower bound
+
+Verifies the negative `int64` bound is enforced as well: subtracting `2` from
+`-9223372036854775807` is evaluated as `int128`, and storing that result into
+`int64[]` is rejected.
+
+>>> source
+let a: int64[] = [-9223372036854775807]
+a[0] = a[0] - 2
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `-9223372036854775809` cannot be represented as `int64`
+
+<<< exit
+1

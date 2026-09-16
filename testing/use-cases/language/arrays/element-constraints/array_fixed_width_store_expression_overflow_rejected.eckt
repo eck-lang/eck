@@ -1,0 +1,18 @@
+# Fixed-width element store rejects an overflowed expression
+
+Verifies `a[0] = a[0] + 1` on an `int8[]` array is rejected instead of storing
+the promoted `int16` result. The indexed assignment crosses the array element
+representation boundary, so `128` cannot enter an `int8` element.
+
+>>> source
+let a: int8[] = [127]
+a[0] = a[0] + 1
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `128` cannot be represented as `int8`
+
+<<< exit
+1

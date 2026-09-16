@@ -1,0 +1,22 @@
+# Fixed-width store normalizes a temporarily promoted value
+
+Verifies an `int8[]` store accepts a value that only needed a wider
+representation while it was evaluated. `a[i] + 127` overflows `int8` and is
+computed as `int16`, and subtracting `127` again yields `2`, which the declared
+`int8` representation can hold. The stored element is normalized back to that
+representation, which the second print proves by using the element as an array
+index that only an actual `int8` payload satisfies.
+
+>>> source
+let a: int8[] = [2]
+let i = 0
+a[i] = (a[i] + 127) - 127
+print(a[0])
+let b: int[] = [7, 8, 9]
+print(b[a[0]])
+
+<<< stdout
+2
+9
+
+<<< stderr

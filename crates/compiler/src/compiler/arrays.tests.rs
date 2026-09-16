@@ -289,6 +289,105 @@ fn widens_adaptive_int_element_beyond_declared_width() {
     assert_ne!(output.base, first_array_type(&program).element.base);
 }
 
+/// Verifies a fixed-width store carries the declared element contract.
+///
+/// Reading an `int8` element and adding to it may promote the result while it is
+/// evaluated, so the store must carry the destination the value has to satisfy.
+#[test]
+fn embeds_the_declared_contract_in_a_fixed_width_store() {
+    let registry = array_registry();
+    let int8 = registry.type_by_name("int8").expect("int8 is registered");
+    let program = parser::parse("let values: int8[] = [127]\nvalues[0] = values[0] + 1\n").unwrap();
+    let program = compile(&program, &registry).unwrap();
+    let element = first_indexed_assignment_element(&program);
+    let TypedExpressionKind::ElementStore {
+        element: destination,
+        expression,
+    } = &element.kind
+    else {
+        panic!("a fixed-width store must carry its destination contract");
+    };
+    assert_eq!(*destination, ValueType::plain(int8));
+    assert_eq!(expression.output, Some(ValueType::plain(int8)));
+}
+
+/// Verifies a provably representable literal store needs no runtime contract.
+#[test]
+fn stores_a_fixed_width_literal_without_a_contract_node() {
+    let program = compile_source("let values: int8[] = [10]\nvalues[0] = 20\n");
+    let element = first_indexed_assignment_element(&program);
+    assert!(matches!(element.kind, TypedExpressionKind::Literal(_)));
+}
+
+/// Verifies a fixed-width element read is trusted at a fixed-width destination.
+///
+/// Element storage only ever holds values the declared representation accepted,
+/// so a read of such an array needs no second check when it is stored again.
+#[test]
+fn stores_a_proven_fixed_width_read_without_a_contract_node() {
+    let program = compile_source("let source: int8[] = [10]\nlet copy: int8[] = [source[0]]\n");
+    let elements = array_literal_elements(binding_initializer(&program, "copy"));
+    assert!(matches!(
+        elements[0].kind,
+        TypedExpressionKind::ElementAccess { .. }
+    ));
+}
+
+/// Verifies an adaptive `int` store keeps its auto-widening semantics.
+#[test]
+fn keeps_adaptive_integer_stores_out_of_the_fixed_width_boundary() {
+    let registry = array_registry();
+    let program = parser::parse("let values: int[] = [1]\nvalues[0] = values[0] + 1\n").unwrap();
+    let program = compile(&program, &registry).unwrap();
+    let element = first_indexed_assignment_element(&program);
+    assert!(matches!(element.kind, TypedExpressionKind::Binary { .. }));
+}
+
+/// Verifies a constrained store carries the declared unit as part of its contract.
+#[test]
+fn embeds_the_declared_subtype_in_a_constrained_store() {
+    let registry = array_registry();
+    let int8 = registry.type_by_name("int8").expect("int8 is registered");
+    let millimeter = registry.subtype_by_suffix("mm").expect("mm is registered");
+    let program =
+        parser::parse("let sizes: int8<mm>[] = [10mm]\nsizes[0] = sizes[0] + 1mm\n").unwrap();
+    let program = compile(&program, &registry).unwrap();
+    let element = first_indexed_assignment_element(&program);
+    let TypedExpressionKind::ElementStore { element, .. } = &element.kind else {
+        panic!("a fixed-width subtype store must carry its destination contract");
+    };
+    assert_eq!(*element, ValueType::qualified(int8, millimeter));
+}
+
+/// Verifies an inferred fixed-width element is checked like a declared one.
+#[test]
+fn checks_an_inferred_fixed_width_array_element() {
+    let program = compile_source("let x: int8 = 127\nlet y: int8 = 1\nlet values = [x + y]\n");
+    let elements = array_literal_elements(binding_initializer(&program, "values"));
+    assert!(matches!(
+        elements[0].kind,
+        TypedExpressionKind::ElementStore { .. }
+    ));
+}
+
+/// Returns the element expression of the first indexed assignment in `program`.
+fn first_indexed_assignment_element(program: &TypedProgram) -> &TypedExpression {
+    for statement in &program.statements {
+        if let TypedStatement::IndexedAssignment { expression, .. } = statement {
+            return expression;
+        }
+    }
+    panic!("program contains no indexed assignment");
+}
+
+/// Returns the compiled elements of an array literal expression.
+fn array_literal_elements(expression: &TypedExpression) -> &[TypedExpression] {
+    match &expression.kind {
+        TypedExpressionKind::ArrayLiteral { elements, .. } => elements,
+        _ => panic!("expression is not an array literal"),
+    }
+}
+
 /// Verifies whole-array reassignment is rejected in favor of element assignment.
 #[test]
 fn rejects_whole_array_reassignment() {
@@ -443,7 +542,7 @@ fn dispatches_dynamic_element_conversion() {
     let program = compile_source(
         "let sizes: int[] = [10mm, 2cm]\n\
          let index = 1\n\
-         let millimeters = sizes[index] -> to(mm)\n",
+         let millimeters = sizes[index]->to(mm)\n",
     );
     let millimeters = binding_initializer(&program, "millimeters");
     let TypedExpressionKind::DynamicConvert { dispatch, .. } = &millimeters.kind else {
@@ -463,7 +562,7 @@ fn dispatches_dynamic_conversion_after_dynamic_write() {
         "let sizes: int[] = [10mm, 2cm]\n\
          let index = 1\n\
          sizes[index] = 3dm\n\
-         let millimeters = sizes[index] -> to(mm)\n",
+         let millimeters = sizes[index]->to(mm)\n",
     );
     let millimeters = binding_initializer(&program, "millimeters");
     assert!(
@@ -482,7 +581,7 @@ fn compiles_dynamic_conversion_with_a_partial_candidate_set() {
     let program = compile_source(
         "let sizes: int[] = [10mm]\n\
          let index = 0\n\
-         let mass = sizes[index] -> to(kg)\n",
+         let mass = sizes[index]->to(kg)\n",
     );
     let mass = binding_initializer(&program, "mass");
     let TypedExpressionKind::DynamicConvert { dispatch, .. } = &mass.kind else {

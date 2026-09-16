@@ -2,6 +2,7 @@ use ir::{TypedBinaryExecutionPlan, TypedExpression, TypedExpressionKind, TypedSc
 use language_core::{
     ArrayValue, BinaryOperator, BinaryOperatorDescriptor, ComparisonOperator, CoreError,
     ExecutionContext, Registry, ResolvedBinaryOperator, ResolvedComparison, Scale, Value,
+    ValueType,
 };
 use syntax::LogicalOperator;
 
@@ -252,6 +253,15 @@ impl<'registry> Runtime<'registry> {
                     ArrayValue::new(values),
                 )))
             }
+            TypedExpressionKind::ElementStore {
+                element,
+                expression,
+            } => {
+                let value = self.eval(expression)?.ok_or_else(|| {
+                    RuntimeError::Message("array element returned no value".into())
+                })?;
+                Ok(Some(self.normalize_element_for_storage(value, *element)?))
+            }
             TypedExpressionKind::ElementAccess {
                 array,
                 index,
@@ -429,6 +439,49 @@ impl<'registry> Runtime<'registry> {
             }
         }
         Ok(scaled)
+    }
+
+    /// Applies one array element contract to a value about to enter storage.
+    ///
+    /// Evaluating an integer expression may temporarily promote its result to a
+    /// wider representation, which stays legal as long as the final value fits
+    /// the representation the destination array declared. The value is therefore
+    /// normalized back to that representation here, before the array is touched,
+    /// so a rejected store leaves the stored element unchanged.
+    ///
+    /// The destination subtype wins when the array constrains one; otherwise the
+    /// value keeps the unit it was stored with. Returns an error naming the value
+    /// when the declared representation cannot hold it.
+    fn normalize_element_for_storage(
+        &self,
+        value: Value,
+        element: ValueType,
+    ) -> Result<Value, RuntimeError> {
+        if value.type_id() == element.base {
+            return Ok(value);
+        }
+        let subtype = element.subtype.or(value.subtype_id());
+        // The cast reads only the magnitude, so the value may keep its subtype
+        // while it is converted; the result is re-qualified below.
+        let normalized = match self.cast_base(&value, element.base) {
+            Ok(normalized) => normalized,
+            Err(_) => return Err(self.element_representation_error(&value, element)),
+        };
+        Ok(normalized.with_subtype(subtype))
+    }
+
+    /// Reports a value the declared array element representation cannot hold.
+    fn element_representation_error(&self, value: &Value, element: ValueType) -> RuntimeError {
+        match self
+            .registry
+            .format_value_with_configuration(value, &self.configuration)
+        {
+            Ok(formatted) => RuntimeError::Message(format!(
+                "array element `{formatted}` cannot be represented as `{}`",
+                self.registry.value_type_name(element)
+            )),
+            Err(error) => RuntimeError::from(error),
+        }
     }
 
     /// Casts one plain numeric value to the requested base representation.

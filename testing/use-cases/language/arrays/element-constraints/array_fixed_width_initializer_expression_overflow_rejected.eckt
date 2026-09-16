@@ -1,0 +1,18 @@
+# Fixed-width initializer rejects an overflowed element expression
+
+Verifies an `int8[]` initializer refuses a value the declared width cannot
+hold even though evaluating `127 + 1` promoted the result to `int16`. The
+destination representation contract applies to the final value, not to the
+temporary width used while the expression was evaluated.
+
+>>> source
+let a: int8[] = [127 + 1]
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `128` cannot be represented as `int8`
+
+<<< exit
+1

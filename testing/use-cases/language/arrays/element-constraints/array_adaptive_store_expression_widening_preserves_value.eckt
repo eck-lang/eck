@@ -1,0 +1,16 @@
+# Adaptive int store keeps an arithmetic widening instead of rejecting it
+
+Verifies an adaptive `int[]` element still widens when arithmetic requires it.
+Adding `1` to the `int64` maximum overflows the declared width, and the widened
+`int128` result is stored rather than rejected, which keeps `int[]` distinct
+from a fixed-width `int64[]`.
+
+>>> source
+let a: int[] = [9223372036854775807]
+a[0] = a[0] + 1
+print(a[0])
+
+<<< stdout
+9223372036854775808
+
+<<< stderr

@@ -1,0 +1,18 @@
+# int64 element store rejects a value past its upper bound
+
+Verifies the widest fixed representation below `int128` still refuses a value
+it cannot hold: `9223372036854775807 + 1` is evaluated as `int128`, and
+storing that result into `int64[]` is rejected.
+
+>>> source
+let a: int64[] = [9223372036854775807]
+a[0] = a[0] + 1
+print(a[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `9223372036854775808` cannot be represented as `int64`
+
+<<< exit
+1

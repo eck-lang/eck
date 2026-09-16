@@ -20,6 +20,11 @@ let inferred = [1, 2, 3]
 * An empty array requires an explicit element type because its type cannot be
   inferred from its contents.
 
+The physical storage a future `int[]` may use is a design question rather than
+part of the syntax contract; the intended direction is recorded in
+[the adaptive integer array design note](../adaptive-integer-arrays.md).
+Fixed-width arrays keep their strict representation contract either way.
+
 ```eck
 let values: int[] = []
 let inferred = [] // Invalid: element type cannot be inferred.
