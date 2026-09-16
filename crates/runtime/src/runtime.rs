@@ -2,8 +2,8 @@ use ir::{
     LocalVariableSlot, TypedBlock, TypedExpression, TypedProgram, TypedRangePlan, TypedStatement,
 };
 use language_core::{
-    BinaryOperator, BinaryOperatorDescriptor, ComparisonExecutor, ComparisonOperator, Registry,
-    ResolvedBinaryOperator, RuntimeConfiguration, Value, ValueType,
+    ArrayValue, BinaryOperator, BinaryOperatorDescriptor, ComparisonExecutor, ComparisonOperator,
+    IndexExtractor, Registry, ResolvedBinaryOperator, RuntimeConfiguration, Value, ValueType,
 };
 
 use crate::RuntimeError;
@@ -76,6 +76,20 @@ impl<'registry> Runtime<'registry> {
                     .ok_or_else(|| RuntimeError::Message("assignment returned no value".into()))?;
                 self.store_local_value(*slot, value);
             }
+            TypedStatement::IndexedAssignment {
+                slot,
+                index,
+                constant_index,
+                index_extractor,
+                expression,
+                ..
+            } => self.execute_indexed_assignment(
+                *slot,
+                index,
+                *constant_index,
+                *index_extractor,
+                expression,
+            )?,
             TypedStatement::Block(block) => self.execute_block(block)?,
             TypedStatement::If {
                 condition,
@@ -121,6 +135,63 @@ impl<'registry> Runtime<'registry> {
             TypedStatement::Break { .. } => self.loop_control = Some(LoopControl::Break),
             TypedStatement::Continue { .. } => self.loop_control = Some(LoopControl::Continue),
         }
+        Ok(())
+    }
+
+    /// Replaces one element of the mutable array stored in `slot`.
+    ///
+    /// The element is evaluated before the array is touched, so a failing
+    /// element expression leaves the array unchanged. The array payload is
+    /// mutated in place while it is uniquely owned and copied on write
+    /// otherwise, which preserves the value semantics of an array shared with
+    /// another binding instead of aliasing the change into the other binding.
+    fn execute_indexed_assignment(
+        &mut self,
+        slot: LocalVariableSlot,
+        index: &TypedExpression,
+        constant_index: Option<usize>,
+        index_extractor: IndexExtractor,
+        expression: &TypedExpression,
+    ) -> Result<(), RuntimeError> {
+        let element = self.eval(expression)?.ok_or_else(|| {
+            RuntimeError::Message("array element assignment returned no value".into())
+        })?;
+        let index = match constant_index {
+            Some(index) => index,
+            None => {
+                let index_value = self
+                    .eval(index)?
+                    .ok_or_else(|| RuntimeError::Message("array index returned no value".into()))?;
+                self.require_plain_index(&index_value)?;
+                index_extractor(&index_value)?
+            }
+        };
+        let mut array_value = self.local_values[slot.0]
+            .take()
+            .ok_or_else(|| RuntimeError::Message("array binding is not initialized".into()))?;
+        let length = array_value
+            .downcast_ref::<ArrayValue>()
+            .map(|array| array.elements().len())
+            .ok_or_else(|| RuntimeError::Message("value is not an array".into()))?;
+        if index >= length {
+            self.store_local_value(slot, array_value);
+            return Err(RuntimeError::Message(format!(
+                "array index {index} is out of bounds for length {length}"
+            )));
+        }
+        if let Some(array) = array_value.downcast_mut::<ArrayValue>() {
+            array.elements_mut()[index] = element;
+        } else {
+            let array_type = array_value.type_id();
+            let mut elements = array_value
+                .downcast_ref::<ArrayValue>()
+                .expect("the value was verified as an array above")
+                .elements()
+                .to_vec();
+            elements[index] = element;
+            array_value = Value::new(array_type, ArrayValue::new(elements));
+        }
+        self.store_local_value(slot, array_value);
         Ok(())
     }
 
@@ -285,6 +356,22 @@ impl<'registry> Runtime<'registry> {
     /// Stores a local value in its compiler-assigned slot.
     fn store_local_value(&mut self, slot: LocalVariableSlot, value: Value) {
         self.local_values[slot.0] = Some(value);
+    }
+
+    /// Requires a dynamically computed index to be an unqualified integer.
+    ///
+    /// The compiler rejects a statically qualified index because the element
+    /// index is a position, not a magnitude. A dynamically typed index cannot be
+    /// checked at compile time, so the same rule is enforced here, keeping the
+    /// two paths consistent instead of silently reading a qualified magnitude.
+    pub(super) fn require_plain_index(&self, index: &Value) -> Result<(), RuntimeError> {
+        if index.subtype_id().is_some() {
+            return Err(RuntimeError::Message(format!(
+                "an array index must be a plain integer, found `{}`",
+                self.registry.value_type_name(index.value_type())
+            )));
+        }
+        Ok(())
     }
 }
 #[cfg(test)]

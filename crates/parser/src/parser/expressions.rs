@@ -90,6 +90,10 @@ impl Parser {
     fn parse_arithmetic(&mut self, min_bp: u8) -> Result<Expression, ParseError> {
         let mut left_operand = self.parse_primary()?;
         loop {
+            if matches!(&self.peek().kind, TokenKind::LeftBracket) {
+                left_operand = self.parse_postfix_element_access(left_operand)?;
+                continue;
+            }
             if matches!(&self.peek().kind, TokenKind::Dot) {
                 left_operand = self.parse_postfix_field_access(left_operand)?;
                 continue;
@@ -121,6 +125,24 @@ impl Parser {
             };
         }
         Ok(left_operand)
+    }
+
+    /// Parses one postfix zero-based array element access.
+    fn parse_postfix_element_access(
+        &mut self,
+        expression: Expression,
+    ) -> Result<Expression, ParseError> {
+        self.advance();
+        let index = self.parse_expression(0)?;
+        let end = self.expect_simple(TokenKind::RightBracket)?.span.end;
+        Ok(Expression::ElementAccess {
+            span: Span {
+                start: expression.span().start,
+                end,
+            },
+            expression: Box::new(expression),
+            index: Box::new(index),
+        })
     }
 
     /// Parses a postfix `.field` access without materializing a row object.
@@ -231,6 +253,7 @@ impl Parser {
             TokenKind::Null => Ok(Expression::Null { span: token.span }),
             TokenKind::Ident(name) => self.parse_identifier_expression(token.span, name),
             TokenKind::Frame => self.parse_frame_literal(token.span.start),
+            TokenKind::LeftBracket => self.parse_array_literal(token.span.start),
             TokenKind::LeftParenthesis => {
                 let expression = self.parse_expression(0)?;
                 self.expect_simple(TokenKind::RightParenthesis)?;
@@ -238,6 +261,31 @@ impl Parser {
             }
             _ => Err(self.error_at(token.span, "expected expression")),
         }
+    }
+
+    /// Parses a bracketed array literal, including multiline element lists.
+    fn parse_array_literal(&mut self, start: usize) -> Result<Expression, ParseError> {
+        self.skip_newlines();
+        let mut elements = Vec::new();
+        if !matches!(&self.peek().kind, TokenKind::RightBracket) {
+            loop {
+                elements.push(self.parse_expression(0)?);
+                self.skip_newlines();
+                if !matches!(&self.peek().kind, TokenKind::Comma) {
+                    break;
+                }
+                self.advance();
+                self.skip_newlines();
+                if matches!(&self.peek().kind, TokenKind::RightBracket) {
+                    break;
+                }
+            }
+        }
+        let end = self.expect_simple(TokenKind::RightBracket)?.span.end;
+        Ok(Expression::ArrayLiteral {
+            elements,
+            span: Span { start, end },
+        })
     }
 
     /// Parses `frame { column: [values] }` into explicit column-oriented syntax.
@@ -336,9 +384,14 @@ impl Parser {
         })
     }
 
-    /// Parses a prefix logical negation with primary-expression precedence.
+    /// Parses a prefix logical negation above every binary operator.
+    ///
+    /// The operand is parsed with a binding power higher than every binary
+    /// operator but still through the postfix loop, so `!values[0]` negates the
+    /// element read just as `-values[0]` negates it, instead of indexing the
+    /// negated array.
     fn parse_logical_not(&mut self, start: Span) -> Result<Expression, ParseError> {
-        let operand = self.parse_primary()?;
+        let operand = self.parse_arithmetic(6)?;
         let span = Span {
             start: start.start,
             end: operand.span().end,

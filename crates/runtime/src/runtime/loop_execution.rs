@@ -211,6 +211,11 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::LogicalNot { .. }
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
+            | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::ElementAccess { .. }
+            | TypedExpressionKind::DynamicBinary { .. }
+            | TypedExpressionKind::DynamicComparison { .. }
+            | TypedExpressionKind::DynamicConvert { .. }
             | TypedExpressionKind::Pipe { .. } => None,
         }
     }
@@ -303,6 +308,11 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::LogicalNot { .. }
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
+            | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::ElementAccess { .. }
+            | TypedExpressionKind::DynamicBinary { .. }
+            | TypedExpressionKind::DynamicComparison { .. }
+            | TypedExpressionKind::DynamicConvert { .. }
             | TypedExpressionKind::Pipe { .. } => Ok(false),
         }
     }
@@ -366,6 +376,12 @@ impl<'registry> Runtime<'registry> {
                 }
             }
             TypedStatement::Configuration { .. } => {}
+            TypedStatement::IndexedAssignment {
+                index, expression, ..
+            } => {
+                Self::count_expression_local_uses(index, local_uses);
+                Self::count_expression_local_uses(expression, local_uses);
+            }
             TypedStatement::Break { .. } | TypedStatement::Continue { .. } => {}
         }
     }
@@ -394,11 +410,22 @@ impl<'registry> Runtime<'registry> {
                 left_operand,
                 right_operand,
                 ..
+            }
+            | TypedExpressionKind::DynamicBinary {
+                left_operand,
+                right_operand,
+                ..
+            }
+            | TypedExpressionKind::DynamicComparison {
+                left_operand,
+                right_operand,
+                ..
             } => {
                 Self::count_expression_local_uses(left_operand, local_uses);
                 Self::count_expression_local_uses(right_operand, local_uses);
             }
-            TypedExpressionKind::Convert { expression, .. } => {
+            TypedExpressionKind::Convert { expression, .. }
+            | TypedExpressionKind::DynamicConvert { expression, .. } => {
                 Self::count_expression_local_uses(expression, local_uses);
             }
             TypedExpressionKind::LogicalNot { operand } => {
@@ -419,6 +446,15 @@ impl<'registry> Runtime<'registry> {
                 for argument in arguments {
                     Self::count_expression_local_uses(argument, local_uses);
                 }
+            }
+            TypedExpressionKind::ArrayLiteral { elements, .. } => {
+                for element in elements {
+                    Self::count_expression_local_uses(element, local_uses);
+                }
+            }
+            TypedExpressionKind::ElementAccess { array, index, .. } => {
+                Self::count_expression_local_uses(array, local_uses);
+                Self::count_expression_local_uses(index, local_uses);
             }
         }
     }

@@ -68,6 +68,13 @@ pub enum Statement {
         expression: Expression,
         span: Span,
     },
+    /// Replaces one zero-based element of an existing mutable array binding.
+    IndexedAssignment {
+        name: String,
+        index: Expression,
+        expression: Expression,
+        span: Span,
+    },
     Block(Block),
     If {
         condition: Expression,

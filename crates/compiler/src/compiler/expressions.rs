@@ -111,6 +111,8 @@ impl Compiler<'_> {
                         slot: variable.slot,
                         nullable: variable.nullable
                             && !self.narrowed_bindings.contains_key(&variable.binding),
+                        array_type: variable.array_type,
+                        dynamic_complete_type: variable.dynamic_complete_type,
                     },
                     span: *span,
                 })
@@ -121,17 +123,36 @@ impl Compiler<'_> {
                 span,
             } => {
                 let operand = self.compile_expression(operand, expected)?;
-                self.require_non_nullable_expression(&operand)?;
+                self.require_scalar_expression(&operand)?;
                 let operand_type = operand
                     .output
                     .ok_or_else(|| CompileError::new(operand.span, "unary operand has no value"))?;
                 match operator {
                     UnaryOperator::Negation => {
-                        let zero = self
+                        let plain_zero = self
                             .registry
                             .parse_numeric("0", Some(operand_type.base))
-                            .map_err(|error| CompileError::core(*span, error))?
-                            .with_subtype(operand_type.subtype);
+                            .map_err(|error| CompileError::core(*span, error))?;
+                        if operand.dynamic_complete_type() {
+                            // `0 - operand` must select the operand's own subtype
+                            // rule, so the generated zero mirrors the candidate
+                            // subtype while the runtime supplies the plain zero.
+                            let left_operand = TypedExpression {
+                                output: Some(plain_zero.value_type()),
+                                kind: TypedExpressionKind::Literal(plain_zero),
+                                span: *span,
+                            };
+                            return self.dynamic_binary(
+                                CoreBinaryOperator::Subtraction,
+                                left_operand,
+                                ValueType::plain(operand_type.base),
+                                operand,
+                                operand_type,
+                                super::arrays::DynamicOperands::MirroredLeft,
+                                *span,
+                            );
+                        }
+                        let zero = plain_zero.with_subtype(operand_type.subtype);
                         let resolution = self
                             .registry
                             .resolve_binary_operation(
@@ -193,8 +214,8 @@ impl Compiler<'_> {
                 };
                 let mut left_operand = self.compile_expression(left_operand, operand_expected)?;
                 let mut right_operand = self.compile_expression(right_operand, operand_expected)?;
-                self.require_non_nullable_expression(&left_operand)?;
-                self.require_non_nullable_expression(&right_operand)?;
+                self.require_scalar_expression(&left_operand)?;
+                self.require_scalar_expression(&right_operand)?;
                 let mut left_operand_type = left_operand.output.ok_or_else(|| {
                     CompileError::new(left_operand.span, "left operand has no value")
                 })?;
@@ -231,6 +252,30 @@ impl Compiler<'_> {
                 // operand as a fraction of the left operand, so consult the
                 // relative index before the ordinary operator index. Any other
                 // relative failure still reports the relative error.
+                let dynamic_operands = match (
+                    left_operand.dynamic_complete_type(),
+                    right_operand.dynamic_complete_type(),
+                ) {
+                    (true, true) => Some(super::arrays::DynamicOperands::Both),
+                    (true, false) => Some(super::arrays::DynamicOperands::Left),
+                    (false, true) => Some(super::arrays::DynamicOperands::Right),
+                    (false, false) => None,
+                };
+                // An operand whose complete type is only known at runtime cannot
+                // be resolved to one operator here. The dispatch table instead
+                // pre-resolves every candidate subtype so the runtime selects the
+                // plan the operand's own subtype calls for.
+                if let Some(operands) = dynamic_operands {
+                    return self.dynamic_binary(
+                        core_binary_operator,
+                        left_operand,
+                        left_operand_type,
+                        right_operand,
+                        right_operand_type,
+                        operands,
+                        *span,
+                    );
+                }
                 let resolution = match core_binary_operator {
                     CoreBinaryOperator::Addition | CoreBinaryOperator::Subtraction => {
                         match self.registry.resolve_subtype_relative_rule(
@@ -364,8 +409,8 @@ impl Compiler<'_> {
                 // `int == decimal` inside a `bool` declaration.
                 let left_operand = self.compile_expression(left_operand, None)?;
                 let right_operand = self.compile_expression(right_operand, None)?;
-                self.require_non_nullable_expression(&left_operand)?;
-                self.require_non_nullable_expression(&right_operand)?;
+                self.require_scalar_expression(&left_operand)?;
+                self.require_scalar_expression(&right_operand)?;
                 let left_operand_type = left_operand.output.ok_or_else(|| {
                     CompileError::new(left_operand.span, "left comparison operand has no value")
                 })?;
@@ -380,6 +425,26 @@ impl Compiler<'_> {
                     ComparisonOperator::Greater => CoreComparisonOperator::Greater,
                     ComparisonOperator::GreaterOrEqual => CoreComparisonOperator::GreaterOrEqual,
                 };
+                let dynamic_operands = match (
+                    left_operand.dynamic_complete_type(),
+                    right_operand.dynamic_complete_type(),
+                ) {
+                    (true, true) => Some(super::arrays::DynamicOperands::Both),
+                    (true, false) => Some(super::arrays::DynamicOperands::Left),
+                    (false, true) => Some(super::arrays::DynamicOperands::Right),
+                    (false, false) => None,
+                };
+                if let Some(operands) = dynamic_operands {
+                    return self.dynamic_comparison(
+                        core_comparison_operator,
+                        left_operand,
+                        left_operand_type,
+                        right_operand,
+                        right_operand_type,
+                        operands,
+                        *span,
+                    );
+                }
                 let resolution = self
                     .registry
                     .resolve_comparison_operation(
@@ -406,8 +471,8 @@ impl Compiler<'_> {
             } => {
                 let left_operand = self.compile_expression(left_operand, None)?;
                 let right_operand = self.compile_expression(right_operand, None)?;
-                self.require_non_nullable_expression(&left_operand)?;
-                self.require_non_nullable_expression(&right_operand)?;
+                self.require_scalar_expression(&left_operand)?;
+                self.require_scalar_expression(&right_operand)?;
                 let left_operand_type = left_operand.output.ok_or_else(|| {
                     CompileError::new(left_operand.span, "left logical operand has no value")
                 })?;
@@ -432,7 +497,7 @@ impl Compiler<'_> {
                 span,
             } => {
                 let typed_expression = self.compile_expression(expression, expected)?;
-                self.require_non_nullable_expression(&typed_expression)?;
+                self.require_scalar_expression(&typed_expression)?;
                 let source = typed_expression.output.ok_or_else(|| {
                     CompileError::new(expression.span(), "a void expression cannot be converted")
                 })?;
@@ -474,7 +539,7 @@ impl Compiler<'_> {
                     return self.compile_measure_to(expression, arguments, *span);
                 }
                 let typed_base = self.compile_expression(expression, None)?;
-                self.require_non_nullable_expression(&typed_base)?;
+                self.require_scalar_expression(&typed_base)?;
                 let base_type = typed_base.output.ok_or_else(|| {
                     CompileError::new(expression.span(), "pipe receiver has no value")
                 })?;
@@ -483,7 +548,7 @@ impl Compiler<'_> {
                 argument_types.push(base_type.base);
                 for argument in arguments {
                     let typed = self.compile_expression(argument, None)?;
-                    self.require_non_nullable_expression(&typed)?;
+                    self.require_scalar_expression(&typed)?;
                     let ty = typed.output.ok_or_else(|| {
                         CompileError::new(
                             argument.span(),
@@ -529,7 +594,7 @@ impl Compiler<'_> {
                 let mut argument_types = Vec::with_capacity(arguments.len());
                 for argument in arguments {
                     let typed = self.compile_expression(argument, None)?;
-                    self.require_non_nullable_expression(&typed)?;
+                    self.require_scalar_expression(&typed)?;
                     let ty = typed.output.ok_or_else(|| {
                         CompileError::new(
                             argument.span(),
@@ -556,6 +621,41 @@ impl Compiler<'_> {
                     kind: TypedExpressionKind::Call {
                         function,
                         arguments: typed_arguments,
+                    },
+                    span: *span,
+                })
+            }
+            Expression::ArrayLiteral { .. } => self.compile_array_expression(expression, None),
+            Expression::ElementAccess {
+                expression: array,
+                index,
+                span,
+            } => {
+                let typed_array = self.compile_expression(array, None)?;
+                let array_type = typed_array.array_type().ok_or_else(|| {
+                    CompileError::new(array.span(), "only an array can be indexed with `[]`")
+                })?;
+                let (typed_index, constant_index, index_extractor) =
+                    self.compile_array_index(index)?;
+                let (output, dynamic_subtype) = match array_type.element.subtype {
+                    // A constrained contract fixes the complete element type, and
+                    // every stored element is converted to it before storage.
+                    Some(_) => (array_type.element, false),
+                    None => match self.array_element_type(&typed_array, constant_index) {
+                        // A recorded literal element keeps its own complete type.
+                        Some(Some(element_type)) => (element_type, false),
+                        // Without a static record the stored subtype governs.
+                        Some(None) | None => (array_type.element, true),
+                    },
+                };
+                Ok(TypedExpression {
+                    output: Some(output),
+                    kind: TypedExpressionKind::ElementAccess {
+                        array: Box::new(typed_array),
+                        index: Box::new(typed_index),
+                        constant_index,
+                        index_extractor,
+                        dynamic_subtype,
                     },
                     span: *span,
                 })
@@ -599,12 +699,13 @@ impl Compiler<'_> {
             ));
         }
         let typed_receiver = self.compile_expression(receiver, None)?;
-        self.require_non_nullable_expression(&typed_receiver)?;
+        self.require_scalar_expression(&typed_receiver)?;
         let source = typed_receiver.output.ok_or_else(|| {
             CompileError::new(receiver.span(), "a void expression cannot be converted")
         })?;
         let mut target_base: Option<TypeId> = None;
         let mut target_subtype: Option<language_core::SubtypeId> = None;
+        let mut target_names: Vec<String> = Vec::with_capacity(arguments.len());
         for argument in arguments {
             let Expression::Variable { name, .. } = argument else {
                 return Err(CompileError::new(
@@ -612,6 +713,7 @@ impl Compiler<'_> {
                     "conversion targets must be bare type or unit names, e.g. `->to(decimal)`, `->to(MB)`, or `->to(decimal, MB)`",
                 ));
             };
+            target_names.push(name.clone());
             let is_type = self.registry.type_by_name(name).is_some();
             let is_subtype = self.registry.subtype_by_suffix(name).is_some();
             match (is_type, is_subtype) {
@@ -672,6 +774,20 @@ impl Compiler<'_> {
                 }
             }
         }
+        // An extracted element keeps the subtype it was stored with, so the
+        // target must be resolved for every candidate source subtype instead of
+        // the declared base alone.
+        if typed_receiver.dynamic_complete_type() {
+            let target_description = format!("`->to({})`", target_names.join(", "));
+            return self.dynamic_convert(
+                typed_receiver,
+                source,
+                target_base,
+                target_subtype,
+                target_description,
+                span,
+            );
+        }
         let (conversion, output) = match (target_base, target_subtype) {
             (Some(base), Some(subtype)) => {
                 let resolved = self
@@ -717,7 +833,7 @@ impl Compiler<'_> {
     }
 
     /// Resolves and parses every operation needed to apply one subtype scale.
-    fn compile_scale_plan(
+    pub(super) fn compile_scale_plan(
         &self,
         base_type: TypeId,
         scale: Scale,

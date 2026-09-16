@@ -92,6 +92,27 @@ impl Registry {
             .ok_or(CoreError::UnknownSubtypeId(id))
     }
 
+    /// Returns the number of dense dispatch slots a complete value can occupy.
+    ///
+    /// Slot `0` addresses an unqualified value and slot `1 + index` addresses a
+    /// qualified value, so the compiler can build a subtype dispatch table that
+    /// the runtime indexes arithmetically instead of performing a lookup.
+    pub fn subtype_dispatch_width(&self) -> usize {
+        self.next_subtype_id as usize + 1
+    }
+
+    /// Returns the dense dispatch slot assigned to one optional subtype.
+    ///
+    /// The slot is `0` for an unqualified value and `1 + index` for a qualified
+    /// one, matching [`Registry::subtype_dispatch_width`]. Slot arithmetic keeps
+    /// dynamic subtype dispatch free of hash lookups on the hot path.
+    pub fn subtype_dispatch_slot(&self, subtype: Option<SubtypeId>) -> usize {
+        match subtype {
+            Some(subtype) => 1 + subtype.index as usize,
+            None => 0,
+        }
+    }
+
     /// Registers how one binary operation combines two optional subtypes.
     ///
     /// `None` denotes a plain, unqualified value. The rule can choose an output

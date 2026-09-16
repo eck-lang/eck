@@ -36,6 +36,7 @@ impl Extension for Integer128Extension {
             parse_null_literal: None,
             format: formatting::format,
         })?;
+        registry.register_index_extractor(id, value::to_index)?;
         operations::register(registry, id)?;
         comparisons::register(registry)
     }

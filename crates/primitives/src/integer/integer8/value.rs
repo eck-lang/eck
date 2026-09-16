@@ -8,6 +8,19 @@ pub(crate) fn get(value: &Value) -> Result<i8, CoreError> {
         .ok_or_else(|| CoreError::InvalidValueRepresentation("int8".into()))
 }
 
+/// Converts this signed 8-bit value into a zero-based array index.
+///
+/// Negative magnitudes cannot address an element and are rejected rather than
+/// wrapped, so `array[-1]` never silently reads the last element.
+pub(crate) fn to_index(value: &Value) -> Result<usize, CoreError> {
+    let integer = get(value)?;
+    usize::try_from(integer).map_err(|_| {
+        CoreError::Runtime(format!(
+            "array index {integer} must be a non-negative integer that fits in a machine word"
+        ))
+    })
+}
+
 /// Reports whether a failure is a checked fixed-width overflow.
 ///
 /// Context-aware `int8` operators use this to decide between propagating the

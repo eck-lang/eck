@@ -44,6 +44,17 @@ pub enum Expression {
         columns: Vec<FrameLiteralColumn>,
         span: Span,
     },
+    /// A source array literal whose element contract is inferred or supplied by a binding.
+    ArrayLiteral {
+        elements: Vec<Expression>,
+        span: Span,
+    },
+    /// Zero-based postfix access to one array element.
+    ElementAccess {
+        expression: Box<Expression>,
+        index: Box<Expression>,
+        span: Span,
+    },
     Unary {
         operator: UnaryOperator,
         operand: Box<Expression>,
@@ -98,6 +109,8 @@ impl Expression {
             | Expression::Variable { span, .. }
             | Expression::FieldAccess { span, .. }
             | Expression::FrameLiteral { span, .. }
+            | Expression::ArrayLiteral { span, .. }
+            | Expression::ElementAccess { span, .. }
             | Expression::Unary { span, .. }
             | Expression::Binary { span, .. }
             | Expression::Comparison { span, .. }

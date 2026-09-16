@@ -1,5 +1,6 @@
 use language_core::{
-    ConfigurationOverride, ResolvedBinaryOperator, ResolvedComparison, Value, ValueType,
+    ConfigurationOverride, IndexExtractor, ResolvedBinaryOperator, ResolvedComparison, Value,
+    ValueType,
 };
 use syntax::Span;
 
@@ -50,6 +51,17 @@ pub enum TypedStatement {
         name: String,
         binding: BindingId,
         slot: LocalVariableSlot,
+        expression: TypedExpression,
+        span: Span,
+    },
+    /// Replaces one element in an existing mutable array slot.
+    IndexedAssignment {
+        name: String,
+        binding: BindingId,
+        slot: LocalVariableSlot,
+        index: TypedExpression,
+        constant_index: Option<usize>,
+        index_extractor: IndexExtractor,
         expression: TypedExpression,
         span: Span,
     },

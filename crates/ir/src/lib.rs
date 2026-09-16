@@ -11,7 +11,9 @@ mod statement;
 
 pub use binding::{BindingId, BindingMetadata, LocalVariableSlot};
 pub use expression::{
-    TypedBinaryExecutionPlan, TypedExpression, TypedExpressionKind, TypedScalePlan, TypedScaleStep,
+    ArrayType, TypedBinaryDispatch, TypedBinaryExecutionPlan, TypedBinaryPlan,
+    TypedComparisonDispatch, TypedConversionDispatch, TypedConversionPlan, TypedExpression,
+    TypedExpressionKind, TypedScalePlan, TypedScaleStep,
 };
 pub use program::TypedProgram;
 pub use statement::{TypedBlock, TypedRangePlan, TypedStatement};

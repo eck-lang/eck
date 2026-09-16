@@ -2,6 +2,35 @@ use std::{any::Any, sync::Arc};
 
 use crate::{SubtypeId, TypeId, ValueType};
 
+/// Contiguous runtime storage for an ECK array.
+///
+/// Each element remains a complete [`Value`], which preserves its concrete
+/// base representation and optional subtype in unconstrained arrays.
+#[derive(Clone)]
+pub struct ArrayValue {
+    elements: Vec<Value>,
+}
+
+impl ArrayValue {
+    /// Creates an array from values already validated by the compiler.
+    #[inline]
+    pub fn new(elements: Vec<Value>) -> Self {
+        Self { elements }
+    }
+
+    /// Borrows every stored element as one contiguous slice.
+    #[inline]
+    pub fn elements(&self) -> &[Value] {
+        &self.elements
+    }
+
+    /// Mutably borrows every stored element when the containing value is unique.
+    #[inline]
+    pub fn elements_mut(&mut self) -> &mut [Value] {
+        &mut self.elements
+    }
+}
+
 /// Number of bytes reserved for one payload stored directly inside a [`Value`].
 const INLINE_PAYLOAD_SIZE: usize = 16;
 

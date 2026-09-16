@@ -4,7 +4,9 @@
 //! [`BindingId`] here, and this module owns the narrowing proofs that record
 //! where a nullable binding has been proven non-null.
 
-use ir::{BindingId, BindingMetadata, LocalVariableSlot, TypedExpression, TypedExpressionKind};
+use ir::{
+    ArrayType, BindingId, BindingMetadata, LocalVariableSlot, TypedExpression, TypedExpressionKind,
+};
 use language_core::ValueType;
 use syntax::{ComparisonOperator, Expression};
 
@@ -20,6 +22,8 @@ impl Compiler<'_> {
         value_type: ValueType,
         mutable: bool,
         nullable: bool,
+        array_type: Option<ArrayType>,
+        dynamic_complete_type: bool,
         declaration_span: syntax::Span,
     ) -> LocalVariable {
         let slot = LocalVariableSlot(self.next_local_slot);
@@ -31,6 +35,8 @@ impl Compiler<'_> {
             slot,
             mutable,
             nullable,
+            array_type,
+            dynamic_complete_type,
         };
         self.bindings.push(BindingMetadata {
             id: binding,
@@ -63,6 +69,20 @@ impl Compiler<'_> {
             .iter()
             .rev()
             .find_map(|scope| scope.get(name).copied())
+    }
+
+    /// Marks the nearest binding for `name` as carrying a runtime complete type.
+    ///
+    /// A statement that assigns an extracted element to an existing binding must
+    /// keep dispatching on the stored subtype, because the binding now holds the
+    /// element's own complete type rather than the declared base alone.
+    pub(super) fn mark_variable_dynamic(&mut self, name: &str) {
+        for scope in self.variable_scopes.iter_mut().rev() {
+            if let Some(variable) = scope.get_mut(name) {
+                variable.dynamic_complete_type = true;
+                return;
+            }
+        }
     }
 
     /// Finds the binding narrowed by a direct `binding != null` condition.
@@ -137,18 +157,28 @@ impl Compiler<'_> {
         )
     }
 
-    /// Rejects nullable operands before they reach concrete registry dispatch.
-    pub(super) fn require_non_nullable_expression(
+    /// Rejects nullable and array operands before concrete registry dispatch.
+    ///
+    /// Scalar operations, conditions, calls, and conversions all require one
+    /// complete scalar value. An array is a container whose compile-time
+    /// contract lives in its element type, so passing it where a scalar is
+    /// expected is always a type error rather than an operator lookup failure.
+    pub(super) fn require_scalar_expression(
         &self,
         expression: &TypedExpression,
     ) -> Result<(), CompileError> {
         if self.expression_is_nullable(expression) {
-            Err(CompileError::new(
+            return Err(CompileError::new(
                 expression.span,
                 "nullable value must be narrowed before this operation",
-            ))
-        } else {
-            Ok(())
+            ));
         }
+        if expression.array_type().is_some() {
+            return Err(CompileError::new(
+                expression.span,
+                "an array cannot be used as a scalar operand",
+            ));
+        }
+        Ok(())
     }
 }

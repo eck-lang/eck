@@ -9,6 +9,20 @@ pub(crate) fn get(value: &Value) -> Result<i128, CoreError> {
         .ok_or_else(|| CoreError::InvalidValueRepresentation("int128".into()))
 }
 
+/// Converts this signed 128-bit value into a zero-based array index.
+///
+/// Negative magnitudes cannot address an element, and a positive magnitude that
+/// exceeds the machine word size cannot address a real array, so both are
+/// rejected instead of truncating to a wrapped index.
+pub(crate) fn to_index(value: &Value) -> Result<usize, CoreError> {
+    let integer = get(value)?;
+    usize::try_from(integer).map_err(|_| {
+        CoreError::Runtime(format!(
+            "array index {integer} must be a non-negative integer that fits in a machine word"
+        ))
+    })
+}
+
 /// Widens a mixed signed-integer pair to `int128` while preserving operand order.
 ///
 /// Exactly one operand must use the `i128` representation and the other must use

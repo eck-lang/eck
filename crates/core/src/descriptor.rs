@@ -25,6 +25,14 @@ pub type ContextBinaryOperatorExecutor =
 pub type ComparisonExecutor = fn(&Value, &Value) -> Result<bool, crate::CoreError>;
 pub type NativeFunction =
     for<'a> fn(&ExecutionContext<'a>, &[Value]) -> Result<Option<Value>, crate::CoreError>;
+/// Converts one opaque integer value into a zero-based array index.
+///
+/// Integer type extensions register this contract so array indexing can read a
+/// user-supplied index without knowing how the index's type stores its
+/// magnitude. An implementation must reject a negative or out-of-range
+/// magnitude with a runtime error instead of truncating it, because a
+/// truncated index would silently address the wrong element.
+pub type IndexExtractor = fn(&Value) -> Result<usize, crate::CoreError>;
 
 #[derive(Clone)]
 pub struct TypeDescriptor {

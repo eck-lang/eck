@@ -51,6 +51,9 @@ impl Parser {
         if self.starts_assignment() {
             return self.parse_assignment();
         }
+        if self.starts_indexed_assignment() {
+            return self.parse_indexed_assignment();
+        }
         if matches!(&self.peek().kind, TokenKind::LeftBrace) {
             return self.parse_block().map(Statement::Block);
         }
@@ -565,6 +568,38 @@ impl Parser {
             )
     }
 
+    /// Reports whether the cursor begins `name[index] = expression`.
+    fn starts_indexed_assignment(&self) -> bool {
+        if !matches!(&self.peek().kind, TokenKind::Ident(_))
+            || !matches!(
+                self.peek_n(1).map(|token| &token.kind),
+                Some(TokenKind::LeftBracket)
+            )
+        {
+            return false;
+        }
+        let mut depth = 0usize;
+        let mut offset = 1usize;
+        while let Some(token) = self.peek_n(offset) {
+            match token.kind {
+                TokenKind::LeftBracket => depth += 1,
+                TokenKind::RightBracket => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        return matches!(
+                            self.peek_n(offset + 1).map(|token| &token.kind),
+                            Some(TokenKind::Equal)
+                        );
+                    }
+                }
+                TokenKind::Newline | TokenKind::Eof => return false,
+                _ => {}
+            }
+            offset += 1;
+        }
+        false
+    }
+
     /// Reports whether the cursor begins `name: frame RowType`.
     fn starts_frame_declaration(&self) -> bool {
         matches!(&self.peek().kind, TokenKind::Ident(_))
@@ -589,7 +624,26 @@ impl Parser {
         let name = self.expect_identifier("expected binding name after declaration keyword")?;
         let type_name = if matches!(&self.peek().kind, TokenKind::Colon) {
             self.advance();
-            Some(self.expect_type_name("expected type name after `:`")?)
+            let mut type_name = self.expect_type_name("expected type name after `:`")?;
+            if matches!(&self.peek().kind, TokenKind::Less) {
+                self.advance();
+                let subtype = self.expect_identifier("expected subtype name after `<`")?;
+                self.expect_simple(TokenKind::Greater)?;
+                type_name.push('<');
+                type_name.push_str(&subtype);
+                type_name.push('>');
+            }
+            if matches!(&self.peek().kind, TokenKind::LeftBracket)
+                && matches!(
+                    self.peek_n(1).map(|token| &token.kind),
+                    Some(TokenKind::RightBracket)
+                )
+            {
+                self.advance();
+                self.advance();
+                type_name.push_str("[]");
+            }
+            Some(type_name)
         } else {
             None
         };
@@ -622,6 +676,26 @@ impl Parser {
         let expression = self.parse_expression(0)?;
         Ok(Statement::Assignment {
             name,
+            span: Span {
+                start,
+                end: expression.span().end,
+            },
+            expression,
+        })
+    }
+
+    /// Parses an indexed assignment after its target shape has been recognized.
+    fn parse_indexed_assignment(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span.start;
+        let name = self.expect_identifier("expected indexed assignment target")?;
+        self.expect_simple(TokenKind::LeftBracket)?;
+        let index = self.parse_expression(0)?;
+        self.expect_simple(TokenKind::RightBracket)?;
+        self.expect_simple(TokenKind::Equal)?;
+        let expression = self.parse_expression(0)?;
+        Ok(Statement::IndexedAssignment {
+            name,
+            index,
             span: Span {
                 start,
                 end: expression.span().end,

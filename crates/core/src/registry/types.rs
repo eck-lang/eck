@@ -1,6 +1,8 @@
 //! Type registration, literal parsing, defaults, and value formatting.
 
-use crate::{BooleanEvaluator, CoreError, TypeDescriptor, TypeId, Value, ValueType};
+use crate::{
+    BooleanEvaluator, CoreError, IndexExtractor, TypeDescriptor, TypeId, Value, ValueType,
+};
 
 use super::Registry;
 
@@ -89,6 +91,30 @@ impl Registry {
     /// registration or resolution failure precisely.
     pub fn type_descriptor(&self, id: TypeId) -> Result<&TypeDescriptor, CoreError> {
         self.types.get(&id).ok_or(CoreError::UnknownTypeId(id))
+    }
+
+    /// Registers how one integer base type converts its values into array indices.
+    ///
+    /// The type must already be registered. Registering the same type again
+    /// replaces the previous contract, which keeps a re-registration idempotent
+    /// instead of failing an otherwise valid extension setup. Returns
+    /// [`CoreError::UnknownTypeId`] when `id` is not registered.
+    pub fn register_index_extractor(
+        &mut self,
+        id: TypeId,
+        extract: IndexExtractor,
+    ) -> Result<(), CoreError> {
+        self.type_descriptor(id)?;
+        self.index_extractors.insert(id, extract);
+        Ok(())
+    }
+
+    /// Returns the array-index extractor registered for a base type, when present.
+    ///
+    /// Types without an extractor, such as `string` or `bool`, cannot be used as
+    /// an array index; the compiler reports that as a compile-time diagnostic.
+    pub fn index_extractor(&self, id: TypeId) -> Option<IndexExtractor> {
+        self.index_extractors.get(&id).copied()
     }
 
     /// Returns whether a registered base type represents integral magnitudes.

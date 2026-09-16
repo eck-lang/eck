@@ -39,6 +39,7 @@ impl Extension for UnsignedIntegerExtension {
             parse_null_literal: None,
             format: formatting::format,
         })?;
+        registry.register_index_extractor(id, value::to_index)?;
         registry.register_type_alias("uint", id)?;
         operations::register(registry, id)?;
         comparisons::register(registry)

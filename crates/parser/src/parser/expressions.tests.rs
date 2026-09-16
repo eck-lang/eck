@@ -124,3 +124,18 @@ fn parses_logical_not_expressions() {
         } if matches!(operand.as_ref(), Expression::Variable { name, .. } if name == "enabled")
     ));
 }
+
+/// Verifies prefix `!` binds its operand tighter than a postfix element access.
+#[test]
+fn parses_logical_not_of_element_access() {
+    let expression = parse_expression("!values[0]");
+
+    assert!(matches!(
+        expression,
+        Expression::Unary {
+            operator: UnaryOperator::LogicalNot,
+            operand,
+            ..
+        } if matches!(operand.as_ref(), Expression::ElementAccess { .. })
+    ));
+}

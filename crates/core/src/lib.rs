@@ -16,8 +16,8 @@ pub use configuration::{
 pub use descriptor::{
     BinaryOperatorDescriptor, BinaryOperatorExecutor, BooleanEvaluator, ComparisonDescriptor,
     ComparisonExecutor, ContextBinaryOperatorExecutor, FunctionDescriptor, FunctionSignature,
-    InPlaceBinaryOperatorExecutor, LiteralParser, NamespaceSymbol, NativeFunction, TypeDescriptor,
-    ValueFormatter,
+    InPlaceBinaryOperatorExecutor, IndexExtractor, LiteralParser, NamespaceSymbol, NativeFunction,
+    TypeDescriptor, ValueFormatter,
 };
 pub use error::CoreError;
 pub use extension::Extension;
@@ -28,4 +28,4 @@ pub use subtype::{
     ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion, Scale,
     SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeRelativeRule, ValueType,
 };
-pub use value::Value;
+pub use value::{ArrayValue, Value};

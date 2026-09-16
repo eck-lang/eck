@@ -1,7 +1,7 @@
 use ir::{TypedBinaryExecutionPlan, TypedExpression, TypedExpressionKind, TypedScalePlan};
 use language_core::{
-    BinaryOperator, BinaryOperatorDescriptor, CoreError, ExecutionContext, ResolvedBinaryOperator,
-    Scale, Value,
+    ArrayValue, BinaryOperator, BinaryOperatorDescriptor, ComparisonOperator, CoreError,
+    ExecutionContext, Registry, ResolvedBinaryOperator, ResolvedComparison, Scale, Value,
 };
 use syntax::LogicalOperator;
 
@@ -31,61 +31,35 @@ impl<'registry> Runtime<'registry> {
                 let right_operand = self.eval(right_operand)?.ok_or_else(|| {
                     RuntimeError::Message("right operand returned no value".into())
                 })?;
-                let resolved_operator = self.registry.operator(resolution.operator)?;
-                let direct_execution = resolution.relative_adjustment.is_none()
-                    && resolution.left_operand_scale.is_identity()
-                    && resolution.right_operand_scale.is_identity()
-                    && left_operand.subtype_id().is_none()
-                    && right_operand.subtype_id().is_none()
-                    && resolution.output.subtype.is_none()
-                    && left_operand.type_id() == resolved_operator.left_operand_type
-                    && right_operand.type_id() == resolved_operator.right_operand_type;
-                let value = if direct_execution {
-                    self.execute_binary_operator(resolved_operator, &left_operand, &right_operand)?
-                        .with_subtype(None)
-                } else if let Some(adjustment_operator) =
-                    execution_plan.relative_adjustment_operator
-                {
-                    // Relative addition reads the right operand as a fraction
-                    // of the left operand, so `100 - 50%` evaluates its
-                    // operands once and combines `left - (left * scaled_right)`.
-                    let left_magnitude =
-                        self.execute_scale_plan(&left_operand, &execution_plan.left_operand_scale)?;
-                    let scaled_right = self
-                        .execute_scale_plan(&right_operand, &execution_plan.right_operand_scale)?;
-                    let adjustment_descriptor = self.redispatch_for_dynamic_types(
-                        self.registry.operator(adjustment_operator)?,
-                        &left_magnitude,
-                        &scaled_right,
-                    );
-                    let adjustment = self.execute_binary_operator(
-                        adjustment_descriptor,
-                        &left_magnitude,
-                        &scaled_right,
-                    )?;
-                    let outer_descriptor = self.redispatch_for_dynamic_types(
-                        resolved_operator,
-                        &left_magnitude,
-                        &adjustment,
-                    );
-                    self.execute_binary_operator(outer_descriptor, &left_magnitude, &adjustment)?
-                        .with_subtype(resolution.output.subtype)
-                } else {
-                    let left_operand =
-                        self.execute_scale_plan(&left_operand, &execution_plan.left_operand_scale)?;
-                    let right_operand = self
-                        .execute_scale_plan(&right_operand, &execution_plan.right_operand_scale)?;
-                    let resolved_operator = self.redispatch_for_dynamic_types(
-                        resolved_operator,
-                        &left_operand,
-                        &right_operand,
-                    );
-                    self.execute_binary_operator(resolved_operator, &left_operand, &right_operand)?
-                        .with_subtype(resolution.output.subtype)
-                };
-                let value = self
-                    .registry
-                    .transform_owned_configured_result(value, &self.configuration)?;
+                let value = self.execute_compiled_binary(
+                    resolution,
+                    execution_plan,
+                    left_operand,
+                    right_operand,
+                )?;
+                Ok(Some(value))
+            }
+            TypedExpressionKind::DynamicBinary {
+                operator,
+                dispatch,
+                left_operand,
+                right_operand,
+                ..
+            } => {
+                let left_operand = self.eval(left_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("left operand returned no value".into())
+                })?;
+                let right_operand = self.eval(right_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("right operand returned no value".into())
+                })?;
+                let plan =
+                    self.select_binary_plan(*operator, dispatch, &left_operand, &right_operand)?;
+                let value = self.execute_compiled_binary(
+                    &plan.resolution,
+                    &plan.execution_plan,
+                    left_operand,
+                    right_operand,
+                )?;
                 Ok(Some(value))
             }
             TypedExpressionKind::Comparison {
@@ -99,15 +73,30 @@ impl<'registry> Runtime<'registry> {
                 let right_operand = self.eval(right_operand)?.ok_or_else(|| {
                     RuntimeError::Message("right comparison operand returned no value".into())
                 })?;
-                let left_operand =
-                    self.scale_magnitude(&left_operand, resolution.left_operand_scale)?;
-                let right_operand =
-                    self.scale_magnitude(&right_operand, resolution.right_operand_scale)?;
-                let comparison = self.registry.comparison(resolution.comparison)?;
-                let value = Value::new(
-                    resolution.output.base,
-                    (comparison.execute)(&left_operand, &right_operand)?,
-                );
+                let value =
+                    self.execute_compiled_comparison(resolution, &left_operand, &right_operand)?;
+                Ok(Some(value))
+            }
+            TypedExpressionKind::DynamicComparison {
+                operator,
+                dispatch,
+                left_operand,
+                right_operand,
+            } => {
+                let left_operand = self.eval(left_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("left comparison operand returned no value".into())
+                })?;
+                let right_operand = self.eval(right_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("right comparison operand returned no value".into())
+                })?;
+                let resolution = self.select_comparison_resolution(
+                    *operator,
+                    dispatch,
+                    &left_operand,
+                    &right_operand,
+                )?;
+                let value =
+                    self.execute_compiled_comparison(&resolution, &left_operand, &right_operand)?;
                 Ok(Some(value))
             }
             TypedExpressionKind::NullCheck {
@@ -164,6 +153,41 @@ impl<'registry> Runtime<'registry> {
                     .transform_owned_configured_result(value, &self.configuration)?;
                 Ok(Some(value))
             }
+            TypedExpressionKind::DynamicConvert {
+                dispatch,
+                expression,
+            } => {
+                let value = self.eval(expression)?.ok_or_else(|| {
+                    RuntimeError::Message("converted expression returned no value".into())
+                })?;
+                // The stored subtype selects the conversion the compiler
+                // pre-resolved for that candidate, so no subtype conversion is
+                // resolved during execution.
+                let slot = self.registry.subtype_dispatch_slot(value.subtype_id());
+                let plan = dispatch
+                    .plans
+                    .get(slot)
+                    .and_then(|plan| plan.as_ref())
+                    .ok_or_else(|| {
+                        RuntimeError::Message(format!(
+                            "conversion from `{}` to {} is not defined",
+                            self.registry.value_type_name(value.value_type()),
+                            dispatch.target_description
+                        ))
+                    })?;
+                let scaled = self
+                    .scale_magnitude(&value, plan.conversion.scale)?
+                    .with_subtype(None);
+                let cast = match plan.target_base {
+                    Some(target) => self.cast_base(&scaled, target)?,
+                    None => scaled,
+                };
+                let value = cast.with_subtype(plan.conversion.output.subtype);
+                let value = self
+                    .registry
+                    .transform_owned_configured_result(value, &self.configuration)?;
+                Ok(Some(value))
+            }
             TypedExpressionKind::Call {
                 function,
                 arguments,
@@ -212,6 +236,52 @@ impl<'registry> Runtime<'registry> {
                     function.name
                 );
                 Ok(result)
+            }
+            TypedExpressionKind::ArrayLiteral {
+                array_type,
+                elements,
+            } => {
+                let mut values = Vec::with_capacity(elements.len());
+                for element in elements {
+                    values.push(self.eval(element)?.ok_or_else(|| {
+                        RuntimeError::Message("array element returned no value".into())
+                    })?);
+                }
+                Ok(Some(Value::new(
+                    array_type.element.base,
+                    ArrayValue::new(values),
+                )))
+            }
+            TypedExpressionKind::ElementAccess {
+                array,
+                index,
+                constant_index,
+                index_extractor,
+                ..
+            } => {
+                let array_value = self.eval(array)?.ok_or_else(|| {
+                    RuntimeError::Message("array expression returned no value".into())
+                })?;
+                let elements = array_value
+                    .downcast_ref::<ArrayValue>()
+                    .ok_or_else(|| RuntimeError::Message("value is not an array".into()))?;
+                let index = match constant_index {
+                    Some(index) => *index,
+                    None => {
+                        let index_value = self.eval(index)?.ok_or_else(|| {
+                            RuntimeError::Message("array index returned no value".into())
+                        })?;
+                        self.require_plain_index(&index_value)?;
+                        index_extractor(&index_value)?
+                    }
+                };
+                let element = elements.elements().get(index).ok_or_else(|| {
+                    RuntimeError::Message(format!(
+                        "array index {index} is out of bounds for length {}",
+                        elements.elements().len()
+                    ))
+                })?;
+                Ok(Some(element.clone()))
             }
         }
     }
@@ -465,4 +535,190 @@ impl<'registry> Runtime<'registry> {
             .and_then(|operator| self.registry.operator(operator))
             .unwrap_or(descriptor)
     }
+
+    /// Executes one compiler-resolved binary plan and applies configuration.
+    ///
+    /// The plan already carries the resolved operator, the operand scales, and
+    /// the optional relative-adjustment operator, so this performs no registry
+    /// resolution beyond the descriptor lookups the plan recorded.
+    pub(super) fn execute_compiled_binary(
+        &self,
+        resolution: &ResolvedBinaryOperator,
+        execution_plan: &TypedBinaryExecutionPlan,
+        left_operand: Value,
+        right_operand: Value,
+    ) -> Result<Value, RuntimeError> {
+        let resolved_operator = self.registry.operator(resolution.operator)?;
+        let direct_execution = resolution.relative_adjustment.is_none()
+            && resolution.left_operand_scale.is_identity()
+            && resolution.right_operand_scale.is_identity()
+            && left_operand.subtype_id().is_none()
+            && right_operand.subtype_id().is_none()
+            && resolution.output.subtype.is_none()
+            && left_operand.type_id() == resolved_operator.left_operand_type
+            && right_operand.type_id() == resolved_operator.right_operand_type;
+        let value = if direct_execution {
+            self.execute_binary_operator(resolved_operator, &left_operand, &right_operand)?
+                .with_subtype(None)
+        } else if let Some(adjustment_operator) = execution_plan.relative_adjustment_operator {
+            // Relative addition reads the right operand as a fraction of the
+            // left operand, so `100 - 50%` evaluates its operands once and
+            // combines `left - (left * scaled_right)`.
+            let left_magnitude =
+                self.execute_scale_plan(&left_operand, &execution_plan.left_operand_scale)?;
+            let scaled_right =
+                self.execute_scale_plan(&right_operand, &execution_plan.right_operand_scale)?;
+            let adjustment_descriptor = self.redispatch_for_dynamic_types(
+                self.registry.operator(adjustment_operator)?,
+                &left_magnitude,
+                &scaled_right,
+            );
+            let adjustment = self.execute_binary_operator(
+                adjustment_descriptor,
+                &left_magnitude,
+                &scaled_right,
+            )?;
+            let outer_descriptor =
+                self.redispatch_for_dynamic_types(resolved_operator, &left_magnitude, &adjustment);
+            self.execute_binary_operator(outer_descriptor, &left_magnitude, &adjustment)?
+                .with_subtype(resolution.output.subtype)
+        } else {
+            let left_operand =
+                self.execute_scale_plan(&left_operand, &execution_plan.left_operand_scale)?;
+            let right_operand =
+                self.execute_scale_plan(&right_operand, &execution_plan.right_operand_scale)?;
+            let resolved_operator =
+                self.redispatch_for_dynamic_types(resolved_operator, &left_operand, &right_operand);
+            self.execute_binary_operator(resolved_operator, &left_operand, &right_operand)?
+                .with_subtype(resolution.output.subtype)
+        };
+        Ok(self
+            .registry
+            .transform_owned_configured_result(value, &self.configuration)?)
+    }
+
+    /// Selects the plan a dynamic operand pair's runtime subtypes call for.
+    ///
+    /// Each dynamic operand contributes one slot per candidate subtype, and the
+    /// slot maps arithmetically to the plan the compiler resolved, so selecting
+    /// a plan performs no type or subtype lookup. A missing plan means the
+    /// registry defines no operation for that pair, which only fails when the
+    /// program actually stores those subtypes.
+    pub(super) fn select_binary_plan<'plan>(
+        &self,
+        operator: BinaryOperator,
+        dispatch: &'plan ir::TypedBinaryDispatch,
+        left_operand: &Value,
+        right_operand: &Value,
+    ) -> Result<&'plan ir::TypedBinaryPlan, RuntimeError> {
+        let index = dynamic_dispatch_index(
+            self.registry,
+            dispatch.left_width,
+            left_operand,
+            dispatch.right_width,
+            right_operand,
+        );
+        dispatch
+            .plans
+            .get(index)
+            .and_then(|plan| plan.as_ref())
+            .ok_or_else(|| {
+                RuntimeError::Message(format!(
+                    "operator `{operator}` is not defined for `{}` and `{}`",
+                    self.registry.value_type_name(left_operand.value_type()),
+                    self.registry.value_type_name(right_operand.value_type())
+                ))
+            })
+    }
+
+    /// Selects the relation a dynamic operand pair's runtime subtypes call for.
+    pub(super) fn select_comparison_resolution(
+        &self,
+        operator: ComparisonOperator,
+        dispatch: &ir::TypedComparisonDispatch,
+        left_operand: &Value,
+        right_operand: &Value,
+    ) -> Result<ResolvedComparison, RuntimeError> {
+        let index = dynamic_dispatch_index(
+            self.registry,
+            dispatch.left_width,
+            left_operand,
+            dispatch.right_width,
+            right_operand,
+        );
+        dispatch
+            .resolutions
+            .get(index)
+            .and_then(|resolution| resolution.as_ref())
+            .copied()
+            .ok_or_else(|| {
+                RuntimeError::Message(format!(
+                    "comparison `{operator}` is not defined for `{}` and `{}`",
+                    self.registry.value_type_name(left_operand.value_type()),
+                    self.registry.value_type_name(right_operand.value_type())
+                ))
+            })
+    }
+
+    /// Executes one compiler-resolved comparison relation.
+    ///
+    /// A dynamically typed operand can hold a representation the compiler did
+    /// not predict, for example when a conversion promotes an integer magnitude
+    /// to a fractional one. Re-resolving the relation for the actual operand
+    /// pair mirrors the arithmetic path's dynamic-type redispatch, while the
+    /// matching case keeps using the compiled executor without another lookup.
+    pub(super) fn execute_compiled_comparison(
+        &self,
+        resolution: &ResolvedComparison,
+        left_operand: &Value,
+        right_operand: &Value,
+    ) -> Result<Value, RuntimeError> {
+        let left_operand = self.scale_magnitude(left_operand, resolution.left_operand_scale)?;
+        let right_operand = self.scale_magnitude(right_operand, resolution.right_operand_scale)?;
+        let descriptor = self.registry.comparison(resolution.comparison)?;
+        let execute = if left_operand.type_id() == descriptor.left_operand_type
+            && right_operand.type_id() == descriptor.right_operand_type
+        {
+            descriptor.execute
+        } else {
+            self.registry
+                .resolve_comparison_operation(
+                    descriptor.operator,
+                    left_operand.value_type(),
+                    right_operand.value_type(),
+                )
+                .and_then(|resolved| self.registry.comparison(resolved.comparison))
+                .map(|replacement| replacement.execute)
+                .unwrap_or(descriptor.execute)
+        };
+        Ok(Value::new(
+            resolution.output.base,
+            (execute)(&left_operand, &right_operand)?,
+        ))
+    }
+}
+
+/// Returns the row-major dispatch index for one operand pair.
+///
+/// A width of one means the operand's complete type is static, so it always
+/// addresses slot zero. Every other width means the value's own subtype selects
+/// the slot the compiler resolved for that candidate subtype.
+fn dynamic_dispatch_index(
+    registry: &Registry,
+    left_width: usize,
+    left_operand: &Value,
+    right_width: usize,
+    right_operand: &Value,
+) -> usize {
+    let left_slot = if left_width == 1 {
+        0
+    } else {
+        registry.subtype_dispatch_slot(left_operand.subtype_id())
+    };
+    let right_slot = if right_width == 1 {
+        0
+    } else {
+        registry.subtype_dispatch_slot(right_operand.subtype_id())
+    };
+    left_slot * right_width + right_slot
 }

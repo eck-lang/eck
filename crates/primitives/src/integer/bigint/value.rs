@@ -8,6 +8,21 @@ pub(crate) fn get(value: &Value) -> Result<&BigInt, CoreError> {
         .ok_or_else(|| CoreError::InvalidValueRepresentation("bigint".into()))
 }
 
+/// Converts this arbitrary-precision value into a zero-based array index.
+///
+/// The decimal spelling is re-parsed as a machine-word index, which rejects a
+/// negative or oversized magnitude through the `usize` parser. An index larger
+/// than the machine word size can never address a real array, so formatting
+/// then parsing keeps the check exact without truncating the index.
+pub(crate) fn to_index(value: &Value) -> Result<usize, CoreError> {
+    let integer = get(value)?;
+    integer.to_string().parse::<usize>().map_err(|_| {
+        CoreError::Runtime(format!(
+            "array index {integer} must be a non-negative integer that fits in a machine word"
+        ))
+    })
+}
+
 /// Extracts a uniquely owned arbitrary-precision integer payload for mutation.
 pub(crate) fn get_mut(value: &mut Value) -> Result<&mut BigInt, CoreError> {
     value

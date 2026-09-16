@@ -150,6 +150,8 @@ fn missing_variable_expression(boolean_type: language_core::TypeId) -> TypedExpr
             binding: BindingId(0),
             slot: LocalVariableSlot(0),
             nullable: false,
+            array_type: None,
+            dynamic_complete_type: false,
         },
         span: SPAN,
     }
@@ -451,6 +453,8 @@ fn true_if_condition_executes_its_body_and_releases_local_variables() {
                     binding: BindingId(1),
                     slot: LocalVariableSlot(1),
                     nullable: false,
+                    array_type: None,
+                    dynamic_complete_type: false,
                 },
                 span: SPAN,
             }),
@@ -565,6 +569,8 @@ fn integer_variable(
             binding: BindingId(slot.0),
             slot,
             nullable: false,
+            array_type: None,
+            dynamic_complete_type: false,
         },
         span: SPAN,
     }

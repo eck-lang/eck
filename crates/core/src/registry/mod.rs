@@ -13,9 +13,9 @@ use std::{
 use crate::configuration::RegisteredTypeConfiguration;
 use crate::{
     BinaryOperator, BinaryOperatorDescriptor, BooleanEvaluator, ComparisonDescriptor, ComparisonId,
-    ComparisonOperator, ConfigurationDescriptor, FunctionDescriptor, FunctionId, OperatorId, Scale,
-    SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeId, SubtypeRelativeRule,
-    TypeDescriptor, TypeId,
+    ComparisonOperator, ConfigurationDescriptor, FunctionDescriptor, FunctionId, IndexExtractor,
+    OperatorId, Scale, SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeId,
+    SubtypeRelativeRule, TypeDescriptor, TypeId,
 };
 
 mod comparisons;
@@ -53,6 +53,12 @@ pub struct Registry {
     types_by_name: HashMap<&'static str, TypeId>,
     /// Stores type descriptors keyed by ID.
     types: HashMap<TypeId, TypeDescriptor>,
+    /// Resolves how one integer base type converts its values into array indices.
+    ///
+    /// The compiler resolves this contract once per index expression and stores
+    /// the function pointer in the typed program, so element access never
+    /// repeats the lookup during execution.
+    index_extractors: HashMap<TypeId, IndexExtractor>,
 
     /// Resolves a semantic subtype name to its compact ID.
     subtypes_by_name: HashMap<&'static str, SubtypeId>,
@@ -133,6 +139,7 @@ impl Default for Registry {
             allocated_subtype_ids: HashSet::new(),
             types_by_name: HashMap::new(),
             types: HashMap::new(),
+            index_extractors: HashMap::new(),
             subtypes_by_name: HashMap::new(),
             subtypes_by_suffix: HashMap::new(),
             subtypes: HashMap::new(),

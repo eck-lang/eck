@@ -39,6 +39,7 @@ impl Extension for IntegerExtension {
             parse_null_literal: None,
             format: formatting::format,
         })?;
+        registry.register_index_extractor(id, value::to_index)?;
         registry.register_type_alias("int", id)?;
         registry.set_default_integer(id)?;
         operations::register(registry, id)?;

@@ -14,10 +14,11 @@ use syntax::{Block, Expression, Program, Statement};
 
 use crate::CompileError;
 use ir::{
-    BindingId, BindingMetadata, LocalVariableSlot, TypedBlock, TypedExpression, TypedProgram,
-    TypedRangePlan, TypedStatement,
+    ArrayType, BindingId, BindingMetadata, LocalVariableSlot, TypedBlock, TypedExpression,
+    TypedProgram, TypedRangePlan, TypedStatement,
 };
 
+mod arrays;
 mod configuration;
 mod expressions;
 mod helpers;
@@ -33,6 +34,7 @@ pub fn compile(program: &Program, registry: &Registry) -> Result<TypedProgram, C
         next_local_slot: 0,
         bindings: Vec::new(),
         narrowed_bindings: HashMap::new(),
+        array_element_types: HashMap::new(),
         loop_depth: 0,
         import_scopes: vec![ImportScope::default()],
     }
@@ -45,6 +47,18 @@ struct Compiler<'a> {
     next_local_slot: usize,
     bindings: Vec<BindingMetadata>,
     narrowed_bindings: HashMap<BindingId, usize>,
+    /// Records the static type of each element of a literal-initialized array.
+    ///
+    /// An unconstrained array keeps no element subtype in its contract, so a
+    /// constant element read such as `sizes[0]` would otherwise lose the stored
+    /// element's subtype. Recording the literal element types preserves that
+    /// subtype for constant reads, and a constant write updates one entry while
+    /// a dynamic write removes the record and falls back to the array contract.
+    ///
+    /// A slot holds `Some` for an element whose complete type the compiler
+    /// knows and `None` for one whose subtype is only known at runtime, so a
+    /// read can tell a precise element type from a dynamic one.
+    array_element_types: HashMap<BindingId, Vec<Option<ValueType>>>,
     loop_depth: usize,
     import_scopes: Vec<ImportScope>,
 }
@@ -57,6 +71,8 @@ struct LocalVariable {
     slot: LocalVariableSlot,
     mutable: bool,
     nullable: bool,
+    array_type: Option<ArrayType>,
+    dynamic_complete_type: bool,
 }
 
 /// Stores namespace and function imports for one lexical source scope.
@@ -151,6 +167,12 @@ impl Compiler<'_> {
                 expression,
                 span,
             } => self.compile_assignment(name, expression, *span),
+            Statement::IndexedAssignment {
+                name,
+                index,
+                expression,
+                span,
+            } => self.compile_indexed_assignment(name, index, expression, *span),
             Statement::Block(block) => Ok(TypedStatement::Block(self.compile_block(block)?)),
             Statement::If {
                 condition,
@@ -159,6 +181,7 @@ impl Compiler<'_> {
                 span,
             } => {
                 let typed_condition = self.compile_boolean_condition(condition, "if")?;
+                let before = self.array_element_type_snapshot();
                 let narrowed_binding = self.non_null_narrowing_binding(condition);
                 if let Some(binding) = narrowed_binding {
                     self.push_narrowing(binding);
@@ -168,13 +191,18 @@ impl Compiler<'_> {
                     self.pop_narrowing(binding);
                 }
                 let compiled_body = compiled_body?;
+                let then = self.array_element_type_snapshot();
+                self.restore_array_element_type_snapshot(before.clone());
+                let compiled_else = else_body
+                    .as_ref()
+                    .map(|body| self.compile_block(body))
+                    .transpose()?;
+                let otherwise = self.array_element_type_snapshot();
+                self.merge_array_element_type_snapshots(&[then, otherwise]);
                 Ok(TypedStatement::If {
                     condition: typed_condition,
                     body: compiled_body,
-                    else_body: else_body
-                        .as_ref()
-                        .map(|body| self.compile_block(body))
-                        .transpose()?,
+                    else_body: compiled_else,
                     span: *span,
                 })
             }
@@ -184,6 +212,7 @@ impl Compiler<'_> {
                 span,
             } => {
                 let typed_condition = self.compile_boolean_condition(condition, "while")?;
+                let before = self.array_element_type_snapshot();
                 let narrowed_binding = self.non_null_narrowing_binding(condition);
                 if let Some(binding) = narrowed_binding {
                     self.push_narrowing(binding);
@@ -194,6 +223,8 @@ impl Compiler<'_> {
                 if let Some(binding) = narrowed_binding {
                     self.pop_narrowing(binding);
                 }
+                let body_types = self.array_element_type_snapshot();
+                self.merge_array_element_type_snapshots(&[before, body_types]);
                 Ok(TypedStatement::While {
                     condition: typed_condition,
                     body: compiled_body?,
@@ -242,7 +273,7 @@ impl Compiler<'_> {
         construct_name: &str,
     ) -> Result<TypedExpression, CompileError> {
         let typed_condition = self.compile_expression(condition, None)?;
-        self.require_non_nullable_expression(&typed_condition)?;
+        self.require_scalar_expression(&typed_condition)?;
         let expected = ValueType::plain(
             self.registry
                 .default_boolean()
@@ -285,7 +316,15 @@ impl Compiler<'_> {
                 format!("binding `{name}` is already declared in this scope"),
             ));
         }
+        let array_annotation = type_name
+            .filter(|type_name| type_name.ends_with("[]"))
+            .map(|type_name| self.resolve_array_type(type_name, span))
+            .transpose()?;
+        if array_annotation.is_some() && nullable {
+            return Err(CompileError::new(span, "array bindings cannot be nullable"));
+        }
         let expected = type_name
+            .filter(|type_name| !type_name.ends_with("[]"))
             .map(|type_name| {
                 self.registry
                     .type_by_name(type_name)
@@ -323,13 +362,28 @@ impl Compiler<'_> {
                 "nullable types are currently limited to `int?`, `decimal?`, `string?`, and `bool?`",
             ));
         }
-        let typed_expression = self.compile_expression(expression, expected)?;
+        let typed_expression = if let Some(array_type) = array_annotation {
+            self.compile_array_expression(expression, Some(array_type))?
+        } else {
+            self.compile_expression(expression, expected)?
+        };
         let actual = typed_expression.output.ok_or_else(|| {
             CompileError::new(
                 expression.span(),
                 "a void expression cannot initialize a binding",
             )
         })?;
+        if typed_expression.array_type().is_some()
+            && let Some(expected) = expected
+        {
+            return Err(CompileError::new(
+                expression.span(),
+                format!(
+                    "binding `{name}` expects `{}`, but the initializer is an array",
+                    self.registry.type_name(expected)
+                ),
+            ));
+        }
         let initializer_is_null = matches!(expression, Expression::Null { .. });
         let initializer_is_nullable = self.expression_is_nullable(&typed_expression);
         if initializer_is_null && !nullable {
@@ -374,8 +428,18 @@ impl Compiler<'_> {
         } else {
             actual
         };
-        let variable =
-            self.bind_local_variable(name.to_owned(), value_type, mutable, nullable, span);
+        let array_type = typed_expression.array_type();
+        let dynamic_complete_type = typed_expression.dynamic_complete_type();
+        let variable = self.bind_local_variable(
+            name.to_owned(),
+            value_type,
+            mutable,
+            nullable,
+            array_type,
+            dynamic_complete_type,
+            span,
+        );
+        self.record_array_element_types(variable.binding, &typed_expression);
         Ok(TypedStatement::VariableDeclaration {
             name: name.to_owned(),
             binding: variable.binding,
@@ -403,11 +467,23 @@ impl Compiler<'_> {
                 format!("cannot assign to immutable binding `{name}`"),
             ));
         }
+        if variable.array_type.is_some() {
+            return Err(CompileError::new(
+                span,
+                "whole-array reassignment is not supported; assign individual elements",
+            ));
+        }
         let typed_expression =
             self.compile_expression(expression, Some(variable.value_type.base))?;
         let actual = typed_expression.output.ok_or_else(|| {
             CompileError::new(expression.span(), "a void expression cannot be assigned")
         })?;
+        if typed_expression.array_type().is_some() {
+            return Err(CompileError::new(
+                expression.span(),
+                format!("cannot assign an array to binding `{name}`"),
+            ));
+        }
         let assigned_null = matches!(expression, Expression::Null { .. });
         let assigned_nullable = self.expression_is_nullable(&typed_expression);
         if assigned_null && !variable.nullable {
@@ -438,10 +514,62 @@ impl Compiler<'_> {
         if variable.nullable {
             self.narrowed_bindings.remove(&variable.binding);
         }
+        if typed_expression.dynamic_complete_type() {
+            self.mark_variable_dynamic(name);
+        }
         Ok(TypedStatement::Assignment {
             name: name.to_owned(),
             binding: variable.binding,
             slot: variable.slot,
+            expression: typed_expression,
+            span,
+        })
+    }
+
+    /// Compiles an indexed assignment against an existing mutable array binding.
+    fn compile_indexed_assignment(
+        &mut self,
+        name: &str,
+        index: &Expression,
+        expression: &Expression,
+        span: syntax::Span,
+    ) -> Result<TypedStatement, CompileError> {
+        let variable = self
+            .resolve_variable(name)
+            .ok_or_else(|| CompileError::new(span, format!("unknown binding `{name}`")))?;
+        if !variable.mutable {
+            return Err(CompileError::new(
+                span,
+                format!("cannot assign through immutable binding `{name}`"),
+            ));
+        }
+        let array_type = variable
+            .array_type
+            .ok_or_else(|| CompileError::new(span, format!("binding `{name}` is not an array")))?;
+        let (typed_index, constant_index, index_extractor) = self.compile_array_index(index)?;
+        let typed_expression = self.compile_array_element(expression, array_type)?;
+        // A written element the compiler cannot type precisely makes that slot
+        // dynamic, so later reads of it keep dispatching on the stored subtype.
+        let element_slot = if typed_expression.dynamic_complete_type() {
+            None
+        } else {
+            typed_expression.output
+        };
+        match constant_index {
+            Some(index) => {
+                self.update_array_element_type(variable.binding, index, element_slot);
+            }
+            None => {
+                self.array_element_types.remove(&variable.binding);
+            }
+        }
+        Ok(TypedStatement::IndexedAssignment {
+            name: name.to_owned(),
+            binding: variable.binding,
+            slot: variable.slot,
+            index: typed_index,
+            constant_index,
+            index_extractor,
             expression: typed_expression,
             span,
         })
@@ -493,11 +621,23 @@ impl Compiler<'_> {
         span: syntax::Span,
     ) -> Result<TypedStatement, CompileError> {
         let typed_start = self.compile_expression(start, None)?;
+        if typed_start.array_type().is_some() {
+            return Err(CompileError::new(
+                start.span(),
+                "a for range bound must be an integer, found an array",
+            ));
+        }
         let start_type = typed_start.output.ok_or_else(|| {
             CompileError::new(start.span(), "a void expression cannot bound a for range")
         })?;
         self.require_plain_integer_bound(start_type, start.span())?;
         let typed_end = self.compile_expression(end, None)?;
+        if typed_end.array_type().is_some() {
+            return Err(CompileError::new(
+                end.span(),
+                "a for range bound must be an integer, found an array",
+            ));
+        }
         let end_type = typed_end.output.ok_or_else(|| {
             CompileError::new(end.span(), "a void expression cannot bound a for range")
         })?;
@@ -519,11 +659,19 @@ impl Compiler<'_> {
             )
             .map_err(|error| CompileError::core(span, error))?;
         self.require_plain_integer_bound(increment.output, span)?;
+        let before = self.array_element_type_snapshot();
         self.variable_scopes.push(HashMap::new());
         self.import_scopes.push(ImportScope::default());
         let compiled = (|| {
-            let local_variable =
-                self.bind_local_variable(variable.to_owned(), start_type, false, false, span);
+            let local_variable = self.bind_local_variable(
+                variable.to_owned(),
+                start_type,
+                false,
+                false,
+                None,
+                false,
+                span,
+            );
             self.loop_depth += 1;
             let compiled_body = self.compile_block(body);
             self.loop_depth -= 1;
@@ -546,6 +694,8 @@ impl Compiler<'_> {
         })();
         self.import_scopes.pop();
         self.variable_scopes.pop();
+        let body_types = self.array_element_type_snapshot();
+        self.merge_array_element_type_snapshots(&[before, body_types]);
         compiled
     }
 

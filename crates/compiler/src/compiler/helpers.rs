@@ -19,6 +19,7 @@ pub(super) fn statement_span(statement: &Statement) -> syntax::Span {
         | Statement::VariableDeclaration { span, .. }
         | Statement::BindingDeclaration { span, .. }
         | Statement::Assignment { span, .. }
+        | Statement::IndexedAssignment { span, .. }
         | Statement::If { span, .. }
         | Statement::While { span, .. }
         | Statement::For { span, .. }
