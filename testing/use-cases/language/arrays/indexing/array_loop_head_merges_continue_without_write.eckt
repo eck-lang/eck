@@ -1,0 +1,21 @@
+# Loop head merges a path that continues without writing
+
+Verifies the loop head merges the unchanged path with the written path. The
+first iteration continues before writing, so the second reads the original
+centimeter-millimeter value and prints `11mm`.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..2) {
+    if (i == 0) {
+        continue
+    }
+    print(a[0] + 1mm)
+    a[0] = 2cm
+}
+
+<<< stdout
+11mm
+
+<<< stderr

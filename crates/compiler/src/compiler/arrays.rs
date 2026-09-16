@@ -480,30 +480,51 @@ impl Compiler<'_> {
         &mut self,
         snapshots: &[HashMap<BindingId, Vec<Option<ValueType>>>],
     ) {
+        self.array_element_types = Self::join_array_element_type_snapshots(snapshots);
+    }
+
+    /// Joins element type snapshots into the state every path agrees on.
+    ///
+    /// The join is the analysis' meet operation on one abstract flow state. A
+    /// binding survives only when every snapshot records it with the same
+    /// length, and an element keeps its complete type only when every snapshot
+    /// records that exact type. Every other element becomes dynamic, so a later
+    /// read dispatches on the subtype the stored value actually holds.
+    ///
+    /// Returning the joined state instead of assigning it lets a loop compare
+    /// the head of one iteration with the head of the next while looking for a
+    /// fixed point.
+    pub(super) fn join_array_element_type_snapshots(
+        snapshots: &[HashMap<BindingId, Vec<Option<ValueType>>>],
+    ) -> HashMap<BindingId, Vec<Option<ValueType>>> {
         let Some(first) = snapshots.first() else {
-            self.array_element_types.clear();
-            return;
+            return HashMap::new();
         };
-        let mut merged = first.clone();
-        merged.retain(|binding, elements| {
-            snapshots.iter().all(|snapshot| {
-                snapshot
-                    .get(binding)
-                    .is_some_and(|other| other.len() == elements.len())
-            })
-        });
-        for (binding, elements) in &mut merged {
-            for (index, element) in elements.iter_mut().enumerate() {
-                if !snapshots.iter().all(|snapshot| {
-                    snapshot
-                        .get(binding)
-                        .is_some_and(|other| other[index] == *element)
-                }) {
-                    *element = None;
-                }
+        let mut merged = HashMap::new();
+        for (binding, elements) in first {
+            let recorded = snapshots
+                .iter()
+                .filter_map(|snapshot| snapshot.get(binding))
+                .collect::<Vec<_>>();
+            if recorded.len() != snapshots.len()
+                || recorded.iter().any(|other| other.len() != elements.len())
+            {
+                continue;
             }
+            let joined = elements
+                .iter()
+                .enumerate()
+                .map(|(index, element)| {
+                    let agrees = recorded.iter().all(|other| other[index] == *element);
+                    match agrees {
+                        true => *element,
+                        false => None,
+                    }
+                })
+                .collect();
+            merged.insert(*binding, joined);
         }
-        self.array_element_types = merged;
+        merged
     }
 
     /// Compiles one binary operation whose operand complete types are dynamic.

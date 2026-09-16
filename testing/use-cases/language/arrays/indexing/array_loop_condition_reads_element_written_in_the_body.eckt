@@ -1,0 +1,21 @@
+# Loop condition observes the element a previous iteration rewrote
+
+Verifies the emitted loop condition uses the stored subtype rather than the
+entry subtype. The body stores `2cm`, so the second test of `a[0] < 15mm` reads
+`20mm` and ends the loop after one iteration instead of looping forever.
+
+>>> source
+let a: int[] = [10mm]
+let n = 0
+
+while (a[0] < 15mm) {
+    n = n + 1
+    a[0] = 2cm
+}
+
+print(n)
+
+<<< stdout
+1
+
+<<< stderr

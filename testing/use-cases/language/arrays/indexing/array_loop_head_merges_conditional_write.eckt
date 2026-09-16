@@ -1,0 +1,21 @@
+# Loop head merges a conditional element write
+
+Verifies a write that only one iteration performs still reaches the next
+iteration. The first iteration stores `2cm`; the second reads that stored
+centimeter value, so the output is `11mm` and then `21mm`.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..2) {
+    print(a[0] + 1mm)
+    if (i == 0) {
+        a[0] = 2cm
+    }
+}
+
+<<< stdout
+11mm
+21mm
+
+<<< stderr

@@ -1,0 +1,20 @@
+# Extracted loop value keeps the subtype it was loaded with
+
+Verifies `let x = a[0]` is a value, not a location. The body loads `x` before
+rewriting `a[0]`, so the first iteration prints `10mm + 1mm = 11mm` while the
+second loads the stored centimeter value and prints `21mm`.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..2) {
+    let x = a[0]
+    a[0] = 2cm
+    print(x + 1mm)
+}
+
+<<< stdout
+11mm
+21mm
+
+<<< stderr

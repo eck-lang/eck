@@ -1,0 +1,23 @@
+# A loop keeps an unwritten slot precise while writing another slot
+
+Verifies constant indexing keeps the flow state per element. The loop rewrites
+`a[1]`, so only that slot loses its recorded subtype while `a[0]` still adds as
+`10mm + 1mm = 11mm` and the rewritten slot reads back as `30cm`.
+
+>>> source
+let a = [10mm, 20cm]
+
+for (i in 0..3) {
+    a[1] = 30cm
+    print(a[0] + 1mm)
+}
+
+print(a[1])
+
+<<< stdout
+11mm
+11mm
+11mm
+30cm
+
+<<< stderr

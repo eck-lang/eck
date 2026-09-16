@@ -36,10 +36,20 @@ pub fn compile(program: &Program, registry: &Registry) -> Result<TypedProgram, C
         narrowed_bindings: HashMap::new(),
         array_element_types: HashMap::new(),
         loop_depth: 0,
+        loop_contexts: Vec::new(),
         import_scopes: vec![ImportScope::default()],
     }
     .compile_program(program)
 }
+
+/// Bounds the loop fixed-point search.
+///
+/// A pass over a loop body only ever removes facts from the loop head, and the
+/// head is a finite set of element slots, so the analysis converges in fewer
+/// passes than it has facts. The bound is a defensive backstop for a future
+/// change that could reintroduce a fact: it turns a hypothetical compile-time
+/// hang into a conservatively merged loop state.
+const MAXIMUM_LOOP_FIXED_POINT_PASSES: usize = 64;
 
 struct Compiler<'a> {
     registry: &'a Registry,
@@ -60,7 +70,43 @@ struct Compiler<'a> {
     /// read can tell a precise element type from a dynamic one.
     array_element_types: HashMap<BindingId, Vec<Option<ValueType>>>,
     loop_depth: usize,
+    /// One entry per enclosing loop whose statements are currently compiled.
+    ///
+    /// A loop records the flow state of every reachable `break` here, because
+    /// the statements after such a `break` are unreachable and must not
+    /// contribute to the state an exit propagates.
+    loop_contexts: Vec<LoopContext>,
     import_scopes: Vec<ImportScope>,
+}
+
+/// Captures the control-flow facts one enclosing loop needs while its body is
+/// compiled.
+struct LoopContext {
+    /// Element type snapshots taken at each reachable `break` in the loop body.
+    ///
+    /// Every pass over the body replaces this list, so a fixed-point pass that
+    /// discards stale facts never leaves an exit recorded from an earlier and
+    /// more precise pass behind.
+    break_exits: Vec<HashMap<BindingId, Vec<Option<ValueType>>>>,
+}
+
+/// Records one compiled pass over a loop body.
+///
+/// A fixed-point search compiles several passes and keeps only the converged
+/// one, so each pass reports everything the loop statement needs from it.
+struct CompiledLoopPass {
+    /// The pass's compiled condition, which only a `while` loop produces.
+    condition: Option<TypedExpression>,
+    /// The pass's compiled body.
+    body: TypedBlock,
+}
+
+/// Records the converged fixed point of one loop.
+struct CompiledLoop {
+    /// The converged compiled pass.
+    pass: CompiledLoopPass,
+    /// The element flow state every reachable loop exit agrees on.
+    exit_state: HashMap<BindingId, Vec<Option<ValueType>>>,
 }
 
 /// Stores the semantic type and statically allocated storage of one local variable.
@@ -210,27 +256,7 @@ impl Compiler<'_> {
                 condition,
                 body,
                 span,
-            } => {
-                let typed_condition = self.compile_boolean_condition(condition, "while")?;
-                let before = self.array_element_type_snapshot();
-                let narrowed_binding = self.non_null_narrowing_binding(condition);
-                if let Some(binding) = narrowed_binding {
-                    self.push_narrowing(binding);
-                }
-                self.loop_depth += 1;
-                let compiled_body = self.compile_block(body);
-                self.loop_depth -= 1;
-                if let Some(binding) = narrowed_binding {
-                    self.pop_narrowing(binding);
-                }
-                let body_types = self.array_element_type_snapshot();
-                self.merge_array_element_type_snapshots(&[before, body_types]);
-                Ok(TypedStatement::While {
-                    condition: typed_condition,
-                    body: compiled_body?,
-                    span: *span,
-                })
-            }
+            } => self.compile_while_statement(condition, body, *span),
             Statement::Expression(expression) => Ok(TypedStatement::Expression(
                 self.compile_expression(expression, None)?,
             )),
@@ -248,6 +274,11 @@ impl Compiler<'_> {
                         "`break` is only allowed inside a loop",
                     ));
                 }
+                // The exit state is the state the jump leaves behind, so it is
+                // captured here rather than read from the end of the loop body:
+                // any statement written after this `break` is unreachable and
+                // must not reach the loop's post state.
+                self.record_loop_break_exit();
                 Ok(TypedStatement::Break { span: *span })
             }
             Statement::Continue { span } => {
@@ -576,11 +607,18 @@ impl Compiler<'_> {
     }
 
     /// Compiles a source block inside a fresh lexical variable scope.
+    ///
+    /// A statement that always transfers control ends the reachable fallthrough
+    /// of the block. Later statements are still compiled so every diagnostic the
+    /// program earns is reported, but the flow facts of that unreachable suffix
+    /// are discarded before the block returns: an assignment written after a
+    /// `break` must not describe the state the `break` propagates.
     fn compile_block(&mut self, block: &Block) -> Result<TypedBlock, CompileError> {
         self.variable_scopes.push(HashMap::new());
         self.import_scopes.push(ImportScope::default());
         let result = (|| {
             let mut statements = Vec::with_capacity(block.statements.len());
+            let mut fallthrough = true;
             for statement in &block.statements {
                 if matches!(statement, Statement::Configuration { .. }) {
                     return Err(CompileError::new(
@@ -592,7 +630,26 @@ impl Compiler<'_> {
                     self.compile_use_declaration(declaration)?;
                     continue;
                 }
-                statements.push(self.compile_statement(statement)?);
+                if !fallthrough {
+                    // The statement is unreachable. Compile it for diagnostics,
+                    // then restore the state the last reachable transfer left so
+                    // its facts cannot reach the block's exit state.
+                    let reachable_types = self.array_element_type_snapshot();
+                    let reachable_narrowings = self.narrowed_bindings.clone();
+                    statements.push(self.compile_statement(statement)?);
+                    self.restore_array_element_type_snapshot(reachable_types);
+                    self.narrowed_bindings = reachable_narrowings;
+                    continue;
+                }
+                let typed_statement = self.compile_statement(statement)?;
+                let terminates = matches!(
+                    typed_statement,
+                    TypedStatement::Break { .. } | TypedStatement::Continue { .. }
+                );
+                statements.push(typed_statement);
+                if terminates {
+                    fallthrough = false;
+                }
             }
             Ok(TypedBlock {
                 statements,
@@ -659,7 +716,13 @@ impl Compiler<'_> {
             )
             .map_err(|error| CompileError::core(span, error))?;
         self.require_plain_integer_bound(increment.output, span)?;
-        let before = self.array_element_type_snapshot();
+        let range_plan = TypedRangePlan {
+            current_type: start_type,
+            increment_unit,
+            comparison,
+            increment,
+        };
+        let loop_entry_state = self.array_element_type_snapshot();
         self.variable_scopes.push(HashMap::new());
         self.import_scopes.push(ImportScope::default());
         let compiled = (|| {
@@ -672,9 +735,17 @@ impl Compiler<'_> {
                 false,
                 span,
             );
-            self.loop_depth += 1;
-            let compiled_body = self.compile_block(body);
-            self.loop_depth -= 1;
+
+            let compiled = self.compile_loop_statement(loop_entry_state, true, |compiler| {
+                compiler.loop_depth += 1;
+                let compiled_body = compiler.compile_block(body);
+                compiler.loop_depth -= 1;
+                let compiled_body = compiled_body?;
+                Ok(CompiledLoopPass {
+                    condition: None,
+                    body: compiled_body,
+                })
+            })?;
             Ok(TypedStatement::For {
                 variable: variable.to_owned(),
                 binding: local_variable.binding,
@@ -682,21 +753,163 @@ impl Compiler<'_> {
                 variable_type: start_type,
                 start: typed_start,
                 end: typed_end,
-                range_plan: TypedRangePlan {
-                    current_type: start_type,
-                    increment_unit,
-                    comparison,
-                    increment,
-                },
-                body: compiled_body?,
+                range_plan,
+                body: compiled.pass.body,
                 span,
             })
         })();
         self.import_scopes.pop();
         self.variable_scopes.pop();
-        let body_types = self.array_element_type_snapshot();
-        self.merge_array_element_type_snapshots(&[before, body_types]);
         compiled
+    }
+
+    /// Compiles a `while (condition) { body }` loop.
+    ///
+    /// The condition is part of the loop, not a one-time guard: it is compiled
+    /// against the loop's head state and recompiled while the head is refined,
+    /// so a condition that reads a mutated element stops trusting the element's
+    /// first-iteration subtype. The loop also falls through when the condition
+    /// is false before its first iteration, so the entry state always
+    /// contributes to the post-loop state.
+    fn compile_while_statement(
+        &mut self,
+        condition: &Expression,
+        body: &Block,
+        span: syntax::Span,
+    ) -> Result<TypedStatement, CompileError> {
+        let loop_entry_state = self.array_element_type_snapshot();
+        let narrowed_binding = self.non_null_narrowing_binding(condition);
+        if let Some(binding) = narrowed_binding {
+            self.push_narrowing(binding);
+        }
+        let compiled = self.compile_loop_statement(loop_entry_state, true, |compiler| {
+            // The condition is compiled on every pass so it observes the current
+            // head, and the converged pass is the one that is emitted.
+            let typed_condition = compiler.compile_boolean_condition(condition, "while")?;
+            compiler.loop_depth += 1;
+            let compiled_body = compiler.compile_block(body);
+            compiler.loop_depth -= 1;
+            let compiled_body = compiled_body?;
+            Ok(CompiledLoopPass {
+                condition: Some(typed_condition),
+                body: compiled_body,
+            })
+        });
+        if let Some(binding) = narrowed_binding {
+            self.pop_narrowing(binding);
+        }
+        let compiled = compiled?;
+        let typed_condition = compiled
+            .pass
+            .condition
+            .ok_or_else(|| CompileError::new(span, "`while` requires a compiled loop condition"))?;
+        Ok(TypedStatement::While {
+            condition: typed_condition,
+            body: compiled.pass.body,
+            span,
+        })
+    }
+
+    /// Computes the loop head and the final body of one loop by fixed point.
+    ///
+    /// A loop body can execute repeatedly, so every operation inside it must be
+    /// compiled against the element types that hold on *any* iteration. The head
+    /// therefore starts at the loop entry state and is refined by joining in the
+    /// state each pass reaches, until the join adds nothing and the head stops
+    /// changing. The condition and body of the converged pass are the ones that
+    /// are emitted, so no operation in the loop was specialized with a fact a
+    /// previous iteration can invalidate.
+    ///
+    /// `body_step` performs one pass with the compiler flow state already set to
+    /// the current loop head, records the state of every reachable `break` in the
+    /// active [`LoopContext`], and returns the compiled pass. Element writes
+    /// inside the pass update the flow state directly, so the state left when the
+    /// pass returns is the pass's backedge state.
+    ///
+    /// `include_entry_state_in_exit` reports whether the loop can leave without
+    /// transferring control out of it, which is a `while` loop whose condition
+    /// may be false and a `for` loop whose range may be empty. Its exit state
+    /// then joins the state the loop started in with the states the loop's own
+    /// exits reach.
+    ///
+    /// A statement written after an unconditional `break` or `continue` is
+    /// unreachable and already excluded from the state recorded here, because
+    /// [`Compiler::compile_block`] discards the flow facts of an unreachable
+    /// suffix.
+    fn compile_loop_statement(
+        &mut self,
+        loop_entry_state: HashMap<BindingId, Vec<Option<ValueType>>>,
+        include_entry_state_in_exit: bool,
+        mut body_step: impl FnMut(&mut Self) -> Result<CompiledLoopPass, CompileError>,
+    ) -> Result<CompiledLoop, CompileError> {
+        let mut head = loop_entry_state.clone();
+        let mut converged: Option<CompiledLoop> = None;
+        for _ in 0..MAXIMUM_LOOP_FIXED_POINT_PASSES {
+            // The head is the state every iteration begins from: the loop entry
+            // and every path that reached the end of a previous body.
+            self.restore_array_element_type_snapshot(head.clone());
+            self.loop_contexts.push(LoopContext {
+                break_exits: Vec::new(),
+            });
+            let body_result = body_step(self);
+            let context = self
+                .loop_contexts
+                .pop()
+                .expect("the loop context was pushed above");
+            let pass = body_result?;
+            let backedge_state = self.array_element_type_snapshot();
+            // Every later iteration begins from a state this pass can reach at
+            // the end of the body, either by completing it or by `break`ing out.
+            // Joining those into the current head heads the next iteration, and
+            // the head is stable once the join adds nothing.
+            let mut reached = vec![backedge_state.clone()];
+            reached.extend(context.break_exits.iter().cloned());
+            let mut head_snapshots = vec![head.clone()];
+            head_snapshots.extend(reached);
+            let next_head = Self::join_array_element_type_snapshots(&head_snapshots);
+            // The post-loop state merges only reachable exits. A `continue` is a
+            // backedge and contributes through the post-body state; a `break`
+            // contributes the state it recorded at the jump. The head already
+            // joins every state a previous iteration reached, so it covers each
+            // exiting iteration without re-listing them here.
+            let mut exit_snapshots = vec![head.clone(), backedge_state];
+            exit_snapshots.extend(context.break_exits.iter().cloned());
+            if include_entry_state_in_exit {
+                exit_snapshots.push(loop_entry_state.clone());
+            }
+            let exit_state = Self::join_array_element_type_snapshots(&exit_snapshots);
+            if next_head == head {
+                converged = Some(CompiledLoop { pass, exit_state });
+                break;
+            }
+            head = next_head;
+        }
+        let compiled = converged.ok_or_else(|| {
+            // The bound was reached without converging. Dropping every element
+            // fact keeps the diagnostic sound instead of emitting operations
+            // compiled against a head a later iteration could invalidate.
+            self.array_element_types.clear();
+            CompileError::new(
+                syntax::Span { start: 0, end: 0 },
+                "the loop flow analysis did not converge",
+            )
+        })?;
+        // Statements after the loop see the merged state of its reachable exits.
+        self.restore_array_element_type_snapshot(compiled.exit_state.clone());
+        Ok(compiled)
+    }
+
+    /// Records the current element flow state as the exit of the innermost loop.
+    ///
+    /// The state is captured at the `break` rather than read from the end of the
+    /// loop body, so a statement written after the jump cannot reach the loop's
+    /// post state. The innermost enclosing [`LoopContext`] always exists here,
+    /// because `break` is rejected outside a loop.
+    fn record_loop_break_exit(&mut self) {
+        let Some(context) = self.loop_contexts.last_mut() else {
+            return;
+        };
+        context.break_exits.push(self.array_element_types.clone());
     }
 
     /// Validates that a range bound is a plain integer type.

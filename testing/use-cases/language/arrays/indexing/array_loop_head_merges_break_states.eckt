@@ -1,0 +1,26 @@
+# Loop head merges the states of different breaks
+
+Verifies a break contributes the state it jumped with. The first iteration
+rewrites `a[1]` and breaks, so `a[0]` is never written and keeps its millimeter
+subtype across the loop, while the rewritten slot is read at runtime.
+
+>>> source
+let a: int[] = [10mm, 20mm]
+
+for (i in 0..2) {
+    if (i == 0) {
+        a[1] = 5cm
+        break
+    }
+    a[0] = 2cm
+    break
+}
+
+print(a[0] + 1mm)
+print(a[1] + 1mm)
+
+<<< stdout
+11mm
+51mm
+
+<<< stderr

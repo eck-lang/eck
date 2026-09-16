@@ -1,0 +1,21 @@
+# Inner loop write reaches the next outer iteration
+
+Verifies an inner loop that rewrites an element is observed by the outer loop
+on a later outer iteration. The outer body reads the element after the inner
+loop, so both prints observe the stored `2cm` independently.
+
+>>> source
+let a: int[] = [10mm]
+
+for (outer in 0..2) {
+    for (inner in 0..1) {
+        a[0] = 2cm
+    }
+    print(a[0])
+}
+
+<<< stdout
+2cm
+2cm
+
+<<< stderr

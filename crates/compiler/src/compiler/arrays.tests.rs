@@ -511,3 +511,157 @@ fn keeps_dynamic_type_after_assignment() {
         "an assigned dynamic value must keep dispatching later"
     );
 }
+
+/// Verifies a repeated element read in a `for` body becomes dynamic when the
+/// body can change the element, because the emitted body must stay valid while
+/// the loop runs more than once.
+#[test]
+fn refines_loop_head_for_a_for_body_that_writes_the_element() {
+    let program = compile_source(
+        "let a: int[] = [10mm]\n\
+         for (i in 0..2) {\n\
+         let read = a[0] + 1mm\n\
+         a[0] = 2cm\n\
+         }\n",
+    );
+    let read = loop_body_initializer(&program, "read");
+    assert!(
+        matches!(read.kind, TypedExpressionKind::DynamicBinary { .. }),
+        "a repeated body that writes the element cannot keep a static element type"
+    );
+}
+
+/// Verifies refining the loop head also reaches the loop condition, so a
+/// `while` condition stops trusting the subtype an earlier iteration replaced.
+#[test]
+fn refines_loop_head_for_a_while_condition() {
+    let program = compile_source(
+        "let a: int[] = [10mm]\n\
+         let index = 0\n\
+         a[index] = 2cm\n\
+         while (a[0] < 15mm) {\n\
+         a[0] = 2cm\n\
+         }\n",
+    );
+    let TypedStatement::While { condition, .. } = compiled_while_statement(&program) else {
+        panic!("the program declares a while loop");
+    };
+    assert!(
+        matches!(
+            condition.kind,
+            TypedExpressionKind::DynamicComparison { .. }
+        ),
+        "a loop condition that reads a mutated element must dispatch at runtime"
+    );
+}
+
+/// Verifies a loop that never writes an element keeps its precise subtype, so a
+/// repeated read is not silently degraded to subtype dispatch.
+#[test]
+fn keeps_a_stable_element_precise_inside_a_loop() {
+    let program = compile_source(
+        "let a: int[] = [10mm]\n\
+         for (i in 0..100) {\n\
+         let read = a[0] + 1mm\n\
+         }\n",
+    );
+    let read = loop_body_initializer(&program, "read");
+    assert!(
+        matches!(read.kind, TypedExpressionKind::Binary { .. }),
+        "a loop that never writes the element must keep the static element type"
+    );
+}
+
+/// Verifies writing one slot leaves an independently known slot precise, because
+/// constant indexing lets the flow state track elements separately.
+#[test]
+fn keeps_an_unwritten_slot_precise_when_another_slot_is_written() {
+    let program = compile_source(
+        "let a = [10mm, 20cm]\n\
+         for (i in 0..100) {\n\
+         a[1] = 30cm\n\
+         let read = a[0] + 1mm\n\
+         }\n",
+    );
+    let read = loop_body_initializer(&program, "read");
+    assert!(
+        matches!(read.kind, TypedExpressionKind::Binary { .. }),
+        "an untouched slot must stay precise when another slot is written"
+    );
+}
+
+/// Verifies an assignment written after a `break` cannot reach the loop's post
+/// state, so the value carried out of the loop is the one written before it.
+#[test]
+fn unreachable_write_after_a_break_does_not_reach_the_loop_exit() {
+    let program = compile_source(
+        "let a: int[] = [10mm]\n\
+         for (i in 0..1) {\n\
+         a[0] = 2cm\n\
+         break\n\
+         a[0] = 10mm\n\
+         }\n\
+         let total = a[0] + 1mm\n",
+    );
+    let total = binding_initializer(&program, "total");
+    assert!(
+        matches!(total.kind, TypedExpressionKind::DynamicBinary { .. }),
+        "the exit state must be the merge of the break and the iterations that reach it"
+    );
+}
+
+/// Verifies an assignment written after a `continue` cannot reach the loop head,
+/// so a later read in the body still sees the merged possibilities.
+#[test]
+fn unreachable_write_after_a_continue_does_not_reach_the_loop() {
+    let program = compile_source(
+        "let a: int[] = [10mm]\n\
+         for (i in 0..2) {\n\
+         if (i == 0) {\n\
+         a[0] = 2cm\n\
+         continue\n\
+         a[0] = 10mm\n\
+         }\n\
+         let read = a[0] + 1mm\n\
+         }\n",
+    );
+    let read = loop_body_initializer(&program, "read");
+    assert!(
+        matches!(read.kind, TypedExpressionKind::DynamicBinary { .. }),
+        "the merged head must not trust the unreachable write"
+    );
+}
+
+/// Returns the first `while` statement of a compiled program.
+fn compiled_while_statement(program: &TypedProgram) -> &TypedStatement {
+    program
+        .statements
+        .iter()
+        .find(|statement| matches!(statement, TypedStatement::While { .. }))
+        .expect("program declares a while loop")
+}
+
+/// Returns the initializer of one binding declared inside a loop body.
+fn loop_body_initializer<'program>(
+    program: &'program TypedProgram,
+    name: &str,
+) -> &'program TypedExpression {
+    for statement in &program.statements {
+        let body = match statement {
+            TypedStatement::For { body, .. } | TypedStatement::While { body, .. } => body,
+            _ => continue,
+        };
+        for nested in &body.statements {
+            if let TypedStatement::VariableDeclaration {
+                name: binding,
+                expression,
+                ..
+            } = nested
+                && binding == name
+            {
+                return expression;
+            }
+        }
+    }
+    panic!("no loop body declares a binding `{name}`");
+}

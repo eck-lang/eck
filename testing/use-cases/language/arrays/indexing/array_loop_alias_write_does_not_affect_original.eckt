@@ -1,0 +1,20 @@
+# A write through an alias does not affect the original array
+
+Verifies arrays keep value semantics inside a loop: rewriting the copy through
+`b` leaves `a` unchanged, so the loop keeps reading `a[0]` as millimeters and
+prints `11mm` on both iterations.
+
+>>> source
+let a: int[] = [10mm]
+let b = a
+
+for (i in 0..2) {
+    b[0] = 2cm
+    print(a[0] + 1mm)
+}
+
+<<< stdout
+11mm
+11mm
+
+<<< stderr

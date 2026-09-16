@@ -1,0 +1,21 @@
+# Continue before a write still reaches the next iteration
+
+Verifies a `continue` is a loop backedge, not an exit. The body writes `2cm`
+and continues on the first iteration, so the second iteration reads the stored
+centimeter value and prints `21mm`.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..2) {
+    if (i == 0) {
+        a[0] = 2cm
+        continue
+    }
+    print(a[0] + 1mm)
+}
+
+<<< stdout
+21mm
+
+<<< stderr

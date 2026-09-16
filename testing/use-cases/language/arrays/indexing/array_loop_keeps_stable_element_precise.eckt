@@ -1,0 +1,19 @@
+# A loop keeps an element it never writes precise
+
+Verifies a loop that never writes `a[0]` leaves its recorded subtype in place,
+so the repeated read stays statically charged as millimeters and prints `11mm`
+on every iteration.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..3) {
+    print(a[0] + 1mm)
+}
+
+<<< stdout
+11mm
+11mm
+11mm
+
+<<< stderr

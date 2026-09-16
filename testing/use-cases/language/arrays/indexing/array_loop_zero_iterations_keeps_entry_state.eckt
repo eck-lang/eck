@@ -1,0 +1,19 @@
+# Empty range keeps the pre-loop element type
+
+Verifies a loop that executes zero times leaves the element flow state at its
+entry value, so the write inside the body is never reachable and `a[0]` still
+adds as `10mm + 1mm = 11mm`.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..0) {
+    a[0] = 2cm
+}
+
+print(a[0] + 1mm)
+
+<<< stdout
+11mm
+
+<<< stderr

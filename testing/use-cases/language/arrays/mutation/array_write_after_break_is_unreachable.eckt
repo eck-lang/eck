@@ -1,0 +1,21 @@
+# A write after `break` is unreachable
+
+Verifies the state a `break` propagates is the state at the jump. The body
+stores `2cm` and then breaks, so the later `a[0] = 10mm` never runs and the
+post-loop read still adds the stored centimeter value: `20mm + 1mm = 21mm`.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..2) {
+    a[0] = 2cm
+    break
+    a[0] = 10mm
+}
+
+print(a[0] + 1mm)
+
+<<< stdout
+21mm
+
+<<< stderr

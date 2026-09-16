@@ -1,0 +1,22 @@
+# A write after `continue` is unreachable
+
+Verifies the loop head is headed by the state the `continue` left. The body
+stores `2cm` and continues, so the later `a[0] = 10mm` never runs and the next
+iteration reads the stored centimeter value: `20mm + 1mm = 21mm`.
+
+>>> source
+let a: int[] = [10mm]
+
+for (i in 0..2) {
+    if (i == 0) {
+        a[0] = 2cm
+        continue
+        a[0] = 10mm
+    }
+    print(a[0] + 1mm)
+}
+
+<<< stdout
+21mm
+
+<<< stderr
