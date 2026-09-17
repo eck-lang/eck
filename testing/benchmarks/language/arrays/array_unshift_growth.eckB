@@ -1,0 +1,16 @@
+# Array front insertion growth performance
+
+Measures 1,000,000 unshift calls that each insert a value before the first
+element of an array that keeps growing. The array is never drained, so the
+workload measures the amortized cost of growing one contiguous allocation from
+the front: an implementation that moved every remaining element on each
+insertion would be quadratic here, while this representation stays linear. The
+first and last elements are printed to prove the stored order.
+
+>>> source
+let values: int[] = []
+for (iteration in 0..1000000) {
+    values->unshift(iteration)
+}
+print(values[0])
+print(values[999999])

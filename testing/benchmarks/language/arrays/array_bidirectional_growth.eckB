@@ -1,0 +1,23 @@
+# Array bidirectional growth and drain performance
+
+Measures 1,000,000 iterations that push one value after the last element and
+one value before the first element, which grows one contiguous allocation in
+both directions, and then drains the resulting 2,000,000 elements from both
+ends. The workload measures the bidirectional growth policy together with both
+removal paths, and the printed removal count proves every element was produced
+exactly once.
+
+>>> source
+let values: int[] = []
+for (iteration in 0..1000000) {
+    values->push(iteration)
+    values->unshift(iteration)
+}
+let removed: int = 0
+while (values->shift() != null) {
+    removed = removed + 1
+}
+while (values->pop() != null) {
+    removed = removed + 1
+}
+print(removed)

@@ -1,0 +1,20 @@
+# Array unshift and shift performance
+
+Measures 5,000,000 unshift/shift pairs on one array that holds a single
+element, so the workload measures front insertion and front removal without any
+resizing: an insertion that claims the free slot before the first element and a
+removal that advances the start of the live window. A per-operation regression
+such as an extra clone or a type lookup shows up directly. Only the final total
+is printed so benchmark output does not dominate execution.
+
+>>> source
+let values: int[] = []
+let total: int = 0
+for (iteration in 0..5000000) {
+    values->unshift(iteration)
+    let removed = values->shift()
+    if (removed != null) {
+        total = total + removed
+    }
+}
+print(total)

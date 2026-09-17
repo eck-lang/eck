@@ -1,0 +1,20 @@
+# Array push and pop performance
+
+Measures 5,000,000 push/pop pairs on one array that holds a single element, so
+the workload measures the end operations themselves: an append that claims the
+free slot after the last element and a removal that moves the element out of
+it. Neither operation moves the other elements, so a per-operation regression
+such as an extra clone or a type lookup shows up directly. Only the final total
+is printed so benchmark output does not dominate execution.
+
+>>> source
+let values: int[] = []
+let total: int = 0
+for (iteration in 0..5000000) {
+    values->push(iteration)
+    let removed = values->pop()
+    if (removed != null) {
+        total = total + removed
+    }
+}
+print(total)
