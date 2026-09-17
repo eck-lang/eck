@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::configuration::RegisteredTypeConfiguration;
 use crate::{
-    ConfigurationDescriptor, ConfigurationValue, CoreError, RuntimeConfiguration,
+    ArrayValue, ConfigurationDescriptor, ConfigurationValue, CoreError, RuntimeConfiguration,
     TypeConfigurationDescriptor, TypeId, Value,
 };
 
@@ -172,11 +172,28 @@ impl Registry {
     }
 
     /// Formats a value using contextual behavior when its type registered one.
+    ///
+    /// An array is a container rather than a scalar payload, so it is rendered
+    /// from its live elements before the element type's own formatter is
+    /// consulted. Every element is formatted through this same contract, which
+    /// keeps its own subtype suffix and configuration exactly as it would have
+    /// on its own.
     pub fn format_value_with_configuration(
         &self,
         value: &Value,
         configuration: &RuntimeConfiguration,
     ) -> Result<String, CoreError> {
+        if let Some(array) = value.downcast_ref::<ArrayValue>() {
+            let mut rendered = String::from("[");
+            for (index, element) in array.elements().iter().enumerate() {
+                if index > 0 {
+                    rendered.push_str(", ");
+                }
+                rendered.push_str(&self.format_value_with_configuration(element, configuration)?);
+            }
+            rendered.push(']');
+            return Ok(rendered);
+        }
         let formatted = match self.type_configuration(value.type_id()) {
             Some(registered) => match registered.descriptor.format {
                 Some(format) => format(value, configuration)?,
