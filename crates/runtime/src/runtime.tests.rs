@@ -1,7 +1,7 @@
 use ir::{
-    ArrayType, BindingId, LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock, TypedExpression,
-    TypedExpressionKind, TypedProgram, TypedRangePlan, TypedScalePlan, TypedScaleStep,
-    TypedStatement,
+    ArrayMethod, ArrayType, BindingId, LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock,
+    TypedExpression, TypedExpressionKind, TypedProgram, TypedRangePlan, TypedScalePlan,
+    TypedScaleStep, TypedStatement,
 };
 use language_core::{
     BinaryOperator, CoreError, Registry, Scale, SubtypeBinaryRule, SubtypeDescriptor,
@@ -1002,4 +1002,221 @@ fn keeps_the_element_unit_when_normalizing_a_widened_element() {
     let elements = stored_elements(&locals[0]);
     assert_eq!(elements[0].subtype_id(), Some(millimeter));
     assert_eq!(elements[0].downcast_ref::<i8>(), Some(&100));
+}
+
+/// Marks the payload a null value carries in the array method tests.
+#[derive(Clone, Copy)]
+struct TestNull;
+
+/// Parses the null literal into the test null payload.
+fn parse_test_null(raw_text: &str, type_id: language_core::TypeId) -> Result<Value, CoreError> {
+    match raw_text {
+        "null" => Ok(Value::new(type_id, TestNull)),
+        _ => Err(CoreError::InvalidLiteral {
+            raw_text: raw_text.to_string(),
+            type_name: "null".to_string(),
+            message: "expected `null`".to_string(),
+        }),
+    }
+}
+
+/// Builds a registry with one array element type and the language null type.
+fn array_method_registry() -> (Registry, language_core::TypeId, language_core::TypeId) {
+    let mut registry = Registry::new();
+    let integer = registry.allocate_type_id();
+    let null = registry.allocate_type_id();
+    registry
+        .register_type(TypeDescriptor {
+            id: integer,
+            name: "integer",
+            is_integer: true,
+            parse_numeric_literal: Some(parse_integer),
+            parse_string_literal: None,
+            parse_regex_literal: None,
+            parse_boolean_literal: None,
+            parse_null_literal: None,
+            format: format_value,
+        })
+        .unwrap();
+    registry
+        .register_type(TypeDescriptor {
+            id: null,
+            name: "null",
+            is_integer: false,
+            parse_numeric_literal: None,
+            parse_string_literal: None,
+            parse_regex_literal: None,
+            parse_boolean_literal: None,
+            parse_null_literal: Some(parse_test_null),
+            format: format_value,
+        })
+        .unwrap();
+    registry.set_default_null(null).unwrap();
+    registry.set_default_integer(integer).unwrap();
+    (registry, integer, null)
+}
+
+/// Builds a statement that declares one array binding from literal elements.
+fn array_declaration(
+    slot: usize,
+    integer: language_core::TypeId,
+    elements: Vec<i64>,
+) -> TypedStatement {
+    let element_type = ValueType::plain(integer);
+    TypedStatement::VariableDeclaration {
+        name: format!("values{slot}"),
+        binding: BindingId(slot),
+        slot: LocalVariableSlot(slot),
+        mutable: true,
+        value_type: element_type,
+        expression: TypedExpression {
+            output: Some(element_type),
+            kind: TypedExpressionKind::ArrayLiteral {
+                array_type: ArrayType {
+                    element: element_type,
+                    adaptive_integer: false,
+                },
+                elements: elements
+                    .into_iter()
+                    .map(|value| TypedExpression {
+                        output: Some(element_type),
+                        kind: TypedExpressionKind::Literal(Value::new(integer, value)),
+                        span: SPAN,
+                    })
+                    .collect(),
+            },
+            span: SPAN,
+        },
+        span: SPAN,
+    }
+}
+
+/// Builds one expression that applies an array method to a local array slot.
+fn array_method_expression(
+    method: ArrayMethod,
+    slot: usize,
+    element: ValueType,
+    arguments: Vec<TypedExpression>,
+    empty_result: Option<Value>,
+) -> TypedExpression {
+    let output = match method.removes_element() {
+        true => Some(element),
+        false => None,
+    };
+    TypedExpression {
+        output,
+        kind: TypedExpressionKind::ArrayMethod {
+            method,
+            binding: BindingId(slot),
+            slot: LocalVariableSlot(slot),
+            arguments,
+            dynamic_result: false,
+            empty_result,
+        },
+        span: SPAN,
+    }
+}
+
+/// Verifies a removal from an empty array produces the language null value.
+#[test]
+fn removing_from_an_empty_array_produces_the_null_value() {
+    let (registry, integer, null) = array_method_registry();
+    let element_type = ValueType::plain(integer);
+    let program = TypedProgram {
+        statements: vec![
+            array_declaration(0, integer, Vec::new()),
+            TypedStatement::VariableDeclaration {
+                name: "removed".to_string(),
+                binding: BindingId(1),
+                slot: LocalVariableSlot(1),
+                mutable: false,
+                value_type: element_type,
+                expression: array_method_expression(
+                    ArrayMethod::Pop,
+                    0,
+                    element_type,
+                    Vec::new(),
+                    Some(parse_test_null("null", null).expect("the null literal parses")),
+                ),
+                span: SPAN,
+            },
+        ],
+        local_slot_count: 2,
+        bindings: Vec::new(),
+    };
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    result.unwrap();
+    assert_eq!(
+        locals[1]
+            .as_ref()
+            .expect("the removal stored a value")
+            .type_id(),
+        null
+    );
+    assert!(stored_elements(&locals[0]).is_empty());
+}
+
+/// Verifies an insertion through one binding leaves a shared array untouched.
+///
+/// Two bindings that hold the same array share one payload until one of them is
+/// mutated, so the mutation has to copy the payload first. The test proves the
+/// copy is made and that the other binding keeps its own elements.
+#[test]
+fn insertion_through_a_shared_binding_copies_the_array() {
+    let (registry, integer, _) = array_method_registry();
+    let element_type = ValueType::plain(integer);
+    let program = TypedProgram {
+        statements: vec![
+            array_declaration(0, integer, vec![1, 2]),
+            TypedStatement::VariableDeclaration {
+                name: "alias".to_string(),
+                binding: BindingId(1),
+                slot: LocalVariableSlot(1),
+                mutable: true,
+                value_type: element_type,
+                expression: TypedExpression {
+                    output: Some(element_type),
+                    kind: TypedExpressionKind::Variable {
+                        name: "values0".to_string(),
+                        binding: BindingId(0),
+                        slot: LocalVariableSlot(0),
+                        nullable: false,
+                        array_type: Some(ArrayType {
+                            element: element_type,
+                            adaptive_integer: false,
+                        }),
+                        dynamic_complete_type: false,
+                    },
+                    span: SPAN,
+                },
+                span: SPAN,
+            },
+            TypedStatement::Expression(array_method_expression(
+                ArrayMethod::Push,
+                1,
+                element_type,
+                vec![TypedExpression {
+                    output: Some(element_type),
+                    kind: TypedExpressionKind::Literal(Value::new(integer, 3_i64)),
+                    span: SPAN,
+                }],
+                None,
+            )),
+        ],
+        local_slot_count: 2,
+        bindings: Vec::new(),
+    };
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    result.unwrap();
+    let original = stored_elements(&locals[0]);
+    assert_eq!(original.len(), 2);
+    assert_eq!(original[0].downcast_ref::<i64>(), Some(&1));
+    assert_eq!(original[1].downcast_ref::<i64>(), Some(&2));
+    let alias = stored_elements(&locals[1]);
+    assert_eq!(alias.len(), 3);
+    assert_eq!(alias[2].downcast_ref::<i64>(), Some(&3));
 }

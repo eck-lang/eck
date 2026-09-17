@@ -370,23 +370,31 @@ impl Compiler<'_> {
                     operator,
                     ComparisonOperator::Equal | ComparisonOperator::NotEqual
                 ) {
+                    // One operand compared with the null literal may hold null.
+                    // Which expressions may is decided by the compiled operand
+                    // itself, so a nullable binding and a removal from an array
+                    // both reach the dedicated null test.
                     let nullable_operand = match (left_operand.as_ref(), right_operand.as_ref()) {
-                        (Expression::Variable { .. }, Expression::Null { .. }) => {
-                            Some(left_operand.as_ref())
-                        }
-                        (Expression::Null { .. }, Expression::Variable { .. }) => {
-                            Some(right_operand.as_ref())
+                        (Expression::Null { .. }, other) | (other, Expression::Null { .. })
+                            if !matches!(other, Expression::Null { .. }) =>
+                        {
+                            Some(other)
                         }
                         _ => None,
                     };
                     if let Some(nullable_operand) = nullable_operand {
                         let typed_operand = self.compile_expression(nullable_operand, None)?;
-                        let declared_nullable = match nullable_operand {
-                            Expression::Variable { name, .. } => self
-                                .resolve_variable(name)
-                                .is_some_and(|variable| variable.nullable),
-                            _ => false,
-                        };
+                        // A binding narrowed by an enclosing proof is no longer
+                        // nullable, but its declaration still is, and comparing
+                        // it with null remains a legitimate test, so both the
+                        // compiled operand and the declaration are consulted.
+                        let declared_nullable = self.expression_is_nullable(&typed_operand)
+                            || match nullable_operand {
+                                Expression::Variable { name, .. } => self
+                                    .resolve_variable(name)
+                                    .is_some_and(|variable| variable.nullable),
+                                _ => false,
+                            };
                         if declared_nullable {
                             let boolean_type = self
                                 .registry
@@ -497,6 +505,22 @@ impl Compiler<'_> {
                 span,
             } => {
                 let typed_expression = self.compile_expression(expression, expected)?;
+                if let Some(array_type) = typed_expression.array_type() {
+                    // A bare `->name` is the argument-less spelling of a method
+                    // call, exactly as `->lowercase` calls a string function.
+                    // Resolving it through the array method table keeps that
+                    // spelling and `->name()` consistent, and reports the
+                    // operation's own arity or name diagnostic instead of a
+                    // scalar-operand failure.
+                    return self.compile_array_method(
+                        expression,
+                        &typed_expression,
+                        array_type,
+                        target,
+                        &[],
+                        *span,
+                    );
+                }
                 self.require_scalar_expression(&typed_expression)?;
                 let source = typed_expression.output.ok_or_else(|| {
                     CompileError::new(expression.span(), "a void expression cannot be converted")
@@ -539,6 +563,16 @@ impl Compiler<'_> {
                     return self.compile_measure_to(expression, arguments, *span);
                 }
                 let typed_base = self.compile_expression(expression, None)?;
+                if let Some(array_type) = typed_base.array_type() {
+                    return self.compile_array_method(
+                        expression,
+                        &typed_base,
+                        array_type,
+                        function,
+                        arguments,
+                        *span,
+                    );
+                }
                 self.require_scalar_expression(&typed_base)?;
                 let base_type = typed_base.output.ok_or_else(|| {
                     CompileError::new(expression.span(), "pipe receiver has no value")
@@ -548,7 +582,9 @@ impl Compiler<'_> {
                 argument_types.push(base_type.base);
                 for argument in arguments {
                     let typed = self.compile_expression(argument, None)?;
-                    self.require_scalar_expression(&typed)?;
+                    // Nullability is rejected here; whether a container may be
+                    // passed is decided once the called function is known.
+                    self.require_non_nullable_expression(&typed)?;
                     let ty = typed.output.ok_or_else(|| {
                         CompileError::new(
                             argument.span(),
@@ -568,6 +604,7 @@ impl Compiler<'_> {
                         other => Err(other),
                     })
                     .map_err(|e| CompileError::core(*span, e))?;
+                self.require_scalar_arguments(function_id, &typed_arguments, *span)?;
                 let output = self
                     .registry
                     .function(function_id)
@@ -594,7 +631,9 @@ impl Compiler<'_> {
                 let mut argument_types = Vec::with_capacity(arguments.len());
                 for argument in arguments {
                     let typed = self.compile_expression(argument, None)?;
-                    self.require_scalar_expression(&typed)?;
+                    // Nullability is rejected here; whether a container may be
+                    // passed is decided once the called function is known.
+                    self.require_non_nullable_expression(&typed)?;
                     let ty = typed.output.ok_or_else(|| {
                         CompileError::new(
                             argument.span(),
@@ -610,6 +649,7 @@ impl Compiler<'_> {
                     &argument_types,
                     *span,
                 )?;
+                self.require_scalar_arguments(function, &typed_arguments, *span)?;
                 let output = self
                     .registry
                     .function(function)

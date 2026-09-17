@@ -262,6 +262,13 @@ impl<'registry> Runtime<'registry> {
                 })?;
                 Ok(Some(self.normalize_element_for_storage(value, *element)?))
             }
+            TypedExpressionKind::ArrayMethod {
+                method,
+                slot,
+                arguments,
+                empty_result,
+                ..
+            } => self.execute_array_method(*method, *slot, arguments, empty_result),
             TypedExpressionKind::ElementAccess {
                 array,
                 index,

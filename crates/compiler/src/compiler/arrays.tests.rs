@@ -2,7 +2,7 @@ use language_core::{Extension, Registry, ValueType};
 use measures::MeasuresExtension;
 
 use crate::{CompileError, TypedStatement, compile};
-use ir::{ArrayType, TypedExpression, TypedExpressionKind, TypedProgram};
+use ir::{ArrayMethod, ArrayType, TypedExpression, TypedExpressionKind, TypedProgram};
 
 /// Builds a registry with every primitive and measure type for array tests.
 ///
@@ -763,4 +763,262 @@ fn loop_body_initializer<'program>(
         }
     }
     panic!("no loop body declares a binding `{name}`");
+}
+
+/// Returns the operation of the first compiled array method call.
+fn first_array_method(program: &TypedProgram) -> ArrayMethod {
+    for statement in &program.statements {
+        if let TypedStatement::Expression(expression) = statement
+            && let TypedExpressionKind::ArrayMethod { method, .. } = &expression.kind
+        {
+            return *method;
+        }
+    }
+    panic!("program calls no array method");
+}
+
+/// Verifies `append` is the `push` operation rather than a second one.
+#[test]
+fn resolves_append_as_the_push_operation() {
+    let pushed = compile_source("let values: int[] = [1]\nvalues->push(2)\n");
+    let appended = compile_source("let values: int[] = [1]\nvalues->append(2)\n");
+
+    assert_eq!(first_array_method(&pushed), ArrayMethod::Push);
+    assert_eq!(first_array_method(&appended), ArrayMethod::Push);
+}
+
+/// Verifies `prepend` is the `unshift` operation rather than a second one.
+#[test]
+fn resolves_prepend_as_the_unshift_operation() {
+    let unshifted = compile_source("let values: int[] = [1]\nvalues->unshift(2)\n");
+    let prepended = compile_source("let values: int[] = [1]\nvalues->prepend(2)\n");
+
+    assert_eq!(first_array_method(&unshifted), ArrayMethod::Unshift);
+    assert_eq!(first_array_method(&prepended), ArrayMethod::Unshift);
+}
+
+/// Verifies the argument-less spelling names the same removal as `pop()`.
+///
+/// A bare `->name` is how ECK spells an argument-less method call, so it must
+/// reach the same operation and the same arity rule as the parenthesized form.
+#[test]
+fn resolves_a_bare_arrow_spelling_as_the_same_removal() {
+    let parenthesized = compile_source("let values: int[] = [1]\nvalues->pop()\n");
+    let bare = compile_source("let values: int[] = [1]\nvalues->pop\n");
+    let insertion = compile_error("let values: int[] = [1]\nvalues->push\n");
+
+    assert_eq!(first_array_method(&parenthesized), ArrayMethod::Pop);
+    assert_eq!(first_array_method(&bare), ArrayMethod::Pop);
+    assert!(
+        insertion
+            .message
+            .contains("`push` expects exactly one value to add")
+    );
+}
+
+/// Verifies a name no array method claims lists the supported methods.
+#[test]
+fn rejects_an_unknown_array_method() {
+    let error = compile_error("let values: int[] = [1]\nvalues->length()\n");
+
+    assert!(error.message.contains("an array has no method `length`"));
+    assert!(
+        error
+            .message
+            .contains("push, append, pop, unshift, prepend, shift")
+    );
+}
+
+/// Verifies an insertion requires exactly one value and a removal none.
+#[test]
+fn rejects_wrong_argument_counts() {
+    let missing = compile_error("let values: int[] = [1]\nvalues->push()\n");
+    let extra = compile_error("let values: int[] = [1]\nvalues->push(2, 3)\n");
+    let removal = compile_error("let values: int[] = [1]\nvalues->pop(0)\n");
+
+    assert!(
+        missing
+            .message
+            .contains("`push` expects exactly one value to add")
+    );
+    assert!(
+        extra
+            .message
+            .contains("`push` expects exactly one value to add")
+    );
+    assert!(
+        removal
+            .message
+            .contains("`pop` removes one element and takes no arguments")
+    );
+}
+
+/// Verifies an end operation requires a mutable array binding as its receiver.
+#[test]
+fn rejects_an_invalid_receiver() {
+    let immutable = compile_error("const values: int[] = [1]\nvalues->push(2)\n");
+    let temporary = compile_error("let values: int[] = [1]\n[2]->push(3)\n");
+
+    assert!(
+        immutable
+            .message
+            .contains("cannot call `push` through immutable binding `values`")
+    );
+    assert!(
+        temporary
+            .message
+            .contains("its receiver must be an array binding")
+    );
+}
+
+/// Verifies an insertion produces no value and a removal produces an element.
+#[test]
+fn distinguishes_insertion_and_removal_results() {
+    let insertion = compile_error("let values: int[] = [1]\nlet stored = values->push(2)\n");
+    let program = compile_source("let values: int[] = [1]\nlet removed = values->pop()\n");
+    let element = program
+        .bindings
+        .first()
+        .expect("the array binding is declared")
+        .value_type;
+
+    assert!(
+        insertion
+            .message
+            .contains("a void expression cannot initialize a binding")
+    );
+    assert_eq!(
+        binding_initializer(&program, "removed").output,
+        Some(element)
+    );
+}
+
+/// Verifies an inferred removal binding is nullable without an annotation.
+///
+/// The removal's type is the element type widened with null, so a declaration
+/// that omits an annotation takes that nullability from its initializer.
+#[test]
+fn infers_a_nullable_binding_from_a_removal() {
+    let program = compile_source("let values: int[] = [1]\nlet removed = values->pop()\n");
+    let binding = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "removed")
+        .expect("the removed binding is declared");
+
+    assert!(binding.nullable);
+}
+
+/// Verifies a removal cannot initialize or be used as a non-null scalar.
+#[test]
+fn rejects_a_removal_where_a_non_null_scalar_is_required() {
+    let annotated = compile_error("let values: int[] = [1]\nlet removed: int = values->pop()\n");
+    let arithmetic = compile_error("let values: int[] = [1]\nlet total = values->pop() + 1\n");
+
+    assert!(
+        annotated
+            .message
+            .contains("nullable value cannot initialize non-nullable binding `removed`")
+    );
+    assert!(
+        arithmetic
+            .message
+            .contains("nullable value must be narrowed before this operation")
+    );
+}
+
+/// Verifies an insertion enforces the declared element representation.
+///
+/// A literal the declared width cannot hold is rejected while compiling, exactly
+/// as it is for an array literal or an indexed assignment, because insertion
+/// crosses the same element contract instead of a conversion path of its own.
+#[test]
+fn rejects_an_inserted_value_the_element_contract_cannot_hold() {
+    let error = compile_error("let values: int8[] = []\nvalues->push(300)\n");
+
+    assert!(
+        error
+            .message
+            .contains("invalid literal `300` for type `int8`")
+    );
+}
+
+/// Verifies an insertion converts a compatible element subtype.
+#[test]
+fn converts_an_inserted_element_to_the_declared_subtype() {
+    let program = compile_source("let sizes: int<mm>[] = []\nsizes->push(2cm)\n");
+    let stored = first_array_method_argument(&program);
+    let output = stored.output.expect("the stored value produces a type");
+    let element = program
+        .bindings
+        .first()
+        .expect("the array binding is declared")
+        .value_type;
+
+    assert!(
+        matches!(
+            stored.kind,
+            TypedExpressionKind::Convert {
+                target_base: Some(_),
+                ..
+            }
+        ),
+        "a constrained element must be converted before it is stored"
+    );
+    assert_eq!(output, element);
+}
+
+/// Verifies inserting a value makes earlier element types unavailable.
+///
+/// The stored value's runtime representation is not guaranteed, so a later read
+/// of the array must dispatch on the subtype the element actually carries
+/// instead of the type recorded when the literal was compiled.
+#[test]
+fn invalidates_recorded_element_types_after_an_insertion() {
+    let program = compile_source(
+        "let sizes: int[] = [10mm]\n\
+         sizes->push(2cm)\n\
+         let first = sizes[0]\n\
+         let sum = first + 1mm\n",
+    );
+    let sum = binding_initializer(&program, "sum");
+
+    assert!(
+        matches!(sum.kind, TypedExpressionKind::DynamicBinary { .. }),
+        "an insertion must invalidate the recorded element types"
+    );
+}
+
+/// Verifies removing an element makes earlier element types unavailable.
+///
+/// A removal repositions every remaining element, so a recorded type would
+/// describe the wrong slot; the read must dispatch on the stored subtype.
+#[test]
+fn invalidates_recorded_element_types_after_a_removal() {
+    let program = compile_source(
+        "let sizes: int[] = [10mm, 2cm]\n\
+         sizes->shift()\n\
+         let first = sizes[0]\n\
+         let sum = first + 1mm\n",
+    );
+    let sum = binding_initializer(&program, "sum");
+
+    assert!(
+        matches!(sum.kind, TypedExpressionKind::DynamicBinary { .. }),
+        "a removal must invalidate the recorded element types"
+    );
+}
+
+/// Returns the stored value of the first compiled array method call.
+fn first_array_method_argument(program: &TypedProgram) -> &TypedExpression {
+    for statement in &program.statements {
+        if let TypedStatement::Expression(expression) = statement
+            && let TypedExpressionKind::ArrayMethod { arguments, .. } = &expression.kind
+        {
+            return arguments
+                .first()
+                .expect("the array method stores one value");
+        }
+    }
+    panic!("program calls no array method");
 }

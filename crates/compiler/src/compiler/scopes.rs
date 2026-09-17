@@ -4,10 +4,8 @@
 //! [`BindingId`] here, and this module owns the narrowing proofs that record
 //! where a nullable binding has been proven non-null.
 
-use ir::{
-    ArrayType, BindingId, BindingMetadata, LocalVariableSlot, TypedExpression, TypedExpressionKind,
-};
-use language_core::ValueType;
+use ir::{ArrayType, BindingId, BindingMetadata, LocalVariableSlot, TypedExpression};
+use language_core::{FunctionId, FunctionSignature, ValueType};
 use syntax::{ComparisonOperator, Expression};
 
 use crate::CompileError;
@@ -150,11 +148,13 @@ impl Compiler<'_> {
     }
 
     /// Reports whether an expression may evaluate to the null value.
+    ///
+    /// A nullable binding yields null until a lexical proof narrows it, and a
+    /// removal from an array yields null when there is no element to remove.
+    /// The typed expression owns this decision so every consumer, including
+    /// binding, assignment, and null-check compilation, asks one implementation.
     pub(super) fn expression_is_nullable(&self, expression: &TypedExpression) -> bool {
-        matches!(
-            expression.kind,
-            TypedExpressionKind::Variable { nullable: true, .. }
-        )
+        expression.is_nullable()
     }
 
     /// Rejects nullable and array operands before concrete registry dispatch.
@@ -167,12 +167,7 @@ impl Compiler<'_> {
         &self,
         expression: &TypedExpression,
     ) -> Result<(), CompileError> {
-        if self.expression_is_nullable(expression) {
-            return Err(CompileError::new(
-                expression.span,
-                "nullable value must be narrowed before this operation",
-            ));
-        }
+        self.require_non_nullable_expression(expression)?;
         if expression.array_type().is_some() {
             return Err(CompileError::new(
                 expression.span,
@@ -180,5 +175,59 @@ impl Compiler<'_> {
             ));
         }
         Ok(())
+    }
+
+    /// Rejects a nullable value where one complete value is required.
+    ///
+    /// Nullability is a property of the value, not of the operation, so this
+    /// check stays in place for every consumer even when the consumer can accept
+    /// a container. A value that may be null must be narrowed first.
+    pub(super) fn require_non_nullable_expression(
+        &self,
+        expression: &TypedExpression,
+    ) -> Result<(), CompileError> {
+        if self.expression_is_nullable(expression) {
+            return Err(CompileError::new(
+                expression.span,
+                "nullable value must be narrowed before this operation",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Rejects a container argument the called native function cannot receive.
+    ///
+    /// An array reaches a native function as the container itself, so the bare
+    /// element base type must not silently select an overload that expects one
+    /// scalar value: the function would read a payload that the array does not
+    /// carry. Only a signature that accepts any single value may receive a
+    /// container, which is how a generic operation such as `print` renders one.
+    pub(super) fn require_scalar_arguments(
+        &self,
+        function: FunctionId,
+        arguments: &[TypedExpression],
+        span: syntax::Span,
+    ) -> Result<(), CompileError> {
+        if arguments
+            .iter()
+            .all(|argument| argument.array_type().is_none())
+        {
+            return Ok(());
+        }
+        let descriptor = self
+            .registry
+            .function(function)
+            .map_err(|error| CompileError::core(span, error))?;
+        if matches!(descriptor.signature, FunctionSignature::AnySingle) {
+            return Ok(());
+        }
+        let container = arguments
+            .iter()
+            .find(|argument| argument.array_type().is_some())
+            .expect("an array argument was found above");
+        Err(CompileError::new(
+            container.span,
+            "an array cannot be used as a scalar operand",
+        ))
     }
 }

@@ -429,7 +429,7 @@ impl Compiler<'_> {
                 format!("cannot assign null to non-nullable type `{expected_name}`"),
             ));
         }
-        if initializer_is_nullable && !nullable {
+        if initializer_is_nullable && !nullable && expected.is_some() {
             return Err(CompileError::new(
                 expression.span(),
                 format!("nullable value cannot initialize non-nullable binding `{name}`"),
@@ -441,6 +441,12 @@ impl Compiler<'_> {
                 "nullable bindings require an explicit type annotation",
             ));
         }
+        // A declaration without an annotation takes the nullability of its
+        // initializer, so `let first = a->shift()` declares the nullable
+        // binding the removal's element type promises. An explicit annotation
+        // still decides, and a nullable initializer that contradicts a
+        // non-nullable annotation is rejected above.
+        let nullable = nullable || (initializer_is_nullable && expected.is_none());
         if let Some(expected) = expected
             && !initializer_is_null
             && actual.base != expected

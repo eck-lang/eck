@@ -29,6 +29,47 @@ pub struct ArrayType {
     pub adaptive_integer: bool,
 }
 
+/// One built-in operation on the end of an array value.
+///
+/// The compiler resolves a source method name to one of these variants, so a
+/// spelling such as `append` or `prepend` is an alias of the canonical
+/// operation and never gains a separate implementation, semantic rule, or
+/// runtime step.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ArrayMethod {
+    /// Adds one value after the last element (`push`, `append`).
+    Push,
+    /// Removes and returns the last element, or null when the array is empty.
+    Pop,
+    /// Adds one value before the first element (`unshift`, `prepend`).
+    Unshift,
+    /// Removes and returns the first element, or null when the array is empty.
+    Shift,
+}
+
+impl ArrayMethod {
+    /// Returns the canonical source name of this operation.
+    ///
+    /// Diagnostics use the canonical name so an alias reports the operation the
+    /// runtime actually performs.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Push => "push",
+            Self::Pop => "pop",
+            Self::Unshift => "unshift",
+            Self::Shift => "shift",
+        }
+    }
+
+    /// Reports whether this operation removes one element instead of adding one.
+    ///
+    /// A removal produces a nullable element, because an empty array has none
+    /// to remove, while an addition produces no value at all.
+    pub fn removes_element(self) -> bool {
+        matches!(self, Self::Pop | Self::Shift)
+    }
+}
+
 /// One typed expression node with its inferred output type and source span.
 ///
 /// `output` is `None` when the expression produces no value, such as a call to
@@ -53,6 +94,18 @@ impl TypedExpression {
         }
     }
 
+    /// Reports whether this expression may produce the null value.
+    ///
+    /// A nullable binding yields null until a lexical proof narrows it, and a
+    /// removal from an array yields null when there is no element to remove.
+    pub fn is_nullable(&self) -> bool {
+        match &self.kind {
+            TypedExpressionKind::Variable { nullable, .. } => *nullable,
+            TypedExpressionKind::ArrayMethod { method, .. } => method.removes_element(),
+            _ => false,
+        }
+    }
+
     /// Returns whether this expression's complete value type is only known at runtime.
     ///
     /// An unconstrained array element keeps the subtype it was stored with, so a
@@ -65,6 +118,7 @@ impl TypedExpression {
                 dynamic_complete_type,
                 ..
             } => *dynamic_complete_type,
+            TypedExpressionKind::ArrayMethod { dynamic_result, .. } => *dynamic_result,
             TypedExpressionKind::ElementAccess {
                 dynamic_subtype, ..
             } => *dynamic_subtype,
@@ -194,6 +248,30 @@ pub enum TypedExpressionKind {
     ArrayLiteral {
         array_type: ArrayType,
         elements: Vec<TypedExpression>,
+    },
+    /// Applies one built-in end operation to the array stored in a local slot.
+    ///
+    /// The receiver is the array binding itself rather than a value, because the
+    /// operation mutates that binding. An adding operation carries its single
+    /// stored value in `arguments`; a removing operation has no argument. The
+    /// stored value is prepared through the same element contract as any other
+    /// value that enters the array, so insertion never has a coercion path of
+    /// its own, and a removal produces the element together with whatever
+    /// subtype it was stored with.
+    ArrayMethod {
+        method: ArrayMethod,
+        binding: BindingId,
+        slot: LocalVariableSlot,
+        arguments: Vec<TypedExpression>,
+        /// Reports whether the produced element's subtype is only known at runtime.
+        dynamic_result: bool,
+        /// The value a removal produces when the array holds no element.
+        ///
+        /// The compiler resolves the language's null value once, so an empty
+        /// removal never repeats a null-literal lookup or parse during
+        /// execution. An adding operation produces no value at all and
+        /// therefore carries `None`.
+        empty_result: Option<Value>,
     },
     /// Applies an array element representation contract to one evaluated value.
     ///

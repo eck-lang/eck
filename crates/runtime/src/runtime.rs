@@ -1,5 +1,6 @@
 use ir::{
-    LocalVariableSlot, TypedBlock, TypedExpression, TypedProgram, TypedRangePlan, TypedStatement,
+    ArrayMethod, LocalVariableSlot, TypedBlock, TypedExpression, TypedProgram, TypedRangePlan,
+    TypedStatement,
 };
 use language_core::{
     ArrayValue, BinaryOperator, BinaryOperatorDescriptor, ComparisonExecutor, ComparisonOperator,
@@ -136,6 +137,61 @@ impl<'registry> Runtime<'registry> {
             TypedStatement::Continue { .. } => self.loop_control = Some(LoopControl::Continue),
         }
         Ok(())
+    }
+
+    /// Applies one built-in end operation to the array stored in `slot`.
+    ///
+    /// Every argument is evaluated before the array is touched, so a failing
+    /// argument expression leaves the array unchanged. The payload is mutated in
+    /// place while it is uniquely owned and copied on write otherwise, which
+    /// preserves the value semantics of an array shared with another binding
+    /// instead of aliasing the change into the other binding. The operation
+    /// itself moves only the element it adds or removes: the buffer claims a
+    /// free slot at the required end, or releases the element at that end.
+    ///
+    /// A removal from an empty array produces the language's null value rather
+    /// than reading an element that does not exist, and an addition produces no
+    /// value at all. The null value is the one the compiler resolved for this
+    /// call, so an empty removal repeats neither a type lookup nor a literal
+    /// parse during execution.
+    fn execute_array_method(
+        &mut self,
+        method: ArrayMethod,
+        slot: LocalVariableSlot,
+        arguments: &[TypedExpression],
+        empty_result: &Option<Value>,
+    ) -> Result<Option<Value>, RuntimeError> {
+        let stored_value =
+            match method.removes_element() {
+                false => Some(self.eval(&arguments[0])?.ok_or_else(|| {
+                    RuntimeError::Message("array element returned no value".into())
+                })?),
+                true => None,
+            };
+        let mut array_value = self.local_values[slot.0]
+            .take()
+            .ok_or_else(|| RuntimeError::Message("array binding is not initialized".into()))?;
+        if array_value.downcast_ref::<ArrayValue>().is_none() {
+            self.store_local_value(slot, array_value);
+            return Err(RuntimeError::Message("value is not an array".into()));
+        }
+        if !array_value.is_uniquely_owned() {
+            let array_type = array_value.type_id();
+            let copied = array_value
+                .downcast_ref::<ArrayValue>()
+                .expect("the value was verified as an array above")
+                .clone();
+            array_value = Value::new(array_type, copied);
+        }
+        let array = array_value
+            .downcast_mut::<ArrayValue>()
+            .expect("the array payload is uniquely owned here");
+        let removed = apply_array_method(array, method, stored_value);
+        self.store_local_value(slot, array_value);
+        match removed {
+            Some(value) => Ok(Some(value)),
+            None => Ok(empty_result.clone()),
+        }
     }
 
     /// Replaces one element of the mutable array stored in `slot`.
@@ -374,6 +430,32 @@ impl<'registry> Runtime<'registry> {
         Ok(())
     }
 }
+
+/// Applies one built-in array end operation and reports the value it removed.
+///
+/// An adding operation stores the value it was given and produces nothing, while
+/// a removing operation reports the element it moved out of the array or `None`
+/// when the array was empty. The array buffer owns the movement of elements, so
+/// this function only selects the end the operation acts on.
+fn apply_array_method(
+    array: &mut ArrayValue,
+    method: ArrayMethod,
+    stored_value: Option<Value>,
+) -> Option<Value> {
+    match method {
+        ArrayMethod::Push => {
+            array.push(stored_value.expect("an adding operation has one value to store"));
+            None
+        }
+        ArrayMethod::Unshift => {
+            array.unshift(stored_value.expect("an adding operation has one value to store"));
+            None
+        }
+        ArrayMethod::Pop => array.pop(),
+        ArrayMethod::Shift => array.shift(),
+    }
+}
+
 #[cfg(test)]
 #[path = "runtime.tests.rs"]
 mod tests;
