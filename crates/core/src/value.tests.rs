@@ -1,5 +1,6 @@
 //! Unit tests for the opaque runtime value representation.
 
+use std::collections::VecDeque;
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -230,4 +231,317 @@ fn value_representation_stays_within_one_cache_line() {
         "Value grew to {} bytes, past the aligned size the runtime stack relies on",
         std::mem::size_of::<Value>()
     );
+}
+
+/// Builds one array element carrying an integer payload.
+fn element(value: i64) -> Value {
+    Value::new(base_type(), value)
+}
+
+/// Reads every live element of an array as its integer payload.
+fn array_contents(array: &ArrayValue) -> Vec<i64> {
+    array.elements().iter().map(integer_payload).collect()
+}
+
+/// A deterministic pseudo-random source for the mixed-operation model test.
+struct Random(u64);
+
+impl Random {
+    /// Advances the generator and returns its next value.
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        self.0 >> 33
+    }
+}
+
+/// Verifies both ends insert and remove elements in deque order.
+#[test]
+fn operations_at_both_ends_follow_deque_order() {
+    let mut array = ArrayValue::new(Vec::new());
+
+    array.push(element(10));
+    array.push(element(20));
+    array.unshift(element(5));
+    assert_eq!(array_contents(&array), vec![5, 10, 20]);
+    assert_eq!(array.length(), 3);
+
+    let first = array.shift().expect("the array has a first element");
+    let last = array.pop().expect("the array has a last element");
+    assert_eq!(integer_payload(&first), 5);
+    assert_eq!(integer_payload(&last), 20);
+    assert_eq!(array_contents(&array), vec![10]);
+}
+
+/// Verifies removing from an empty array reports no element.
+#[test]
+fn removing_from_an_empty_array_reports_no_element() {
+    let mut array = ArrayValue::new(Vec::new());
+
+    assert!(array.pop().is_none());
+    assert!(array.shift().is_none());
+
+    array.push(element(1));
+    assert!(array.pop().is_some());
+    assert!(array.pop().is_none());
+    assert!(array.shift().is_none());
+}
+
+/// Verifies a front insertion that has room claims it instead of moving elements.
+///
+/// The first insertion has to grow the allocation, because a literal array
+/// starts exactly sized, and it recenters the window so free slots are left in
+/// front of it. Every following insertion until those slots run out must claim
+/// one of them, which neither reallocates nor moves an element.
+#[test]
+fn front_insertion_into_free_room_moves_no_element() {
+    let mut array = ArrayValue::new((0..8).map(element).collect());
+    array.unshift(element(-1));
+
+    let free_front_slots = array.start;
+    assert!(free_front_slots >= 1, "the growth must leave front room");
+    let allocation = array.storage.as_ptr();
+    let stored_addresses: Vec<*const Value> = {
+        let elements = array.elements();
+        (0..elements.len())
+            .map(|index| &elements[index] as *const Value)
+            .collect()
+    };
+    for step in 0..free_front_slots {
+        array.unshift(element(-(step as i64) - 2));
+    }
+
+    assert_eq!(
+        array.storage.as_ptr(),
+        allocation,
+        "free front room must be used before the allocation grows again"
+    );
+    for (index, address) in stored_addresses.iter().enumerate() {
+        assert_eq!(
+            &array.elements()[index + free_front_slots] as *const Value,
+            *address,
+            "the element that was at index {index} must not move"
+        );
+    }
+    let expected: Vec<i64> = (0..free_front_slots)
+        .rev()
+        .map(|step| -(step as i64) - 2)
+        .chain([-1])
+        .chain(0..8)
+        .collect();
+    assert_eq!(array_contents(&array), expected);
+}
+
+/// Verifies repeated front insertions cost a logarithmic number of allocations.
+///
+/// A front insertion that moved every element, or that reallocated on every
+/// call, would change the allocation once per insertion. Geometric growth with
+/// recentering leaves front room for many insertions at once, so 1000
+/// insertions must allocate a small constant number of times.
+#[test]
+fn repeated_front_insertions_grow_geometrically() {
+    let mut array = ArrayValue::new(Vec::new());
+    let mut allocations = 0;
+    let mut previous = std::ptr::null();
+    for value in 0..1000 {
+        array.unshift(element(value));
+        if array.storage.as_ptr() != previous {
+            allocations += 1;
+            previous = array.storage.as_ptr();
+        }
+    }
+
+    assert_eq!(array.length(), 1000);
+    assert!(
+        allocations <= 12,
+        "1000 front insertions allocated {allocations} times"
+    );
+    let expected: Vec<i64> = (0..1000).rev().collect();
+    assert_eq!(array_contents(&array), expected);
+}
+
+/// Verifies repeated appends cost a logarithmic number of allocations.
+#[test]
+fn repeated_appends_grow_geometrically() {
+    let mut array = ArrayValue::new(Vec::new());
+    let mut allocations = 0;
+    let mut previous = std::ptr::null();
+    for value in 0..1000 {
+        array.push(element(value));
+        if array.storage.as_ptr() != previous {
+            allocations += 1;
+            previous = array.storage.as_ptr();
+        }
+    }
+
+    assert!(
+        allocations <= 12,
+        "1000 appends allocated {allocations} times"
+    );
+    let expected: Vec<i64> = (0..1000).collect();
+    assert_eq!(array_contents(&array), expected);
+}
+
+/// Verifies an array that is only appended to never reserves front space.
+///
+/// The growth policy redistributes the free slots in the proportion they already
+/// hold, so an append-only array keeps its first element at the start of the
+/// allocation instead of paying for front room it never uses.
+#[test]
+fn appending_only_never_reserves_front_space() {
+    let mut array = ArrayValue::new(Vec::new());
+
+    for value in 0..100 {
+        array.push(element(value));
+        assert_eq!(
+            array.start, 0,
+            "an append-only array must not reserve front space"
+        );
+    }
+}
+
+/// Verifies draining an array keeps its allocation and regains room at both ends.
+#[test]
+fn draining_keeps_the_allocation_and_recenters_the_window() {
+    let mut array = ArrayValue::new((0..64).map(element).collect());
+    let allocation = array.storage.as_ptr();
+
+    while array.shift().is_some() {}
+
+    assert_eq!(array.length(), 0);
+    assert_eq!(
+        array.storage.as_ptr(),
+        allocation,
+        "draining must not release the allocation"
+    );
+    assert!(
+        array.start > 0,
+        "an empty window is recentered so both ends have room"
+    );
+    array.push(element(1));
+    array.unshift(element(0));
+    assert_eq!(array.storage.as_ptr(), allocation);
+    assert_eq!(array_contents(&array), vec![0, 1]);
+}
+
+/// Verifies the live window is one contiguous run of elements.
+///
+/// The removed push and shift operations are the only operations that change the
+/// window, so probing a mixed sequence proves the payload a bulk consumer reads
+/// stays contiguous from the first logical element to the last.
+#[test]
+fn mixed_end_operations_match_a_reference_model() {
+    let mut array = ArrayValue::new(Vec::new());
+    let mut reference: VecDeque<i64> = VecDeque::new();
+    let mut random = Random(0x5eed);
+
+    for step in 0..2000_i64 {
+        match random.next() % 4 {
+            0 => {
+                array.push(element(step));
+                reference.push_back(step);
+            }
+            1 => {
+                array.unshift(element(-step));
+                reference.push_front(-step);
+            }
+            2 => assert_eq!(
+                array.pop().map(|value| integer_payload(&value)),
+                reference.pop_back()
+            ),
+            _ => assert_eq!(
+                array.shift().map(|value| integer_payload(&value)),
+                reference.pop_front()
+            ),
+        }
+        let expected: Vec<i64> = reference.iter().copied().collect();
+        assert_eq!(array_contents(&array), expected, "after step {step}");
+    }
+}
+
+/// Verifies the live elements of an array can be mutated in place.
+#[test]
+fn mutable_element_access_reaches_the_live_window() {
+    let mut array = ArrayValue::new(vec![element(1), element(2)]);
+    array.unshift(element(0));
+
+    array.elements_mut()[1] = element(9);
+
+    assert_eq!(array_contents(&array), vec![0, 9, 2]);
+}
+
+/// Verifies an unused slot can never be read as a value of any type.
+#[test]
+fn unused_slots_hold_a_placeholder_that_matches_no_type() {
+    let mut array = ArrayValue::new((0..8).map(element).collect());
+    array.unshift(element(-1));
+    assert!(
+        array.start >= 1,
+        "the window must leave a front placeholder"
+    );
+    assert!(
+        array.start + array.length < array.storage.len(),
+        "the window must leave a back placeholder"
+    );
+
+    let front_placeholder = &array.storage[array.start - 1];
+    let back_placeholder = &array.storage[array.start + array.length];
+    for placeholder in [front_placeholder, back_placeholder] {
+        assert!(placeholder.downcast_ref::<i64>().is_none());
+        assert!(placeholder.downcast_ref::<Value>().is_none());
+    }
+}
+
+/// Verifies a clone copies only the live elements into a compact allocation.
+#[test]
+fn cloning_copies_only_the_live_elements() {
+    let mut array = ArrayValue::new(Vec::new());
+    for value in 0..8 {
+        array.push(element(value));
+    }
+    array.unshift(element(-1));
+
+    let mut clone = array.clone();
+
+    assert_eq!(clone.length(), 9);
+    assert_eq!(clone.storage.len(), 9, "a clone must not copy unused slots");
+    assert_eq!(clone.start, 0);
+    assert_eq!(array_contents(&clone), array_contents(&array));
+
+    clone.pop();
+    let expected: Vec<i64> = std::iter::once(-1).chain(0..8).collect();
+    assert_eq!(array_contents(&array), expected);
+    assert_eq!(clone.length(), 8);
+}
+
+/// Verifies an end operation transfers exactly one owner of a removed element.
+///
+/// Each element here owns a drop-counting payload, so the test proves that a
+/// removal moves the payload out of the array, that releasing it runs the
+/// destructor once, and that the elements left in the array are released exactly
+/// once when the array is dropped: no element is duplicated, dropped twice, or
+/// leaked.
+#[test]
+fn removed_elements_are_released_exactly_once() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let mut array = ArrayValue::new(Vec::new());
+    for _ in 0..8 {
+        array.push(Value::new(
+            base_type(),
+            DropCountingPayload {
+                drop_count: Arc::clone(&drops),
+                contents: [0; 4],
+            },
+        ));
+    }
+
+    drop(array.shift().expect("the array has a first element"));
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
+    drop(array.pop().expect("the array has a last element"));
+    assert_eq!(drops.load(Ordering::SeqCst), 2);
+
+    drop(array);
+    assert_eq!(drops.load(Ordering::SeqCst), 8);
 }

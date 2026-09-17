@@ -6,33 +6,244 @@ use crate::{SubtypeId, TypeId, ValueType};
 ///
 /// Each element remains a complete [`Value`], which preserves its concrete
 /// base representation and optional subtype in unconstrained arrays.
-#[derive(Clone)]
+///
+/// The buffer grows and shrinks at both ends without moving the live elements.
+/// `storage` is the whole allocation and the live elements occupy
+/// `storage[start .. start + length]`, so the first logical element is a
+/// contiguous slice starting at `start` and every consumer keeps reading one
+/// ordinary pointer plus a length. Slots outside that window hold
+/// [`Value::vacant_slot`] placeholders, which keeps every slot of the
+/// allocation initialized and therefore safe to index and to drop.
+///
+/// Inserting at the front claims one unused slot before `start`, and removing
+/// the first element advances `start`, instead of moving the remaining
+/// elements. When the required end holds no unused slot the elements are moved
+/// into a larger allocation, which keeps a sequence of insertions at either end
+/// amortized `O(1)`, exactly like `push` on a plain vector.
+///
+/// The representation deliberately stays a bidirectionally growable contiguous
+/// buffer rather than a segmented or circular deque: bulk numeric, slice, and
+/// SIMD consumers need one undisjoint payload, so the live elements must never
+/// be split across two memory regions.
 pub struct ArrayValue {
-    elements: Vec<Value>,
+    /// The whole allocation. Slots outside the live window are placeholders.
+    storage: Vec<Value>,
+    /// Index of the first live element inside `storage`.
+    start: usize,
+    /// Number of live elements.
+    length: usize,
 }
+
+/// Smallest allocation a grown array receives.
+///
+/// The value keeps the first insertion into an empty array from allocating one
+/// element at a time.
+const MINIMUM_ARRAY_ALLOCATION: usize = 4;
 
 impl ArrayValue {
     /// Creates an array from values already validated by the compiler.
+    ///
+    /// The elements become the whole allocation, so an array that is only
+    /// appended to never reserves unused space in front of its first element.
     #[inline]
     pub fn new(elements: Vec<Value>) -> Self {
-        Self { elements }
+        let length = elements.len();
+        Self {
+            storage: elements,
+            start: 0,
+            length,
+        }
     }
 
-    /// Borrows every stored element as one contiguous slice.
+    /// Returns the number of live elements.
+    #[inline]
+    pub fn length(&self) -> usize {
+        self.length
+    }
+
+    /// Borrows every live element as one contiguous slice.
     #[inline]
     pub fn elements(&self) -> &[Value] {
-        &self.elements
+        debug_assert!(self.start + self.length <= self.storage.len());
+        &self.storage[self.start..self.start + self.length]
     }
 
-    /// Mutably borrows every stored element when the containing value is unique.
+    /// Mutably borrows every live element when the containing value is unique.
     #[inline]
     pub fn elements_mut(&mut self) -> &mut [Value] {
-        &mut self.elements
+        debug_assert!(self.start + self.length <= self.storage.len());
+        &mut self.storage[self.start..self.start + self.length]
+    }
+
+    /// Appends one value after the last element.
+    ///
+    /// The call claims the unused slot after the live window when one is
+    /// available and otherwise grows the allocation, so its cost is amortized
+    /// `O(1)`.
+    #[inline]
+    pub fn push(&mut self, value: Value) {
+        if self.start + self.length == self.storage.len() {
+            self.grow_for_back();
+        }
+        self.storage[self.start + self.length] = value;
+        self.length += 1;
+    }
+
+    /// Removes and returns the last element, or `None` when the array is empty.
+    ///
+    /// The removed value is moved out of storage, so the operation transfers
+    /// exactly one owner and never duplicates or clones an element.
+    #[inline]
+    pub fn pop(&mut self) -> Option<Value> {
+        if self.length == 0 {
+            return None;
+        }
+        self.length -= 1;
+        let value = std::mem::replace(
+            &mut self.storage[self.start + self.length],
+            Value::vacant_slot(),
+        );
+        self.recenter_when_empty();
+        Some(value)
+    }
+
+    /// Inserts one value before the first element.
+    ///
+    /// The call claims the unused slot before the live window when one is
+    /// available and otherwise grows and recenters the allocation, so its cost
+    /// is amortized `O(1)`.
+    #[inline]
+    pub fn unshift(&mut self, value: Value) {
+        if self.start == 0 {
+            self.grow_for_front();
+        }
+        self.start -= 1;
+        self.storage[self.start] = value;
+        self.length += 1;
+    }
+
+    /// Removes and returns the first element, or `None` when the array is empty.
+    ///
+    /// The removed value is moved out of storage and the remaining elements are
+    /// left where they are, so the operation transfers exactly one owner and
+    /// never moves the rest of the array.
+    #[inline]
+    pub fn shift(&mut self) -> Option<Value> {
+        if self.length == 0 {
+            return None;
+        }
+        let value = std::mem::replace(&mut self.storage[self.start], Value::vacant_slot());
+        self.start += 1;
+        self.length -= 1;
+        self.recenter_when_empty();
+        Some(value)
+    }
+
+    /// Grows the allocation so one more element fits after the live window.
+    ///
+    /// The window keeps its position in proportion to the allocation, so an
+    /// array that is only appended to starts its window at the beginning of the
+    /// new allocation and never pays for front space it does not use, while an
+    /// array that also inserts in front keeps the share of room it already had
+    /// there. Doubling the allocation keeps appending amortized `O(1)` per
+    /// element, exactly like a plain vector.
+    ///
+    /// This is the only operation that moves more than one element, and it runs
+    /// only when the back of the window is already the end of the allocation.
+    /// Reusing free space that exists only in front of the window would move the
+    /// same elements without creating any new room, so the buffer does not carry
+    /// that extra path.
+    fn grow_for_back(&mut self) {
+        let new_capacity = self.next_capacity(self.length + 1);
+        let new_start = match self.storage.len() {
+            0 => 0,
+            current_capacity => self.start * new_capacity / current_capacity,
+        };
+        self.reallocate(new_capacity, new_start);
+    }
+
+    /// Grows and recenters the allocation so one more element fits before the live window.
+    ///
+    /// Recentering hands half of the extra slots to each end, so the new
+    /// allocation leaves room for many further front insertions and keeps them
+    /// amortized `O(1)` while still serving the back.
+    fn grow_for_front(&mut self) {
+        let new_capacity = self.next_capacity(self.length + 4);
+        self.reallocate(new_capacity, (new_capacity - self.length) / 2);
+    }
+
+    /// Returns the allocation size that holds at least `required` live slots.
+    ///
+    /// Doubling keeps both ends amortized `O(1)`, and the minimum keeps an
+    /// empty array from reallocating for its first few insertions.
+    fn next_capacity(&self, required: usize) -> usize {
+        (self.storage.len() * 2)
+            .max(required)
+            .max(MINIMUM_ARRAY_ALLOCATION)
+    }
+
+    /// Moves the live elements into a freshly allocated buffer.
+    ///
+    /// Every slot of the new allocation starts as a placeholder, so no part of
+    /// the buffer is uninitialized, and the live elements are moved rather than
+    /// cloned out of the old allocation before it is released. The old
+    /// allocation therefore drops only placeholders, and every live element
+    /// keeps exactly one owner.
+    fn reallocate(&mut self, new_capacity: usize, new_start: usize) {
+        let mut storage = vec![Value::vacant_slot(); new_capacity];
+        let old_storage = std::mem::take(&mut self.storage);
+        for (index, value) in old_storage.into_iter().enumerate() {
+            if index >= self.start && index < self.start + self.length {
+                storage[new_start + index - self.start] = value;
+            }
+        }
+        self.storage = storage;
+        self.start = new_start;
+    }
+
+    /// Restores a window with room at both ends once the last element is removed.
+    ///
+    /// An empty array has no live element to keep contiguous, so reclaiming
+    /// both ends is free and keeps a drained array from reallocating when it is
+    /// filled again. The allocation itself is retained deliberately, so
+    /// repeated `push`/`pop` or `unshift`/`shift` pairs at one end never
+    /// reallocate either.
+    fn recenter_when_empty(&mut self) {
+        if self.length == 0 {
+            self.start = self.storage.len() / 2;
+        }
+    }
+}
+
+impl Clone for ArrayValue {
+    /// Copies the live elements into a fresh, exactly sized allocation.
+    ///
+    /// Cloning is the copy-on-write step of array mutation, so it must not pay
+    /// for the unused slots of the source allocation.
+    fn clone(&self) -> Self {
+        Self::new(self.elements().to_vec())
     }
 }
 
 /// Number of bytes reserved for one payload stored directly inside a [`Value`].
 const INLINE_PAYLOAD_SIZE: usize = 16;
+
+/// Base type recorded by the placeholder that fills an unused array slot.
+///
+/// No registry ever allocates registry id zero, so a placeholder can never be
+/// mistaken for a value of a registered type.
+const VACANT_TYPE_ID: TypeId = TypeId {
+    registry_id: 0,
+    index: u32::MAX,
+};
+
+/// Reports that no queried payload type is the placeholder's payload type.
+///
+/// Installing this check makes every downcast of a placeholder fail, so an
+/// unused array slot cannot be read as a value of any type.
+fn no_payload_type_matches(_: std::any::TypeId) -> bool {
+    false
+}
 
 /// Raw storage for one payload that needs no destructor.
 ///
@@ -185,6 +396,24 @@ impl Value {
             type_id,
             subtype_id: None,
             payload: PayloadStorage::from_owned(value),
+        }
+    }
+
+    /// Creates the placeholder that fills an unused array slot.
+    ///
+    /// The placeholder owns no payload and installs a type check that never
+    /// matches, so it cannot be read as a value of any type. Array storage uses
+    /// it to keep every allocated slot initialized without tracking separately
+    /// which slots hold live elements.
+    #[inline]
+    fn vacant_slot() -> Self {
+        Self {
+            type_id: VACANT_TYPE_ID,
+            subtype_id: None,
+            payload: PayloadStorage::Inline {
+                bytes: InlinePayload([0; 2]),
+                payload_type_check: no_payload_type_matches,
+            },
         }
     }
 
