@@ -198,3 +198,25 @@ Element access preserves the complete semantic type of the stored value:
 Operations on an extracted element use the normal rules for that type and
 subtype. Arrays do not introduce separate arithmetic or conversion semantics
 for their elements.
+
+## Rendering
+
+An array is rendered as a bracketed, comma-separated list of its elements, in
+their stored order:
+
+```eck
+let sizes: int[] = [10mm, 2cm]
+print(sizes) // [10mm, 2cm]
+
+let empty: int[] = []
+print(empty) // []
+```
+
+Every element keeps the representation it was stored with, so its subtype
+suffix and its active configuration apply exactly as they do outside the
+array.
+
+## End operations
+
+Adding and removing a value at either end of a mutable array is documented in
+[array end operations](array-end-operations.md).

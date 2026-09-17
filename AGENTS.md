@@ -11,7 +11,8 @@ Read the relevant files before making changes:
 * `.agents/docs/eck-lang/adaptive-integer-arrays.md` — intended direction for adaptive `int[]` storage and vectorized execution (design note, not current semantics)
 * `.agents/docs/eck-lang/use-cases.md` — language use-case test conventions
 * `.agents/docs/eck-lang/performance.md` — raw execution speed as the primary implementation goal
-* `.agents/docs/eck-lang/syntax/array-declaration.md` — array literals, element constraints, indexing, and mutation
+* `.agents/docs/eck-lang/syntax/array-declaration.md` — array literals, element constraints, indexing, mutation, and rendering
+* `.agents/docs/eck-lang/syntax/array-end-operations.md` — adding and removing values at either end of a mutable array, including the aliases and the empty-array contract
 * `.agents/docs/eck-lang/syntax/conditionals.md` — current `if`, `else if`, and `else` syntax, including mandatory condition parentheses
 * `.agents/docs/eck-lang/syntax/for.md` — current integer range `for` loop syntax and behavior
 * `.agents/docs/eck-lang/syntax/variable-declaration.md` — variable declaration syntax, mutability, type inference, and nullability

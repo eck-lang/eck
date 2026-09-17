@@ -73,6 +73,7 @@ each directory after the area it protects. Array cases use:
 | `element-constraints/` | The base type, subtype, and integer width a stored element must satisfy: conversion, adaptive widening, and overflow or inexactness rejections |
 | `indexing/` | Index resolution and validation, bounds, and the complete type a read yields |
 | `mutation/` | Indexed assignment, immutability, aliasing, and rejected assignment forms |
+| `end-operations/` | Adding and removing values at either end, aliases, the empty-array contract, and rejected receivers |
 | `dynamic-elements/` | Operations on an element whose subtype is only known at runtime |
 
 Keep a case's filename unchanged when it moves between these directories, and
