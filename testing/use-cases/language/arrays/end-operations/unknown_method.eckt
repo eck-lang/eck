@@ -1,0 +1,16 @@
+# An unknown array method is rejected
+
+Verifies a method name that is not a built-in array end operation is
+rejected, and that the diagnostic lists the supported method names.
+
+>>> source
+let values: int[] = [1]
+values->length()
+
+<<< stdout
+
+<<< stderr
+eck: an array has no method `length`; the supported methods are push, append, pop, unshift, prepend, shift at Span { start: 24, end: 40 }
+
+<<< exit
+1

@@ -1,0 +1,14 @@
+# An insertion converts a compatible element subtype
+
+Verifies inserting 2cm into an int<mm>[] array stores 20mm, because insertion
+crosses the same element contract as a literal element.
+
+>>> source
+let sizes: int<mm>[] = []
+sizes->push(2cm)
+print(sizes)
+
+<<< stdout
+[20mm]
+
+<<< stderr

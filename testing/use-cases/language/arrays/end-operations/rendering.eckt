@@ -1,0 +1,19 @@
+# Printing an array renders its elements
+
+Verifies an array renders as a bracketed, comma-separated list of its
+elements, including an empty array and elements that keep their own subtypes.
+
+>>> source
+let empty: int[] = []
+print(empty)
+let sizes: int[] = [10mm, 2cm]
+print(sizes)
+let names: string[] = ["alice", "bob"]
+print(names)
+
+<<< stdout
+[]
+[10mm, 2cm]
+[alice, bob]
+
+<<< stderr

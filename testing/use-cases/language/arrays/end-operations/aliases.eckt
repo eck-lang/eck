@@ -1,0 +1,15 @@
+# Append and prepend alias push and unshift
+
+Verifies append performs the push operation and prepend performs the unshift
+operation, which the single resulting element order proves.
+
+>>> source
+let values: int[] = [20]
+values->append(30)
+values->prepend(10)
+print(values)
+
+<<< stdout
+[10, 20, 30]
+
+<<< stderr

@@ -1,0 +1,16 @@
+# An insertion enforces the declared element representation
+
+Verifies inserting 300 into an int8[] array is rejected while compiling,
+exactly as the array literal and the indexed assignment reject it.
+
+>>> source
+let values: int8[] = []
+values->push(300)
+
+<<< stdout
+
+<<< stderr
+eck: invalid literal `300` for type `int8`: number too large to fit in target type at Span { start: 37, end: 40 }
+
+<<< exit
+1

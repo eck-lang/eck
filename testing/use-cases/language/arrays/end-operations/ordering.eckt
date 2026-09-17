@@ -1,0 +1,28 @@
+# Array end operations keep the element order
+
+Verifies the documented example: two pushes and one unshift build [5, 10,
+20], and a following shift and pop produce 5 and 20 while leaving [10].
+
+>>> source
+let a: int[] = []
+a->push(10)
+a->push(20)
+a->unshift(5)
+print(a)
+let first = a->shift()
+let last = a->pop()
+print(a)
+if (first != null) {
+    print(first)
+}
+if (last != null) {
+    print(last)
+}
+
+<<< stdout
+[5, 10, 20]
+[10]
+5
+20
+
+<<< stderr

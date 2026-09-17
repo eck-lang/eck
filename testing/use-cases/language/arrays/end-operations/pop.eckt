@@ -1,0 +1,18 @@
+# Pop removes and returns the last element
+
+Verifies pop yields the last element of a non-empty int[] array and shortens
+the array, leaving the remaining elements in their original order.
+
+>>> source
+let values: int[] = [1, 2, 3]
+let removed = values->pop()
+if (removed != null) {
+    print(removed)
+}
+print(values)
+
+<<< stdout
+3
+[1, 2]
+
+<<< stderr

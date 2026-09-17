@@ -1,0 +1,16 @@
+# Pop of an empty array produces null
+
+Verifies a removal from an empty int[] array yields the null value instead of
+reading an element that does not exist, and leaves the array empty.
+
+>>> source
+let values: int[] = []
+let removed = values->pop()
+print(removed == null)
+print(values)
+
+<<< stdout
+true
+[]
+
+<<< stderr

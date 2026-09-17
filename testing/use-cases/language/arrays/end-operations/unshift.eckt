@@ -1,0 +1,15 @@
+# Unshift inserts one value before the first element
+
+Verifies unshift places each value in front of the elements already stored,
+so successive insertions end up in front of one another in the printed array.
+
+>>> source
+let values: int[] = [30, 40]
+values->unshift(20)
+values->unshift(10)
+print(values)
+
+<<< stdout
+[10, 20, 30, 40]
+
+<<< stderr

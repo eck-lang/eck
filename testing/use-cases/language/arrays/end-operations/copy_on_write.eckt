@@ -1,0 +1,17 @@
+# An insertion through an alias copies the array
+
+Verifies inserting a value through one binding that shares an array leaves
+the other binding unchanged, which preserves array value semantics.
+
+>>> source
+let original: int[] = [10, 20]
+let copy = original
+copy->push(30)
+print(original)
+print(copy)
+
+<<< stdout
+[10, 20]
+[10, 20, 30]
+
+<<< stderr

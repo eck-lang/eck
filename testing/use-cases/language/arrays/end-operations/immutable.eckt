@@ -1,0 +1,16 @@
+# An end operation requires a mutable binding
+
+Verifies an end operation through a const array binding is rejected, because
+the operation mutates the binding it acts on.
+
+>>> source
+const values: int[] = [1]
+values->push(2)
+
+<<< stdout
+
+<<< stderr
+eck: cannot call `push` through immutable binding `values` at Span { start: 26, end: 32 }
+
+<<< exit
+1

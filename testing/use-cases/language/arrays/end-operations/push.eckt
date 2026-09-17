@@ -1,0 +1,15 @@
+# Push appends one value after the last element
+
+Verifies push adds each value to the end of an int[] array that starts empty,
+and that the printed array keeps the insertion order.
+
+>>> source
+let values: int[] = []
+values->push(10)
+values->push(20)
+print(values)
+
+<<< stdout
+[10, 20]
+
+<<< stderr

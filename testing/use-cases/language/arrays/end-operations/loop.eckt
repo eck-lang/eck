@@ -1,0 +1,27 @@
+# Array end operations work inside loop bodies
+
+Verifies pushes and unshifts in for bodies build the expected array, and that
+a while condition may shift until the array is empty.
+
+>>> source
+let values: int[] = []
+for (i in 0..5) {
+    values->push(i)
+}
+for (i in 0..2) {
+    values->unshift(i)
+}
+print(values)
+let removed: int = 0
+while (values->shift() != null) {
+    removed = removed + 1
+}
+print(removed)
+print(values)
+
+<<< stdout
+[1, 0, 0, 1, 2, 3, 4]
+7
+[]
+
+<<< stderr

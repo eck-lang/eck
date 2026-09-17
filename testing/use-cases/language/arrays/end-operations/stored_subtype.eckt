@@ -1,0 +1,15 @@
+# An inserted element keeps its own subtype
+
+Verifies an element stored by a later insertion still carries the complete
+type it was stored with, because converting the read to mm produces 20mm from
+2cm.
+
+>>> source
+let sizes: int[] = [10mm]
+sizes->push(2cm)
+print(sizes[1]->to(mm))
+
+<<< stdout
+20mm
+
+<<< stderr

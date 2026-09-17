@@ -1,0 +1,18 @@
+# Shift removes and returns the first element
+
+Verifies shift yields the first element of a non-empty int[] array and leaves
+the remaining elements in order, without moving them.
+
+>>> source
+let values: int[] = [1, 2, 3]
+let removed = values->shift()
+if (removed != null) {
+    print(removed)
+}
+print(values)
+
+<<< stdout
+1
+[2, 3]
+
+<<< stderr

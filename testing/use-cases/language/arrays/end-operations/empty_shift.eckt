@@ -1,0 +1,17 @@
+# Shift of an empty array produces null
+
+Verifies shift yields null once every element has been removed, while a
+non-empty array still yields its element.
+
+>>> source
+let values: int[] = [7]
+let first = values->shift()
+let missing = values->shift()
+print(first == null)
+print(missing == null)
+
+<<< stdout
+false
+true
+
+<<< stderr

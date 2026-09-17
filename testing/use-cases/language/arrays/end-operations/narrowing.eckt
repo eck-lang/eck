@@ -1,0 +1,16 @@
+# A removal must be narrowed before it is used
+
+Verifies the nullable element a removal produces cannot take part in
+arithmetic until a null check has narrowed it.
+
+>>> source
+let values: int[] = [1]
+let total = values->pop() + 1
+
+<<< stdout
+
+<<< stderr
+eck: nullable value must be narrowed before this operation at Span { start: 36, end: 49 }
+
+<<< exit
+1
