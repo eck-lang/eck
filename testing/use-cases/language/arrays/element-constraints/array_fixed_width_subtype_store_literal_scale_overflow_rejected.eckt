@@ -1,0 +1,17 @@
+# Fixed-width subtype insertion rejects a scaled literal overflow
+
+Verifies an insertion applies the same scaled conversion as an array literal:
+`13cm` must become `130mm` before it enters `int8<mm>[]` storage, and that
+magnitude does not fit `int8`, so the insertion is rejected while compiling.
+
+>>> source
+let sizes: int8<mm>[] = []
+sizes->push(13cm)
+
+<<< stdout
+
+<<< stderr
+eck: array element `int8[cm]` cannot be represented as `int8[mm]` at Span { start: 39, end: 43 }
+
+<<< exit
+1

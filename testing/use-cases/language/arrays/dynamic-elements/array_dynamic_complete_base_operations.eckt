@@ -1,0 +1,44 @@
+# Dynamic adaptive elements preserve their complete integer bases
+
+Verifies dynamic reads of actual `int64`, `int128`, and `bigint` values use
+the stored base for chained arithmetic, comparison, conversion, and negation.
+
+>>> source
+let int64_source: int64 = 10
+let int64_values: int[] = [int64_source]
+let int128_source: int128 = 8
+let int128_values: int[] = [int128_source]
+let bigint_source: bigint = 9
+let bigint_values: int[] = [bigint_source]
+let index = 0
+
+print(int64_values[index] + 1 + 1)
+print(int64_values[index] > 9)
+print(int64_values[index]->to(int128))
+print(-int64_values[index])
+
+print(int128_values[index] + 1 + 1)
+print(int128_values[index] > 7)
+print(int128_values[index]->to(int64))
+print(-int128_values[index])
+
+print(bigint_values[index] + 1 + 1)
+print(bigint_values[index] > 8)
+print(bigint_values[index]->to(int128))
+print(-bigint_values[index])
+
+<<< stdout
+12
+true
+10
+-10
+10
+true
+8
+-8
+11
+true
+9
+-9
+
+<<< stderr

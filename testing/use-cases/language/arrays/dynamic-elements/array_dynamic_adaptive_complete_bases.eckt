@@ -1,0 +1,24 @@
+# Adaptive array reads dispatch on the stored integer base
+
+Verifies dynamic reads preserve int64, int128, and bigint identities, including
+int64-to-int128 and int128-to-bigint overflow before a chained operation.
+
+>>> source
+let int64_values: int[] = [9223372036854775807]
+let int64_index = 0
+print(int64_values[int64_index] + 1 + 1)
+
+let int128_values: int[] = [170141183460469231731687303715884105727]
+let int128_index = 0
+print(int128_values[int128_index] + 1 + 1)
+
+let bigint_values: int[] = [340282366920938463463374607431768211456]
+let bigint_index = 0
+print(bigint_values[bigint_index] + 1)
+
+<<< stdout
+9223372036854775809
+170141183460469231731687303715884105729
+340282366920938463463374607431768211457
+
+<<< stderr

@@ -1,0 +1,14 @@
+# Fixed-width subtype scaling normalizes an in-range literal
+
+Verifies the scaled magnitude folded while compiling agrees with the stored
+value: `12cm` becomes `120mm`, which the declared `int8` representation can
+hold, so the element is stored with the converted magnitude.
+
+>>> source
+let sizes: int8<mm>[] = [12cm]
+print(sizes[0])
+
+<<< stdout
+120mm
+
+<<< stderr

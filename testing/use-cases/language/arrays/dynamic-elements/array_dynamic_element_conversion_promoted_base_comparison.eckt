@@ -7,7 +7,7 @@ centimeter magnitude still compares correctly and yields `true`.
 >>> source
 let sizes: int[] = [10mm]
 let index = 0
-print((sizes[index] -> to(cm)) > 0cm)
+print((sizes[index]->to(cm)) > 0cm)
 
 <<< stdout
 true

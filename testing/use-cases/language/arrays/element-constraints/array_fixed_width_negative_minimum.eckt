@@ -1,0 +1,13 @@
+# Fixed-width arrays accept signed minimum literals
+
+Verifies the parser-shaped negative literal keeps its sign while initializing
+the minimum value representable by an `int8` array.
+
+>>> source
+let values: int8[] = [-128]
+print(values[0])
+
+<<< stdout
+-128
+
+<<< stderr

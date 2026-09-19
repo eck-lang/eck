@@ -1,0 +1,15 @@
+# Inexact fixed-width subtype conversion is rejected
+
+Verifies an `int8` centimeter array does not truncate `15mm` to `1cm` while
+converting the element's unit.
+
+>>> source
+let sizes: int8<cm>[] = [15mm]
+
+<<< stdout
+
+<<< stderr
+eck: array element `int8[mm]` cannot be represented as `int8[cm]` at Span { start: 25, end: 29 }
+
+<<< exit
+1

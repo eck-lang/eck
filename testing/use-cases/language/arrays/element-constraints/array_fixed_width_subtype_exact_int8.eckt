@@ -1,0 +1,13 @@
+# Exact fixed-width subtype conversion is normalized
+
+Verifies an exactly divisible `int8` unit conversion stores the converted
+magnitude in the declared centimeter representation.
+
+>>> source
+let sizes: int8<cm>[] = [20mm]
+print(sizes[0])
+
+<<< stdout
+2cm
+
+<<< stderr

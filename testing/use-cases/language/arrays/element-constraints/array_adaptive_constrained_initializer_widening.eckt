@@ -1,0 +1,13 @@
+# Adaptive int widens a constrained initializer
+
+Verifies an adaptive `int<mm>[]` keeps its unit while selecting `int128` for a
+magnitude beyond the default `int64` representation.
+
+>>> source
+let values: int<mm>[] = [9223372036854775808mm]
+print(values[0])
+
+<<< stdout
+9223372036854775808mm
+
+<<< stderr

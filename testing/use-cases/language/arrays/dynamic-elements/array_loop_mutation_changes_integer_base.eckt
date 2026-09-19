@@ -1,0 +1,16 @@
+# A loop mutation changes an adaptive element's integer base
+
+Verifies a loop write that promotes an `int64` element to `int128` keeps the
+later dynamic read and chained operation on the promoted base.
+
+>>> source
+let values: int[] = [1]
+for (i in 0..1) {
+    values[0] = 9223372036854775807 + 1
+}
+print(values[0] + 1)
+
+<<< stdout
+9223372036854775809
+
+<<< stderr

@@ -1,0 +1,19 @@
+# An oversized dynamically stored bigint is not an array index
+
+Verifies a `bigint` index larger than the machine word is rejected without
+truncation.
+
+>>> source
+let values: int[] = [10]
+let source: bigint = 18446744073709551616
+let indexes: int[] = [source]
+let selector = 0
+print(values[indexes[selector]])
+
+<<< stdout
+
+<<< stderr
+eck: runtime error: array index 18446744073709551616 must be a non-negative integer that fits in a machine word
+
+<<< exit
+1

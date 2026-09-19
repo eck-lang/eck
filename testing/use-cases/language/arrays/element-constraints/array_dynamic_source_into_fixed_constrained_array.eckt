@@ -1,0 +1,15 @@
+# Dynamic source converts into a fixed constrained array
+
+Verifies an element read through a dynamic index is converted from centimeters
+to the declared millimeter subtype before entering `int64<mm>[]` storage.
+
+>>> source
+let source: int[] = [2cm]
+let index = 0
+let sizes: int64<mm>[] = [source[index]]
+print(sizes[0])
+
+<<< stdout
+20mm
+
+<<< stderr

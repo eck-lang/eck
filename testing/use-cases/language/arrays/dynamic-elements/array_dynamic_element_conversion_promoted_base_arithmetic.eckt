@@ -8,7 +8,7 @@ representation still behaves like the same value outside an array: converting a
 >>> source
 let sizes: int[] = [10mm]
 let index = 0
-print((sizes[index] -> to(cm)) + 1cm)
+print((sizes[index]->to(cm)) + 1cm)
 
 <<< stdout
 2cm

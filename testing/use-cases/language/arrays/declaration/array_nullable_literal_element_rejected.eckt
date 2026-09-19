@@ -1,0 +1,16 @@
+# Nullable array literal elements are rejected
+
+Verifies a nullable binding cannot cross into a non-nullable array literal,
+even when its current value is null.
+
+>>> source
+let item: int? = null
+let values: int[] = [item]
+
+<<< stdout
+
+<<< stderr
+eck: nullable value must be narrowed before this operation at Span { start: 43, end: 47 }
+
+<<< exit
+1

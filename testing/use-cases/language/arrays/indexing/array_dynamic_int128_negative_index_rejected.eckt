@@ -1,0 +1,19 @@
+# A dynamically stored negative int128 is not an array index
+
+Verifies negative indexes are rejected after extracting a runtime `int128`
+value from an adaptive array.
+
+>>> source
+let values: int[] = [10]
+let source: int128 = -1
+let indexes: int[] = [source]
+let selector = 0
+print(values[indexes[selector]])
+
+<<< stdout
+
+<<< stderr
+eck: runtime error: array index -1 must be a non-negative integer that fits in a machine word
+
+<<< exit
+1

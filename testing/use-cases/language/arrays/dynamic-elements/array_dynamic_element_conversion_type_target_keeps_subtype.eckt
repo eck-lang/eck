@@ -7,7 +7,7 @@ rather than losing its unit.
 >>> source
 let sizes: int[] = [2cm]
 let index = 0
-print(sizes[index] -> to(decimal))
+print(sizes[index]->to(decimal))
 
 <<< stdout
 2cm

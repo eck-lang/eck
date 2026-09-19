@@ -1,0 +1,18 @@
+# Dynamic source rejects a constrained representation overflow
+
+Verifies converting a dynamically read centimeter value to millimeters can
+promote its magnitude, and the final `int64<mm>[]` storage still rejects it.
+
+>>> source
+let source: int[] = [9223372036854775807cm]
+let index = 0
+let sizes: int64<mm>[] = [source[index]]
+print(sizes[0])
+
+<<< stdout
+
+<<< stderr
+eck: array element `92233720368547758070mm` cannot be represented as `int64[mm]`
+
+<<< exit
+1

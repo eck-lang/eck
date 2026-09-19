@@ -1,0 +1,18 @@
+# Dynamic source rejects an incompatible constrained destination
+
+Verifies a dynamically read kilogram value cannot enter an array constrained
+to millimeters when no subtype conversion is registered.
+
+>>> source
+let source: int[] = [5kg]
+let index = 0
+let sizes: int<mm>[] = [source[index]]
+print(sizes[0])
+
+<<< stdout
+
+<<< stderr
+eck: conversion from `int64[kg]` to array element conversion to `int64[mm]` is not defined
+
+<<< exit
+1

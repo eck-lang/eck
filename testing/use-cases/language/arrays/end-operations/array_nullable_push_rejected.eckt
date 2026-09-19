@@ -1,0 +1,17 @@
+# Nullable push arguments are rejected
+
+Verifies push cannot store a potentially null value in an array with a
+non-nullable element contract.
+
+>>> source
+let item: int? = null
+let values: int[] = []
+values->push(item)
+
+<<< stdout
+
+<<< stderr
+eck: nullable value must be narrowed before this operation at Span { start: 58, end: 62 }
+
+<<< exit
+1

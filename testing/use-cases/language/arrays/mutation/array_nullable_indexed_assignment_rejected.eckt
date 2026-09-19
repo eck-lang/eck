@@ -1,0 +1,17 @@
+# Nullable indexed array stores are rejected
+
+Verifies an indexed assignment applies the same non-nullable storage gate as
+an array literal.
+
+>>> source
+let item: int? = 10
+let values: int[] = [1]
+values[0] = item
+
+<<< stdout
+
+<<< stderr
+eck: nullable value must be narrowed before this operation at Span { start: 56, end: 60 }
+
+<<< exit
+1

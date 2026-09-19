@@ -1,0 +1,13 @@
+# Inferred arrays widen signed literals in semantic order
+
+Verifies an unannotated array chooses a signed representation wide enough for
+every literal, including a value just beyond `int64`.
+
+>>> source
+let values = [1, 9223372036854775808]
+print(values[1])
+
+<<< stdout
+9223372036854775808
+
+<<< stderr

@@ -1,0 +1,13 @@
+# Adaptive int widens a negative initializer
+
+Verifies the parser-shaped negative literal widens through the signed integer
+progression instead of rejecting the positive token or truncating the value.
+
+>>> source
+let values: int[] = [-9223372036854775809]
+print(values[0])
+
+<<< stdout
+-9223372036854775809
+
+<<< stderr

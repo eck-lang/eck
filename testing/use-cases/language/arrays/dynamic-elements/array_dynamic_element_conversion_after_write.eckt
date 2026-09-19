@@ -7,7 +7,7 @@ write: the element now holds `3dm`, so the conversion scales it to `300mm`.
 let sizes: int[] = [10mm, 2cm]
 let index = 1
 sizes[index] = 3dm
-print(sizes[index] -> to(mm))
+print(sizes[index]->to(mm))
 
 <<< stdout
 300mm

@@ -1,0 +1,17 @@
+# Inexact fixed-width subtype conversion rejects a variable source
+
+Verifies the shared conversion rule rejects an inexact `int8` value from a
+variable before an array insertion can truncate it.
+
+>>> source
+let source: int8 = 15mm
+let sizes: int8<cm>[] = []
+sizes->push(source)
+
+<<< stdout
+
+<<< stderr
+eck: cannot convert `int8` to `int8`
+
+<<< exit
+1

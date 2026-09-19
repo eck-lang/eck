@@ -7,7 +7,7 @@ declared target instead of silently converting.
 >>> source
 let sizes: int[] = [10mm, 5kg]
 let index = 1
-print(sizes[index] -> to(mm))
+print(sizes[index]->to(mm))
 
 <<< stdout
 

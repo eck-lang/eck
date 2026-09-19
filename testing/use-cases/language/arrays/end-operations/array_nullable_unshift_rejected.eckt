@@ -1,0 +1,17 @@
+# Nullable unshift arguments are rejected
+
+Verifies unshift cannot store a potentially null value in an array with a
+non-nullable element contract.
+
+>>> source
+let item: int? = 10
+let values: int[] = []
+values->unshift(item)
+
+<<< stdout
+
+<<< stderr
+eck: nullable value must be narrowed before this operation at Span { start: 59, end: 63 }
+
+<<< exit
+1

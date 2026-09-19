@@ -1,0 +1,15 @@
+# Exact fixed-width subtype conversion normalizes a variable source
+
+Verifies an exactly divisible `int8` variable conversion is evaluated before
+the array insertion and stored as the declared centimeter value.
+
+>>> source
+let source: int8 = 20mm
+let sizes: int8<cm>[] = []
+sizes->push(source)
+print(sizes[0])
+
+<<< stdout
+2cm
+
+<<< stderr

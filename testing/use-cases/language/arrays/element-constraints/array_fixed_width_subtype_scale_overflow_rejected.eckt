@@ -1,0 +1,17 @@
+# Fixed-width subtype scaling rejects multiplication overflow
+
+Verifies converting `127cm` to `int8<mm>` does not wrap the intermediate `1270`
+magnitude before the fixed-width store boundary. The scaled magnitude is folded
+while compiling, so the overflowing literal is rejected there rather than when
+the value crosses into storage.
+
+>>> source
+let sizes: int8<mm>[] = [127cm]
+
+<<< stdout
+
+<<< stderr
+eck: array element `int8[cm]` cannot be represented as `int8[mm]` at Span { start: 25, end: 30 }
+
+<<< exit
+1

@@ -1,0 +1,21 @@
+# Adaptive storage keeps overflow promotions through later operations
+
+Verifies an `int64` overflow to `int128` and an `int128` overflow to `bigint`
+survive a second arithmetic operation and are stored back in adaptive arrays.
+
+>>> source
+let int64_values: int[] = [9223372036854775807]
+int64_values[0] = int64_values[0] + 1
+int64_values[0] = int64_values[0] + 1
+print(int64_values[0])
+
+let int128_values: int[] = [170141183460469231731687303715884105727]
+int128_values[0] = int128_values[0] + 1
+int128_values[0] = int128_values[0] + 1
+print(int128_values[0])
+
+<<< stdout
+9223372036854775809
+170141183460469231731687303715884105729
+
+<<< stderr

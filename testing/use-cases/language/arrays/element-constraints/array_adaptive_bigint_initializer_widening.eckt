@@ -1,0 +1,13 @@
+# Adaptive int reaches bigint after int128
+
+Verifies an adaptive initializer beyond the signed `int128` range selects
+`bigint` and preserves the exact magnitude.
+
+>>> source
+let values: int[] = [170141183460469231731687303715884105728]
+print(values[0])
+
+<<< stdout
+170141183460469231731687303715884105728
+
+<<< stderr

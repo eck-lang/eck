@@ -7,7 +7,7 @@ the same rule a standalone centimeter value would use, yielding `20mm`.
 >>> source
 let sizes: int[] = [10mm, 2cm]
 let index = 1
-print(sizes[index] -> to(mm))
+print(sizes[index]->to(mm))
 
 <<< stdout
 20mm

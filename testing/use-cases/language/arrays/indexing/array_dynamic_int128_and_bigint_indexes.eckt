@@ -1,0 +1,20 @@
+# Dynamic wide integer indexes select array elements
+
+Verifies dynamic index extraction supports both `int128` and `bigint`
+representations when the runtime index is stored in an adaptive array.
+
+>>> source
+let values: int[] = [10, 20, 30]
+let int128_source: int128 = 1
+let bigint_source: bigint = 2
+let int128_indexes: int[] = [int128_source]
+let bigint_indexes: int[] = [bigint_source]
+let selector = 0
+print(values[int128_indexes[selector]])
+print(values[bigint_indexes[selector]])
+
+<<< stdout
+20
+30
+
+<<< stderr

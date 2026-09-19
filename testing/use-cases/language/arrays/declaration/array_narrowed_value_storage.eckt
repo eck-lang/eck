@@ -1,0 +1,19 @@
+# A narrowed value can cross every array storage boundary
+
+Verifies a null check permits a nullable value to initialize, assign, push,
+and unshift a non-nullable array while the proof is in scope.
+
+>>> source
+let item: int? = 10
+if (item != null) {
+    let values: int[] = [item]
+    values[0] = item
+    values->push(item)
+    values->unshift(item)
+    print(values)
+}
+
+<<< stdout
+[10, 10, 10]
+
+<<< stderr

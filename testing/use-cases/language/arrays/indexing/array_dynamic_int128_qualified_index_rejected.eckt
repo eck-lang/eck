@@ -1,0 +1,19 @@
+# A dynamically stored qualified int128 is not an array index
+
+Verifies the plain-integer index rule reports a qualified `int128` value
+instead of silently extracting its magnitude.
+
+>>> source
+let values: int[] = [10]
+let source: int128 = 1mm
+let indexes: int[] = [source]
+let selector = 0
+print(values[indexes[selector]])
+
+<<< stdout
+
+<<< stderr
+eck: an array index must be a plain integer, found `int128[mm]`
+
+<<< exit
+1

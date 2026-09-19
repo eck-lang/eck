@@ -1,0 +1,45 @@
+# Dynamic adaptive elements preserve complete qualified identities
+
+Verifies dynamic reads of `int64[mm]`, `int128[mm]`, and `bigint[mm]`
+preserve the base and subtype through chained arithmetic, comparison,
+conversion, and negation.
+
+>>> source
+let int64_source: int64 = 10mm
+let int64_values: int[] = [int64_source]
+let int128_source: int128 = 8mm
+let int128_values: int[] = [int128_source]
+let bigint_source: bigint = 9mm
+let bigint_values: int[] = [bigint_source]
+let index = 0
+
+print(int64_values[index] + 1mm + 1mm)
+print(int64_values[index] > 9mm)
+print(int64_values[index]->to(cm))
+print(-int64_values[index])
+
+print(int128_values[index] + 1mm + 1mm)
+print(int128_values[index] > 7mm)
+print(int128_values[index]->to(int64))
+print(-int128_values[index])
+
+print(bigint_values[index] + 1mm + 1mm)
+print(bigint_values[index] > 8mm)
+print(bigint_values[index]->to(int128))
+print(-bigint_values[index])
+
+<<< stdout
+12mm
+true
+1cm
+-10mm
+10mm
+true
+8mm
+-8mm
+11mm
+true
+9mm
+-9mm
+
+<<< stderr
