@@ -1,0 +1,175 @@
+//! Base-type binary operator registration and dispatch.
+
+use crate::semantic::{
+    BinaryOperator, BinaryOperatorDescriptor, BinaryOperatorExecutor,
+    ContextBinaryOperatorExecutor, CoreError, InPlaceBinaryOperatorExecutor, OperatorId, TypeId,
+};
+
+use super::Registry;
+
+impl Registry {
+    /// Registers one binary operator implementation for an exact pair of base types.
+    ///
+    /// The returned ID is dense and remains stable for the lifetime of this
+    /// registry, allowing compiled programs to dispatch directly at runtime.
+    /// All input and result type IDs must already be registered. Returns
+    /// [`CoreError::UnknownTypeId`] for an unknown type or
+    /// [`CoreError::DuplicateOperator`] for an existing signature.
+    pub fn register_binary_operator(
+        &mut self,
+        operator: BinaryOperator,
+        left_operand_type: TypeId,
+        right_operand_type: TypeId,
+        result_type: TypeId,
+        execute: BinaryOperatorExecutor,
+    ) -> Result<OperatorId, CoreError> {
+        self.type_descriptor(left_operand_type)?;
+        self.type_descriptor(right_operand_type)?;
+        self.type_descriptor(result_type)?;
+
+        let key = (operator, left_operand_type, right_operand_type);
+        if self.operator_index.contains_key(&key) {
+            return Err(CoreError::DuplicateOperator {
+                operator,
+                left_operand_type: self.type_name(left_operand_type).to_string(),
+                right_operand_type: self.type_name(right_operand_type).to_string(),
+            });
+        }
+
+        let id = OperatorId {
+            registry_id: self.registry_id,
+            index: self.operators.len(),
+        };
+        self.operators.push(BinaryOperatorDescriptor {
+            id,
+            operator,
+            left_operand_type,
+            right_operand_type,
+            result_type,
+            execute,
+            in_place_execute: None,
+            context_execute: None,
+        });
+        self.operator_index.insert(key, id);
+        Ok(id)
+    }
+
+    /// Registers one binary operator with a registry-aware execution override.
+    ///
+    /// Validation matches [`Registry::register_binary_operator`]: all input
+    /// and result type IDs must already be registered, and the exact operand
+    /// signature must be unique. The plain `execute` callback remains the
+    /// context-free implementation while `context_execute` is the override the
+    /// runtime prefers, which lets an extension resolve related types (such as
+    /// an overflow promotion target) at execution time. Returns
+    /// [`CoreError::UnknownTypeId`] for an unknown type or
+    /// [`CoreError::DuplicateOperator`] for an existing signature.
+    pub fn register_context_binary_operator(
+        &mut self,
+        operator: BinaryOperator,
+        left_operand_type: TypeId,
+        right_operand_type: TypeId,
+        result_type: TypeId,
+        execute: BinaryOperatorExecutor,
+        context_execute: ContextBinaryOperatorExecutor,
+    ) -> Result<OperatorId, CoreError> {
+        self.type_descriptor(left_operand_type)?;
+        self.type_descriptor(right_operand_type)?;
+        self.type_descriptor(result_type)?;
+
+        let key = (operator, left_operand_type, right_operand_type);
+        if self.operator_index.contains_key(&key) {
+            return Err(CoreError::DuplicateOperator {
+                operator,
+                left_operand_type: self.type_name(left_operand_type).to_string(),
+                right_operand_type: self.type_name(right_operand_type).to_string(),
+            });
+        }
+
+        let id = OperatorId {
+            registry_id: self.registry_id,
+            index: self.operators.len(),
+        };
+        self.operators.push(BinaryOperatorDescriptor {
+            id,
+            operator,
+            left_operand_type,
+            right_operand_type,
+            result_type,
+            execute,
+            in_place_execute: None,
+            context_execute: Some(context_execute),
+        });
+        self.operator_index.insert(key, id);
+        Ok(id)
+    }
+
+    /// Adds an allocation-avoiding executor to an existing same-type operator.
+    ///
+    /// The registered operator must already have the exact operand types and a
+    /// result type equal to its left operand. Runtime execution invokes this
+    /// callback only for a uniquely owned left value, preserving normal value
+    /// sharing semantics. Returns the same resolution errors as
+    /// [`Registry::resolve_binary_operator`] and rejects incompatible result
+    /// types with [`CoreError::InvalidInPlaceOperator`].
+    pub fn register_in_place_binary_operator(
+        &mut self,
+        operator: BinaryOperator,
+        left_operand_type: TypeId,
+        right_operand_type: TypeId,
+        execute: InPlaceBinaryOperatorExecutor,
+    ) -> Result<(), CoreError> {
+        let id = self.resolve_binary_operator(operator, left_operand_type, right_operand_type)?;
+        if self.operator(id)?.result_type != left_operand_type {
+            return Err(CoreError::InvalidInPlaceOperator {
+                operator,
+                left_operand_type: self.type_name(left_operand_type).to_string(),
+                right_operand_type: self.type_name(right_operand_type).to_string(),
+            });
+        }
+        let descriptor = self
+            .operators
+            .get_mut(id.index)
+            .ok_or(CoreError::UnknownOperatorId(id))?;
+        descriptor.in_place_execute = Some(execute);
+        Ok(())
+    }
+
+    /// Resolves a binary operator for an exact pair of base types.
+    ///
+    /// This is the hot compile-time lookup used before subtype rules are
+    /// considered. It does not search for implicit coercions.
+    pub fn resolve_binary_operator(
+        &self,
+        operator: BinaryOperator,
+        left_operand_type: TypeId,
+        right_operand_type: TypeId,
+    ) -> Result<OperatorId, CoreError> {
+        self.operator_index
+            .get(&(operator, left_operand_type, right_operand_type))
+            .copied()
+            .ok_or_else(|| CoreError::OperatorNotDefined {
+                operator,
+                left_operand_type: self.type_name(left_operand_type).to_string(),
+                right_operand_type: self.type_name(right_operand_type).to_string(),
+            })
+    }
+
+    /// Returns the executable descriptor identified by a previously resolved ID.
+    ///
+    /// IDs index a vector rather than requiring a second hash lookup during
+    /// runtime evaluation. Returns [`CoreError::UnknownOperatorId`] when `id`
+    /// was resolved by another registry or is otherwise invalid.
+    pub fn operator(&self, id: OperatorId) -> Result<&BinaryOperatorDescriptor, CoreError> {
+        if id.registry_id != self.registry_id {
+            return Err(CoreError::UnknownOperatorId(id));
+        }
+        self.operators
+            .get(id.index)
+            .ok_or(CoreError::UnknownOperatorId(id))
+    }
+}
+
+#[cfg(test)]
+#[path = "operators.tests.rs"]
+mod tests;

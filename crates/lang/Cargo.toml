@@ -1,0 +1,13 @@
+[package]
+name = "eck-lang"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+logos = "0.16"
+num-bigint.workspace = true
+regex.workspace = true
+rust_decimal.workspace = true
+thiserror.workspace = true
+

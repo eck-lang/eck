@@ -1,0 +1,247 @@
+//! The central semantic catalogue for an ECK language instance.
+//!
+//! `Registry` keeps all lookup indices required during compilation and runtime.
+//! Name-based lookups use hash maps for expected constant-time resolution;
+//! resolved operators and functions use dense vectors so their IDs are cheap to
+//! dereference during execution.
+
+use std::{
+    collections::{HashMap, HashSet},
+    sync::atomic::{AtomicU64, Ordering},
+};
+
+use crate::semantic::configuration::{ArrayValueFormatter, RegisteredTypeConfiguration};
+use crate::semantic::{
+    BinaryOperator, BinaryOperatorDescriptor, BooleanEvaluator, ComparisonDescriptor, ComparisonId,
+    ComparisonOperator, ConfigurationDescriptor, FunctionDescriptor, FunctionId, IndexExtractor,
+    OperatorId, Scale, SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeId,
+    SubtypeRelativeRule, TypeDescriptor, TypeId,
+};
+
+pub mod bootstrap;
+mod comparisons;
+mod configurations;
+mod functions;
+mod namespaces;
+mod numeric;
+mod operators;
+mod subtypes;
+#[cfg(test)]
+mod test_support;
+mod types;
+
+static NEXT_REGISTRY_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Stores the language capabilities installed by ECK extensions.
+///
+/// This is intentionally one façade: type, subtype, operator, and function
+/// resolution cooperate to answer a single semantic question about an ECK
+/// expression. Its internal indices remain separated by concern in child
+/// modules.
+pub struct Registry {
+    /// Distinguishes IDs allocated by different registry instances.
+    registry_id: u64,
+    /// Allocates compact, stable IDs for registered base types.
+    next_type_id: u32,
+    /// Allocates compact, stable IDs for registered subtypes.
+    next_subtype_id: u32,
+
+    /// IDs issued to extensions but not yet registered as base types.
+    allocated_type_ids: HashSet<TypeId>,
+    /// IDs issued to extensions but not yet registered as subtypes.
+    allocated_subtype_ids: HashSet<SubtypeId>,
+
+    /// Resolves a declared type name to its compact ID.
+    types_by_name: HashMap<&'static str, TypeId>,
+    /// Stores type descriptors keyed by ID.
+    types: HashMap<TypeId, TypeDescriptor>,
+    /// Resolves how one integer base type converts its values into array indices.
+    ///
+    /// The compiler resolves this contract once per index expression and stores
+    /// the function pointer in the typed program, so element access never
+    /// repeats the lookup during execution.
+    index_extractors: HashMap<TypeId, IndexExtractor>,
+
+    /// Resolves a semantic subtype name to its compact ID.
+    subtypes_by_name: HashMap<&'static str, SubtypeId>,
+    /// Resolves every registered literal suffix to its subtype.
+    subtypes_by_suffix: HashMap<&'static str, SubtypeId>,
+    /// Stores subtype descriptors keyed by ID.
+    subtypes: HashMap<SubtypeId, SubtypeDescriptor>,
+
+    /// Resolves subtype-aware arithmetic rules by operator and operand subtype.
+    subtype_operator_index:
+        HashMap<(BinaryOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeBinaryRule>,
+    /// Resolves relative addition and subtraction rules by operator and operand subtype.
+    subtype_relative_index:
+        HashMap<(BinaryOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeRelativeRule>,
+    /// Resolves subtype-aware comparison rules by operator and operand subtype.
+    subtype_comparison_index:
+        HashMap<(ComparisonOperator, Option<SubtypeId>, Option<SubtypeId>), SubtypeComparisonRule>,
+    /// Resolves direct conversions between registered subtypes.
+    subtype_conversion_index: HashMap<(SubtypeId, SubtypeId), Scale>,
+
+    /// Resolves a base-type operation to a dense operator ID.
+    operator_index: HashMap<(BinaryOperator, TypeId, TypeId), OperatorId>,
+    /// Stores executable operator descriptors in ID order.
+    operators: Vec<BinaryOperatorDescriptor>,
+
+    /// Resolves a base-type comparison to a dense comparison ID.
+    comparison_index: HashMap<(ComparisonOperator, TypeId, TypeId), ComparisonId>,
+    /// Stores executable comparison descriptors in ID order.
+    comparisons: Vec<ComparisonDescriptor>,
+    /// Rejects duplicate comparison declarations expressed through stable type names.
+    comparison_declaration_index: HashSet<(ComparisonOperator, &'static str, &'static str)>,
+    /// Retains named comparisons so optional cross-extension relations can activate later.
+    comparison_declarations: Vec<comparisons::ComparisonDeclaration>,
+
+    /// Resolves a function name to its candidate overload IDs.
+    functions_by_name: HashMap<&'static str, Vec<FunctionId>>,
+    /// Stores executable function descriptors in ID order.
+    functions: Vec<FunctionDescriptor>,
+    /// Names whose overload families may be called without a lexical import.
+    global_functions: HashSet<&'static str>,
+
+    /// Stores public namespace surfaces independently from native functions.
+    namespaces: HashMap<&'static str, namespaces::RegisteredNamespace>,
+    /// Associates a receiver base type with the namespace used by pipe lookup.
+    namespaces_by_receiver_type: HashMap<TypeId, &'static str>,
+
+    /// Validates and supplies defaults for registered runtime configuration leaves.
+    configurations: HashMap<&'static str, ConfigurationDescriptor>,
+    /// Resolves source object paths that define explicit `None` behavior to their leaves.
+    configuration_none_objects: HashMap<&'static str, &'static str>,
+    /// Associates configuration-aware result and formatting hooks with base types.
+    ///
+    /// Result transformation is consulted for every produced value, so the
+    /// hooks are stored densely by type index instead of behind a hash lookup.
+    type_configurations: Vec<Option<RegisteredTypeConfiguration>>,
+    /// Formats array values without making Core depend on an array payload type.
+    array_formatter: Option<ArrayValueFormatter>,
+
+    /// Selects the base type for uncontextualized integer literals.
+    default_integer: Option<TypeId>,
+    /// Selects the base type for uncontextualized fractional literals.
+    default_fractional: Option<TypeId>,
+    /// Selects the base type for uncontextualized string literals.
+    default_string: Option<TypeId>,
+    /// Selects the base type for uncontextualized regex literals.
+    default_regex: Option<TypeId>,
+    /// Selects and evaluates the base type for boolean language semantics.
+    default_boolean: Option<(TypeId, BooleanEvaluator)>,
+    /// Selects the base type for null language semantics.
+    default_null: Option<TypeId>,
+}
+
+impl Default for Registry {
+    fn default() -> Self {
+        Self {
+            registry_id: NEXT_REGISTRY_ID.fetch_add(1, Ordering::Relaxed),
+            next_type_id: 0,
+            next_subtype_id: 0,
+            allocated_type_ids: HashSet::new(),
+            allocated_subtype_ids: HashSet::new(),
+            types_by_name: HashMap::new(),
+            types: HashMap::new(),
+            index_extractors: HashMap::new(),
+            subtypes_by_name: HashMap::new(),
+            subtypes_by_suffix: HashMap::new(),
+            subtypes: HashMap::new(),
+            subtype_operator_index: HashMap::new(),
+            subtype_relative_index: HashMap::new(),
+            subtype_comparison_index: HashMap::new(),
+            subtype_conversion_index: HashMap::new(),
+            operator_index: HashMap::new(),
+            operators: Vec::new(),
+            comparison_index: HashMap::new(),
+            comparisons: Vec::new(),
+            comparison_declaration_index: HashSet::new(),
+            comparison_declarations: Vec::new(),
+            functions_by_name: HashMap::new(),
+            functions: Vec::new(),
+            global_functions: HashSet::new(),
+            namespaces: HashMap::new(),
+            namespaces_by_receiver_type: HashMap::new(),
+            configurations: HashMap::new(),
+            configuration_none_objects: HashMap::new(),
+            type_configurations: Vec::new(),
+            array_formatter: None,
+            default_integer: None,
+            default_fractional: None,
+            default_string: None,
+            default_regex: None,
+            default_boolean: None,
+            default_null: None,
+        }
+    }
+}
+
+impl Registry {
+    /// Creates an empty registry with no language capabilities installed.
+    ///
+    /// Extensions must register types, operations, and defaults before the
+    /// compiler can resolve source expressions that depend on them.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Allocates the next unique ID for a base type descriptor.
+    ///
+    /// Callers allocate an ID before constructing the matching
+    /// [`TypeDescriptor`], then pass both to [`Registry::register_type`].
+    pub fn allocate_type_id(&mut self) -> TypeId {
+        let id = TypeId {
+            registry_id: self.registry_id,
+            index: self.next_type_id,
+        };
+        self.next_type_id += 1;
+        self.allocated_type_ids.insert(id);
+        id
+    }
+
+    /// Allocates the next unique ID for a subtype descriptor.
+    ///
+    /// Callers allocate an ID before constructing the matching
+    /// [`SubtypeDescriptor`], then pass both to [`Registry::register_subtype`].
+    pub fn allocate_subtype_id(&mut self) -> SubtypeId {
+        let id = SubtypeId {
+            registry_id: self.registry_id,
+            index: self.next_subtype_id,
+        };
+        self.next_subtype_id += 1;
+        self.allocated_subtype_ids.insert(id);
+        id
+    }
+
+    /// Returns the dense key for one complete scalar type.
+    ///
+    /// `subtype_stride` is the compiler-recorded width of the optional
+    /// subtype axis. The base type index occupies the higher axis, so the key
+    /// is stable arithmetic over the registry's dense IDs and does not need a
+    /// name or hash lookup at runtime.
+    pub fn complete_type_dispatch_key(
+        &self,
+        value_type: crate::semantic::ValueType,
+        subtype_stride: usize,
+    ) -> usize {
+        assert!(
+            subtype_stride > 0,
+            "complete type dispatch stride must be non-zero"
+        );
+        value_type.base.index as usize * subtype_stride
+            + self.subtype_dispatch_slot(value_type.subtype)
+    }
+
+    /// Returns the dense key-space width for complete scalar types.
+    ///
+    /// The width includes allocated type slots so a compiler-created domain
+    /// can retain direct arithmetic indexing even when a registry has an
+    /// unregistered slot between two registered extensions.
+    pub fn complete_type_dispatch_width(&self, subtype_stride: usize) -> usize {
+        assert!(
+            subtype_stride > 0,
+            "complete type dispatch stride must be non-zero"
+        );
+        self.next_type_id as usize * subtype_stride
+    }
+}

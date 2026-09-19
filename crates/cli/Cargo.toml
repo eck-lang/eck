@@ -9,7 +9,4 @@ name = "eck"
 path = "src/main.rs"
 
 [dependencies]
-dialect = { package = "eck-dialect", path = "../dialect" }
-parser = { package = "eck-parser", path = "../parser" }
-compiler = { package = "eck-compiler", path = "../compiler" }
-runtime = { package = "eck-runtime", path = "../runtime" }
+eck-lang = { path = "../lang" }

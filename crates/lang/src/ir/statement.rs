@@ -1,0 +1,104 @@
+use crate::semantic::{
+    ConfigurationOverride, IndexExtractor, ResolvedBinaryOperator, ResolvedComparison,
+    SemanticType, Value, ValueType,
+};
+use crate::syntax::Span;
+
+use crate::ir::binding::{BindingId, LocalVariableSlot};
+use crate::ir::expression::{TypedExpression, TypedIndexDispatch};
+
+/// A statement sequence that shares one lexical variable scope.
+#[derive(Clone)]
+pub struct TypedBlock {
+    pub statements: Vec<TypedStatement>,
+    /// Slots declared directly in this block, in declaration order.
+    pub owned_slots: Box<[LocalVariableSlot]>,
+    pub span: Span,
+}
+
+/// Stores the compiled execution plan for one integer range loop.
+///
+/// The initial plan avoids registry resolution during ordinary iterations. The
+/// runtime rebuilds it only if an overflow promotion changes the iteration
+/// value's concrete type.
+#[derive(Clone)]
+pub struct TypedRangePlan {
+    pub current_type: ValueType,
+    pub increment_unit: Value,
+    pub comparison: ResolvedComparison,
+    pub increment: ResolvedBinaryOperator,
+}
+
+/// One executable statement whose bindings, operators, and functions the
+/// compiler has already resolved.
+#[derive(Clone)]
+pub enum TypedStatement {
+    /// Applies a validated `@config` override to subsequent statements.
+    Configuration {
+        configuration_override: ConfigurationOverride,
+        span: Span,
+    },
+    /// Declares a local binding and stores its initializer in a slot.
+    VariableDeclaration {
+        name: String,
+        binding: BindingId,
+        slot: LocalVariableSlot,
+        mutable: bool,
+        semantic_type: SemanticType,
+        expression: TypedExpression,
+        span: Span,
+    },
+    /// Stores a new value in an existing mutable binding slot.
+    Assignment {
+        name: String,
+        binding: BindingId,
+        slot: LocalVariableSlot,
+        expression: TypedExpression,
+        span: Span,
+    },
+    /// Replaces one element in an existing mutable array slot.
+    IndexedAssignment {
+        name: String,
+        binding: BindingId,
+        slot: LocalVariableSlot,
+        index: TypedExpression,
+        constant_index: Option<usize>,
+        index_extractor: IndexExtractor,
+        index_dispatch: Option<TypedIndexDispatch>,
+        expression: TypedExpression,
+        span: Span,
+    },
+    /// Executes a nested lexically scoped block.
+    Block(TypedBlock),
+    /// Executes one of two blocks based on a boolean condition.
+    If {
+        condition: TypedExpression,
+        body: TypedBlock,
+        else_body: Option<TypedBlock>,
+        span: Span,
+    },
+    /// Repeats a block while a boolean condition stays true.
+    While {
+        condition: TypedExpression,
+        body: TypedBlock,
+        span: Span,
+    },
+    /// Iterates a block over an integer range with a precompiled step plan.
+    For {
+        variable: String,
+        binding: BindingId,
+        slot: LocalVariableSlot,
+        variable_type: ValueType,
+        start: TypedExpression,
+        end: TypedExpression,
+        range_plan: TypedRangePlan,
+        body: TypedBlock,
+        span: Span,
+    },
+    /// Exits the innermost enclosing loop.
+    Break { span: Span },
+    /// Skips to the next iteration of the innermost enclosing loop.
+    Continue { span: Span },
+    /// Evaluates an expression for its side effects and discards the result.
+    Expression(TypedExpression),
+}

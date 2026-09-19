@@ -59,7 +59,11 @@ fn prefixes_compile_errors_and_exits_nonzero() {
 
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
-    assert!(String::from_utf8(output.stderr).unwrap().starts_with("eck: "));
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .starts_with("eck: ")
+    );
 }
 
 #[test]

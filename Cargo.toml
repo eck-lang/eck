@@ -1,17 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/core",
-  "crates/compiler",
-  "crates/ir",
-  "crates/parser",
-  "crates/primitives",
-  "crates/measures",
-  "crates/runtime",
-  "crates/std/*",
+  "crates/lang",
   "crates/cli",
-  "crates/lsp",
-  "crates/dialect",
   "crates/test-runner",
 ]
 
