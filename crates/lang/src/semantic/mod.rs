@@ -12,7 +12,7 @@ mod subtype;
 mod types;
 
 pub use crate::values::Value;
-pub use array::{ArrayElementMode, ArrayType};
+pub use array::{ArrayElementMode, ArrayEndOperation, ArrayType};
 pub use configuration::{
     ArrayValueFormatter, ConfigurationDescriptor, ConfigurationNormalizer, ConfigurationOverride,
     ConfigurationValue, ConfiguredValueFormatter, ConfiguredValueTransformer, ExecutionContext,

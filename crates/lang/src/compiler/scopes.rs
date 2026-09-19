@@ -81,7 +81,7 @@ impl Compiler<'_> {
     }
 
     /// Finds the nearest active declaration for a source variable name.
-    pub(super) fn resolve_variable(&self, name: &str) -> Option<LocalVariable> {
+    pub(crate) fn resolve_variable(&self, name: &str) -> Option<LocalVariable> {
         self.variable_scopes
             .iter()
             .rev()
@@ -192,7 +192,7 @@ impl Compiler<'_> {
     /// complete scalar value. An array is a container whose compile-time
     /// contract lives in its element type, so passing it where a scalar is
     /// expected is always a type error rather than an operator lookup failure.
-    pub(super) fn require_scalar_expression(
+    pub(crate) fn require_scalar_expression(
         &self,
         expression: &TypedExpression,
     ) -> Result<(), CompileError> {
@@ -240,7 +240,7 @@ impl Compiler<'_> {
     /// Nullability is a property of the value, not of the operation, so this
     /// check stays in place for every consumer even when the consumer can accept
     /// a container. A value that may be null must be narrowed first.
-    pub(super) fn require_non_nullable_expression(
+    pub(crate) fn require_non_nullable_expression(
         &self,
         expression: &TypedExpression,
     ) -> Result<(), CompileError> {

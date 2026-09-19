@@ -25,7 +25,7 @@ impl Compiler<'_> {
     /// `expected` carries the type requested by the enclosing construct. It
     /// drives numeric literal parsing, so an annotated `12.50` is parsed by the
     /// annotated type instead of passing through a generic float path.
-    pub(super) fn compile_expression(
+    pub(crate) fn compile_expression(
         &mut self,
         expression: &Expression,
         expected: Option<TypeId>,
@@ -926,7 +926,7 @@ impl Compiler<'_> {
     }
 
     /// Resolves and parses every operation needed to apply one subtype scale.
-    pub(super) fn compile_scale_plan(
+    pub(crate) fn compile_scale_plan(
         &self,
         base_type: TypeId,
         scale: Scale,

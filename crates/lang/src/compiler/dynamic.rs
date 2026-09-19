@@ -18,7 +18,7 @@ use super::Compiler;
 
 impl Compiler<'_> {
     /// Reports whether a base belongs to the adaptive signed integer family.
-    pub(super) fn is_signed_integer_base(&self, base: TypeId) -> bool {
+    pub(crate) fn is_signed_integer_base(&self, base: TypeId) -> bool {
         self.registry
             .signed_integer_widening_types()
             .contains(&base)
@@ -384,7 +384,7 @@ impl Compiler<'_> {
     ///
     /// The target is resolved for every candidate source type into a dispatch
     /// table, so runtime execution only selects the precomputed plan.
-    pub(super) fn dynamic_convert(
+    pub(crate) fn dynamic_convert(
         &self,
         expression: TypedExpression,
         source_domain: Arc<CompleteTypeDomain>,

@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use crate::ir::ArrayMethod;
 use crate::semantic::{
-    ArrayType, BinaryOperator, ComparisonOperator, FunctionId, IndexExtractor, OperatorId,
-    Registry, ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion, SemanticType,
-    TypeId, Value, ValueType,
+    ArrayEndOperation, ArrayType, BinaryOperator, ComparisonOperator, FunctionId, IndexExtractor,
+    OperatorId, Registry, ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion,
+    SemanticType, TypeId, Value, ValueType,
 };
 use crate::syntax::{LogicalOperator, Span};
 
@@ -308,7 +307,7 @@ pub enum TypedExpressionKind {
     /// its own, and a removal produces the element together with whatever
     /// subtype it was stored with.
     ArrayMethod {
-        method: ArrayMethod,
+        method: ArrayEndOperation,
         binding: BindingId,
         slot: LocalVariableSlot,
         arguments: Vec<TypedExpression>,

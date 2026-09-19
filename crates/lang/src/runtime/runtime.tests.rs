@@ -1,13 +1,13 @@
 use crate::containers::array::ArrayValue;
 use crate::ir::{
-    ArrayMethod, BindingId, LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock,
-    TypedExpression, TypedExpressionKind, TypedProgram, TypedRangePlan, TypedScalePlan,
-    TypedScaleStep, TypedStatement,
+    BindingId, LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock, TypedExpression,
+    TypedExpressionKind, TypedProgram, TypedRangePlan, TypedScalePlan, TypedScaleStep,
+    TypedStatement,
 };
 use crate::semantic::{
-    ArrayElementMode, ArrayType, BinaryOperator, CoreError, Registry, ResolvedSubtypeConversion,
-    Scale, SemanticType, SubtypeBinaryRule, SubtypeDescriptor, SubtypeRelativeRule, TypeDescriptor,
-    Value, ValueType,
+    ArrayElementMode, ArrayEndOperation, ArrayType, BinaryOperator, CoreError, Registry,
+    ResolvedSubtypeConversion, Scale, SemanticType, SubtypeBinaryRule, SubtypeDescriptor,
+    SubtypeRelativeRule, TypeDescriptor, Value, ValueType,
 };
 use crate::syntax::Span;
 
@@ -1492,7 +1492,7 @@ fn array_declaration(
 
 /// Builds one expression that applies an array method to a local array slot.
 fn array_method_expression(
-    method: ArrayMethod,
+    method: ArrayEndOperation,
     slot: usize,
     element: ValueType,
     arguments: Vec<TypedExpression>,
@@ -1531,7 +1531,7 @@ fn removing_from_an_empty_array_produces_the_null_value() {
                 mutable: false,
                 semantic_type: SemanticType::Scalar(element_type),
                 expression: array_method_expression(
-                    ArrayMethod::Pop,
+                    ArrayEndOperation::Pop,
                     0,
                     element_type,
                     Vec::new(),
@@ -1593,14 +1593,14 @@ fn empty_removals_keep_shared_array_payloads() {
             array_declaration(2, integer, Vec::new()),
             alias_declaration(2, 3),
             TypedStatement::Expression(array_method_expression(
-                ArrayMethod::Pop,
+                ArrayEndOperation::Pop,
                 0,
                 element_type,
                 Vec::new(),
                 Some(parse_test_null("null", null).expect("the null literal parses")),
             )),
             TypedStatement::Expression(array_method_expression(
-                ArrayMethod::Shift,
+                ArrayEndOperation::Shift,
                 2,
                 element_type,
                 Vec::new(),
@@ -1660,7 +1660,7 @@ fn insertion_through_a_shared_binding_copies_the_array() {
                 span: SPAN,
             },
             TypedStatement::Expression(array_method_expression(
-                ArrayMethod::Push,
+                ArrayEndOperation::Push,
                 1,
                 element_type,
                 vec![TypedExpression {

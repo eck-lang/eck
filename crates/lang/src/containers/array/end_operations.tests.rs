@@ -1,5 +1,6 @@
-use crate::ir::ArrayMethod;
-use crate::semantic::{ArrayElementMode, ArrayType, CoreError, Registry, Value, ValueType};
+use crate::semantic::{
+    ArrayElementMode, ArrayEndOperation, ArrayType, CoreError, Registry, Value, ValueType,
+};
 
 use super::*;
 use crate::ArrayValue;
@@ -58,13 +59,13 @@ fn push_and_pop_move_the_last_element() {
     let mut value = payload(&[1, 2]);
 
     assert!(
-        apply_end_operation(&mut value, ArrayMethod::Push, Some(element(3)))
+        apply_end_operation(&mut value, ArrayEndOperation::Push, Some(element(3)))
             .unwrap()
             .is_none()
     );
     assert_eq!(integers(&value), [1, 2, 3]);
 
-    let removed = apply_end_operation(&mut value, ArrayMethod::Pop, None).unwrap();
+    let removed = apply_end_operation(&mut value, ArrayEndOperation::Pop, None).unwrap();
     assert_eq!(removed_integer(removed), 3);
     assert_eq!(integers(&value), [1, 2]);
 }
@@ -75,13 +76,13 @@ fn unshift_and_shift_move_the_first_element() {
     let mut value = payload(&[1, 2]);
 
     assert!(
-        apply_end_operation(&mut value, ArrayMethod::Unshift, Some(element(0)))
+        apply_end_operation(&mut value, ArrayEndOperation::Unshift, Some(element(0)))
             .unwrap()
             .is_none()
     );
     assert_eq!(integers(&value), [0, 1, 2]);
 
-    let removed = apply_end_operation(&mut value, ArrayMethod::Shift, None).unwrap();
+    let removed = apply_end_operation(&mut value, ArrayEndOperation::Shift, None).unwrap();
     assert_eq!(removed_integer(removed), 0);
     assert_eq!(integers(&value), [1, 2]);
 }
@@ -92,12 +93,12 @@ fn removing_from_an_empty_array_reports_nothing() {
     let mut value = payload(&[]);
 
     assert!(
-        apply_end_operation(&mut value, ArrayMethod::Pop, None)
+        apply_end_operation(&mut value, ArrayEndOperation::Pop, None)
             .unwrap()
             .is_none()
     );
     assert!(
-        apply_end_operation(&mut value, ArrayMethod::Shift, None)
+        apply_end_operation(&mut value, ArrayEndOperation::Shift, None)
             .unwrap()
             .is_none()
     );
@@ -111,7 +112,7 @@ fn an_addition_keeps_a_shared_payload_isolated() {
     let mut alias = original.clone();
     assert!(!alias.is_uniquely_owned(), "the fixture shares one payload");
 
-    apply_end_operation(&mut alias, ArrayMethod::Push, Some(element(3))).unwrap();
+    apply_end_operation(&mut alias, ArrayEndOperation::Push, Some(element(3))).unwrap();
 
     assert_eq!(integers(&alias), [1, 2, 3]);
     assert_eq!(integers(&original), [1, 2]);
@@ -170,7 +171,7 @@ fn element_at_reports_an_out_of_bounds_index() {
 fn a_scalar_value_is_rejected() {
     let mut scalar = element(1);
 
-    let error = match apply_end_operation(&mut scalar, ArrayMethod::Push, Some(element(2))) {
+    let error = match apply_end_operation(&mut scalar, ArrayEndOperation::Push, Some(element(2))) {
         Ok(_) => panic!("a scalar value is not an array payload"),
         Err(error) => error,
     };

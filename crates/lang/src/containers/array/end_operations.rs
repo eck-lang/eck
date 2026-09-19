@@ -1,13 +1,12 @@
 //! Built-in operations at either end of an array payload, plus element access.
 //!
 //! These operations are language intrinsics rather than registered functions:
-//! the compiler resolves a source spelling to one [`ArrayMethod`] and the runtime
+//! the compiler resolves a source spelling to one [`ArrayEndOperation`] and the runtime
 //! applies it here. The payload owns the element movement, the copy-on-write
 //! decision, and the bounds contract, so the runtime keeps only expression
 //! evaluation and local-slot flow.
 
-use crate::ir::ArrayMethod;
-use crate::semantic::{ArrayType, CoreError, Value};
+use crate::semantic::{ArrayEndOperation, ArrayType, CoreError, Value};
 
 use super::value::{ArrayValue, invalid_array_value};
 
@@ -22,7 +21,7 @@ use super::value::{ArrayValue, invalid_array_value};
 /// compiled program guarantees.
 pub fn apply_end_operation(
     value: &mut Value,
-    method: ArrayMethod,
+    method: ArrayEndOperation,
     stored: Option<Value>,
 ) -> Result<Option<Value>, CoreError> {
     let array_type = value.array_type().ok_or_else(invalid_array_value)?;
@@ -32,16 +31,16 @@ pub fn apply_end_operation(
     copy_if_shared(value, array_type)?;
     let array = ArrayValue::from_value_mut(value)?;
     match method {
-        ArrayMethod::Push => {
+        ArrayEndOperation::Push => {
             array.push(stored.expect("an adding operation has one value to store"));
             Ok(None)
         }
-        ArrayMethod::Unshift => {
+        ArrayEndOperation::Unshift => {
             array.unshift(stored.expect("an adding operation has one value to store"));
             Ok(None)
         }
-        ArrayMethod::Pop => Ok(array.pop()),
-        ArrayMethod::Shift => Ok(array.shift()),
+        ArrayEndOperation::Pop => Ok(array.pop()),
+        ArrayEndOperation::Shift => Ok(array.shift()),
     }
 }
 
