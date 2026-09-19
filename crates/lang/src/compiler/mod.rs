@@ -13,12 +13,12 @@ use crate::semantic::{
 };
 use crate::syntax::{Block, Expression, Program, Statement, TypeExpression};
 
+use crate::containers::array::compiler::ArrayElementFlow;
 use crate::ir::{
     BindingId, BindingMetadata, CompleteTypeDomain, LocalVariableSlot, TypedBlock, TypedExpression,
     TypedProgram, TypedRangePlan, TypedStatement,
 };
 
-mod arrays;
 mod configuration;
 mod dynamic;
 mod error;
@@ -39,7 +39,7 @@ pub fn compile(program: &Program, registry: &Registry) -> Result<TypedProgram, C
         next_local_slot: 0,
         bindings: Vec::new(),
         narrowed_bindings: HashMap::new(),
-        array_element_types: HashMap::new(),
+        element_flow: ArrayElementFlow::new(),
         loop_depth: 0,
         loop_contexts: Vec::new(),
         import_scopes: vec![ImportScope::default()],
@@ -56,8 +56,8 @@ pub fn compile(program: &Program, registry: &Registry) -> Result<TypedProgram, C
 /// hang into a conservatively merged loop state.
 const MAXIMUM_LOOP_FIXED_POINT_PASSES: usize = 64;
 
-struct Compiler<'a> {
-    registry: &'a Registry,
+pub(crate) struct Compiler<'a> {
+    pub(crate) registry: &'a Registry,
     variable_scopes: Vec<HashMap<String, LocalVariable>>,
     scope_slots: Vec<Vec<LocalVariableSlot>>,
     next_local_slot: usize,
@@ -74,7 +74,7 @@ struct Compiler<'a> {
     /// A slot holds `Some` for an element whose complete type the compiler
     /// knows and `None` for one whose subtype is only known at runtime, so a
     /// read can tell a precise element type from a dynamic one.
-    array_element_types: HashMap<BindingId, Vec<Option<ValueType>>>,
+    pub(crate) element_flow: ArrayElementFlow,
     loop_depth: usize,
     /// One entry per enclosing loop whose statements are currently compiled.
     ///
@@ -93,7 +93,7 @@ struct LoopContext {
     /// Every pass over the body replaces this list, so a fixed-point pass that
     /// discards stale facts never leaves an exit recorded from an earlier and
     /// more precise pass behind.
-    break_exits: Vec<HashMap<BindingId, Vec<Option<ValueType>>>>,
+    break_exits: Vec<ArrayElementFlow>,
 }
 
 /// Records one compiled pass over a loop body.
@@ -112,19 +112,19 @@ struct CompiledLoop {
     /// The converged compiled pass.
     pass: CompiledLoopPass,
     /// The element flow state every reachable loop exit agrees on.
-    exit_state: HashMap<BindingId, Vec<Option<ValueType>>>,
+    exit_state: ArrayElementFlow,
 }
 
 /// Stores the semantic type and statically allocated storage of one local variable.
 #[derive(Clone)]
-struct LocalVariable {
-    binding: BindingId,
-    semantic_type: SemanticType,
-    slot: LocalVariableSlot,
-    mutable: bool,
-    nullable: bool,
-    complete_type_domain: Option<Arc<CompleteTypeDomain>>,
-    adaptive_integer: bool,
+pub(crate) struct LocalVariable {
+    pub(crate) binding: BindingId,
+    pub(crate) semantic_type: SemanticType,
+    pub(crate) slot: LocalVariableSlot,
+    pub(crate) mutable: bool,
+    pub(crate) nullable: bool,
+    pub(crate) complete_type_domain: Option<Arc<CompleteTypeDomain>>,
+    pub(crate) adaptive_integer: bool,
 }
 
 /// Stores the semantic contract resolved from one explicit binding annotation.
@@ -243,7 +243,7 @@ impl Compiler<'_> {
                 span,
             } => {
                 let typed_condition = self.compile_boolean_condition(condition, "if")?;
-                let before = self.array_element_type_snapshot();
+                let before = self.element_flow.snapshot();
                 let narrowed_binding = self.non_null_narrowing_binding(condition);
                 if let Some(binding) = narrowed_binding {
                     self.push_narrowing(binding);
@@ -253,14 +253,14 @@ impl Compiler<'_> {
                     self.pop_narrowing(binding);
                 }
                 let compiled_body = compiled_body?;
-                let then = self.array_element_type_snapshot();
-                self.restore_array_element_type_snapshot(before.clone());
+                let then = self.element_flow.snapshot();
+                self.element_flow.restore(before.clone());
                 let compiled_else = else_body
                     .as_ref()
                     .map(|body| self.compile_block(body))
                     .transpose()?;
-                let otherwise = self.array_element_type_snapshot();
-                self.merge_array_element_type_snapshots(&[then, otherwise]);
+                let otherwise = self.element_flow.snapshot();
+                self.element_flow.merge(&[then, otherwise]);
                 Ok(TypedStatement::If {
                     condition: typed_condition,
                     body: compiled_body,
@@ -711,7 +711,7 @@ impl Compiler<'_> {
                 self.update_array_element_type(variable.binding, index, element_slot);
             }
             None => {
-                self.array_element_types.remove(&variable.binding);
+                self.element_flow.remove(variable.binding);
             }
         }
         Ok(TypedStatement::IndexedAssignment {
@@ -756,10 +756,10 @@ impl Compiler<'_> {
                     // The statement is unreachable. Compile it for diagnostics,
                     // then restore the state the last reachable transfer left so
                     // its facts cannot reach the block's exit state.
-                    let reachable_types = self.array_element_type_snapshot();
+                    let reachable_types = self.element_flow.snapshot();
                     let reachable_narrowings = self.narrowed_bindings.clone();
                     statements.push(self.compile_statement(statement)?);
-                    self.restore_array_element_type_snapshot(reachable_types);
+                    self.element_flow.restore(reachable_types);
                     self.narrowed_bindings = reachable_narrowings;
                     continue;
                 }
@@ -849,7 +849,7 @@ impl Compiler<'_> {
             comparison,
             increment,
         };
-        let loop_entry_state = self.array_element_type_snapshot();
+        let loop_entry_state = self.element_flow.snapshot();
         self.variable_scopes.push(HashMap::new());
         self.scope_slots.push(Vec::new());
         self.import_scopes.push(ImportScope::default());
@@ -905,7 +905,7 @@ impl Compiler<'_> {
         body: &Block,
         span: crate::syntax::Span,
     ) -> Result<TypedStatement, CompileError> {
-        let loop_entry_state = self.array_element_type_snapshot();
+        let loop_entry_state = self.element_flow.snapshot();
         let narrowed_binding = self.non_null_narrowing_binding(condition);
         if let Some(binding) = narrowed_binding {
             self.push_narrowing(binding);
@@ -966,7 +966,7 @@ impl Compiler<'_> {
     /// suffix.
     fn compile_loop_statement(
         &mut self,
-        loop_entry_state: HashMap<BindingId, Vec<Option<ValueType>>>,
+        loop_entry_state: ArrayElementFlow,
         include_entry_state_in_exit: bool,
         mut body_step: impl FnMut(&mut Self) -> Result<CompiledLoopPass, CompileError>,
     ) -> Result<CompiledLoop, CompileError> {
@@ -975,7 +975,7 @@ impl Compiler<'_> {
         for _ in 0..MAXIMUM_LOOP_FIXED_POINT_PASSES {
             // The head is the state every iteration begins from: the loop entry
             // and every path that reached the end of a previous body.
-            self.restore_array_element_type_snapshot(head.clone());
+            self.element_flow.restore(head.clone());
             self.loop_contexts.push(LoopContext {
                 break_exits: Vec::new(),
             });
@@ -985,7 +985,7 @@ impl Compiler<'_> {
                 .pop()
                 .expect("the loop context was pushed above");
             let pass = body_result?;
-            let backedge_state = self.array_element_type_snapshot();
+            let backedge_state = self.element_flow.snapshot();
             // Every later iteration begins from a state this pass can reach at
             // the end of the body, either by completing it or by `break`ing out.
             // Joining those into the current head heads the next iteration, and
@@ -994,7 +994,7 @@ impl Compiler<'_> {
             reached.extend(context.break_exits.iter().cloned());
             let mut head_snapshots = vec![head.clone()];
             head_snapshots.extend(reached);
-            let next_head = Self::join_array_element_type_snapshots(&head_snapshots);
+            let next_head = ArrayElementFlow::join(&head_snapshots);
             // The post-loop state merges only reachable exits. A `continue` is a
             // backedge and contributes through the post-body state; a `break`
             // contributes the state it recorded at the jump. The head already
@@ -1005,7 +1005,7 @@ impl Compiler<'_> {
             if include_entry_state_in_exit {
                 exit_snapshots.push(loop_entry_state.clone());
             }
-            let exit_state = Self::join_array_element_type_snapshots(&exit_snapshots);
+            let exit_state = ArrayElementFlow::join(&exit_snapshots);
             if next_head == head {
                 converged = Some(CompiledLoop { pass, exit_state });
                 break;
@@ -1016,14 +1016,14 @@ impl Compiler<'_> {
             // The bound was reached without converging. Dropping every element
             // fact keeps the diagnostic sound instead of emitting operations
             // compiled against a head a later iteration could invalidate.
-            self.array_element_types.clear();
+            self.element_flow.clear();
             CompileError::new(
                 crate::syntax::Span { start: 0, end: 0 },
                 "the loop flow analysis did not converge",
             )
         })?;
         // Statements after the loop see the merged state of its reachable exits.
-        self.restore_array_element_type_snapshot(compiled.exit_state.clone());
+        self.element_flow.restore(compiled.exit_state.clone());
         Ok(compiled)
     }
 
@@ -1037,7 +1037,7 @@ impl Compiler<'_> {
         let Some(context) = self.loop_contexts.last_mut() else {
             return;
         };
-        context.break_exits.push(self.array_element_types.clone());
+        context.break_exits.push(self.element_flow.snapshot());
     }
 
     /// Validates that a range bound is a plain integer type.

@@ -14,8 +14,8 @@ pub mod values;
 
 pub use crate::runtime::{RuntimeError, execute};
 pub use compiler::{CompileError, compile};
-pub use containers::array::{ArrayElementMode, ArrayType, ArrayValue};
-pub use ir::{ArrayMethod, TypedExpression, TypedExpressionKind, TypedProgram, TypedStatement};
+pub use containers::array::{ArrayElementMode, ArrayEndOperation, ArrayType, ArrayValue};
+pub use ir::{TypedExpression, TypedExpressionKind, TypedProgram, TypedStatement};
 pub use measures::{data, frequency, linear, mass, percentage, time, volume};
 pub use parser::{ECK_KEYWORDS, ParseError, parse};
 pub use primitives::{

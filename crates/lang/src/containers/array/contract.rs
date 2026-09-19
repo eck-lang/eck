@@ -2,6 +2,22 @@
 
 use crate::semantic::{CoreError, Registry, RuntimeConfiguration, Value, ValueType};
 
+/// Reports whether a value crosses into storage without applying the contract.
+///
+/// This is the runtime half of one rule whose compile-time half is the array
+/// compiler's proof that a store already carries the declared representation.
+/// The compiler emits a store without a runtime check exactly when it can prove
+/// this predicate holds for the value the store produces, so both halves live in
+/// this module and neither can be read without the other.
+///
+/// A value whose base already matches crosses unchanged, including the subtype
+/// it carries. The declared subtype is therefore never stamped onto a value the
+/// container did not convert: a constrained element subtype is converted by the
+/// compiler before the value reaches storage.
+pub fn element_crosses_unchanged(value: &Value, element: ValueType) -> bool {
+    value.type_id() == element.base
+}
+
 /// Applies one array element contract to a value about to enter storage.
 ///
 /// Evaluating an integer expression may temporarily promote its result to a
@@ -18,7 +34,7 @@ pub fn apply_element_contract(
     value: Value,
     element: ValueType,
 ) -> Result<Value, CoreError> {
-    if value.type_id() == element.base {
+    if element_crosses_unchanged(&value, element) {
         return Ok(value);
     }
     let subtype = element.subtype.or(value.subtype_id());

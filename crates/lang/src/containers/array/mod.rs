@@ -1,11 +1,21 @@
+//! The built-in array container.
+//!
+//! This module is the single owner of the array payload and its storage, the
+//! element contract a value crosses into storage through, the end operations,
+//! element access, and the formatter installed by [`ArrayExtension`]. The array
+//! vocabulary itself ([`ArrayType`] and [`ArrayElementMode`]) stays in
+//! `semantic`, because a `Value` carries its own array identity.
+
+pub(crate) mod compiler;
 mod contract;
 mod end_operations;
 mod formatting;
+mod runtime;
 mod storage;
 mod value;
 
-pub use crate::semantic::{ArrayElementMode, ArrayType};
-pub use contract::apply_element_contract;
+pub use crate::semantic::{ArrayElementMode, ArrayEndOperation, ArrayType};
+pub use contract::{apply_element_contract, element_crosses_unchanged};
 pub use end_operations::{apply_end_operation, element_at, set_element};
 pub use value::ArrayValue;
 
@@ -28,5 +38,5 @@ impl Extension for ArrayExtension {
 }
 
 #[cfg(test)]
-#[path = "lib.tests.rs"]
+#[path = "mod.tests.rs"]
 mod tests;

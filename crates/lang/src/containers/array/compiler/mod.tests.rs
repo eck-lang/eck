@@ -1,7 +1,16 @@
-use crate::measures::MeasuresExtension;
-use crate::semantic::{ArrayElementMode, ArrayType, Extension, Registry, SemanticType, ValueType};
+//! Tests for array compilation as one module.
+//!
+//! These tests compile whole array programs and inspect the IR they produce, so
+//! they exercise the child modules of array compilation together rather than one
+//! of them in isolation. That is the same role `lib.tests.rs` plays for a crate
+//! façade, and it is why this file is named for the module it verifies.
 
-use crate::ir::{ArrayMethod, TypedExpression, TypedExpressionKind, TypedProgram};
+use crate::measures::MeasuresExtension;
+use crate::semantic::{
+    ArrayElementMode, ArrayEndOperation, ArrayType, Extension, Registry, SemanticType, ValueType,
+};
+
+use crate::ir::{TypedExpression, TypedExpressionKind, TypedProgram};
 use crate::{CompileError, TypedStatement, compile};
 
 /// Builds a registry with every primitive and measure type for array tests.
@@ -920,7 +929,7 @@ fn loop_body_initializer<'program>(
 }
 
 /// Returns the operation of the first compiled array method call.
-fn first_array_method(program: &TypedProgram) -> ArrayMethod {
+fn first_array_method(program: &TypedProgram) -> ArrayEndOperation {
     for statement in &program.statements {
         if let TypedStatement::Expression(expression) = statement
             && let TypedExpressionKind::ArrayMethod { method, .. } = &expression.kind
@@ -937,8 +946,8 @@ fn resolves_append_as_the_push_operation() {
     let pushed = compile_source("let values: int[] = [1]\nvalues->push(2)\n");
     let appended = compile_source("let values: int[] = [1]\nvalues->append(2)\n");
 
-    assert_eq!(first_array_method(&pushed), ArrayMethod::Push);
-    assert_eq!(first_array_method(&appended), ArrayMethod::Push);
+    assert_eq!(first_array_method(&pushed), ArrayEndOperation::Push);
+    assert_eq!(first_array_method(&appended), ArrayEndOperation::Push);
 }
 
 /// Verifies `prepend` is the `unshift` operation rather than a second one.
@@ -947,8 +956,8 @@ fn resolves_prepend_as_the_unshift_operation() {
     let unshifted = compile_source("let values: int[] = [1]\nvalues->unshift(2)\n");
     let prepended = compile_source("let values: int[] = [1]\nvalues->prepend(2)\n");
 
-    assert_eq!(first_array_method(&unshifted), ArrayMethod::Unshift);
-    assert_eq!(first_array_method(&prepended), ArrayMethod::Unshift);
+    assert_eq!(first_array_method(&unshifted), ArrayEndOperation::Unshift);
+    assert_eq!(first_array_method(&prepended), ArrayEndOperation::Unshift);
 }
 
 /// Verifies the argument-less spelling names the same removal as `pop()`.
@@ -961,8 +970,8 @@ fn resolves_a_bare_arrow_spelling_as_the_same_removal() {
     let bare = compile_source("let values: int[] = [1]\nvalues->pop\n");
     let insertion = compile_error("let values: int[] = [1]\nvalues->push\n");
 
-    assert_eq!(first_array_method(&parenthesized), ArrayMethod::Pop);
-    assert_eq!(first_array_method(&bare), ArrayMethod::Pop);
+    assert_eq!(first_array_method(&parenthesized), ArrayEndOperation::Pop);
+    assert_eq!(first_array_method(&bare), ArrayEndOperation::Pop);
     assert!(
         insertion
             .message

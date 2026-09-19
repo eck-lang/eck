@@ -1,4 +1,3 @@
-use crate::containers::array::ArrayValue;
 use crate::ir::{TypedBinaryExecutionPlan, TypedExpression, TypedExpressionKind, TypedScalePlan};
 use crate::semantic::{
     BinaryOperator, BinaryOperatorDescriptor, ComparisonOperator, CoreError, ExecutionContext,
@@ -10,7 +9,7 @@ use super::Runtime;
 use crate::RuntimeError;
 
 impl<'registry> Runtime<'registry> {
-    pub(super) fn eval(
+    pub(crate) fn eval(
         &mut self,
         expression: &TypedExpression,
     ) -> Result<Option<Value>, RuntimeError> {
@@ -290,33 +289,12 @@ impl<'registry> Runtime<'registry> {
                 Ok(result)
             }
             TypedExpressionKind::ArrayLiteral { elements } => {
-                let array_type = expression.array_type().ok_or_else(|| {
-                    RuntimeError::Message(
-                        "array literal does not have an array semantic output".into(),
-                    )
-                })?;
-                let mut values = Vec::with_capacity(elements.len());
-                for element in elements {
-                    values.push(self.eval(element)?.ok_or_else(|| {
-                        RuntimeError::Message("array element returned no value".into())
-                    })?);
-                }
-                Ok(Some(Value::new_array(array_type, ArrayValue::new(values))))
+                self.build_array_value(expression, elements)
             }
             TypedExpressionKind::ElementStore {
                 element,
                 expression,
-            } => {
-                let value = self.eval(expression)?.ok_or_else(|| {
-                    RuntimeError::Message("array element returned no value".into())
-                })?;
-                Ok(Some(crate::containers::array::apply_element_contract(
-                    self.registry,
-                    &self.configuration,
-                    value,
-                    *element,
-                )?))
-            }
+            } => self.store_element_value(*element, expression),
             TypedExpressionKind::ArrayMethod {
                 method,
                 slot,
@@ -331,48 +309,13 @@ impl<'registry> Runtime<'registry> {
                 index_extractor,
                 index_dispatch,
                 ..
-            } => {
-                let array_value = self.eval(array)?.ok_or_else(|| {
-                    RuntimeError::Message("array expression returned no value".into())
-                })?;
-                let index = match constant_index {
-                    Some(index) => *index,
-                    None => {
-                        let index_value = self.eval(index)?.ok_or_else(|| {
-                            RuntimeError::Message("array index returned no value".into())
-                        })?;
-                        self.require_plain_index(&index_value)?;
-                        match index_dispatch {
-                            Some(dispatch) => {
-                                let slot = dispatch
-                                    .domain
-                                    .candidate_index(self.registry, index_value.value_type())
-                                    .ok_or_else(|| {
-                                        RuntimeError::Message(format!(
-                                            "type `{}` cannot be used as an array index",
-                                            self.registry.type_name(index_value.type_id())
-                                        ))
-                                    })?;
-                                dispatch
-                                    .extractors
-                                    .get(slot)
-                                    .and_then(|extractor| *extractor)
-                                    .ok_or_else(|| {
-                                        RuntimeError::Message(format!(
-                                            "type `{}` cannot be used as an array index",
-                                            self.registry.type_name(index_value.type_id())
-                                        ))
-                                    })?(&index_value)?
-                            }
-                            None => index_extractor(&index_value)?,
-                        }
-                    }
-                };
-                Ok(Some(crate::containers::array::element_at(
-                    &array_value,
-                    index,
-                )?))
-            }
+            } => self.read_array_element(
+                array,
+                index,
+                *constant_index,
+                *index_extractor,
+                index_dispatch.as_deref(),
+            ),
         }
     }
 

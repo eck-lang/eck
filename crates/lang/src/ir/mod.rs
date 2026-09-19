@@ -4,13 +4,11 @@
 //! [`TypedProgram`] is produced, and the execution plans are precomputed so the
 //! runtime never repeats resolution work on a hot path.
 
-mod array;
 mod binding;
 mod expression;
 mod program;
 mod statement;
 
-pub use array::ArrayMethod;
 pub use binding::{BindingId, BindingMetadata, LocalVariableSlot};
 pub use expression::{
     CompleteTypeDomain, TypedBinaryDispatch, TypedBinaryExecutionPlan, TypedBinaryPlan,

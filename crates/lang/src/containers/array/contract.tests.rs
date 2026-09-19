@@ -1,4 +1,6 @@
-use crate::semantic::{CoreError, Registry, TypeDescriptor, TypeId, Value, ValueType};
+use crate::semantic::{
+    CoreError, Registry, SubtypeDescriptor, TypeDescriptor, TypeId, Value, ValueType,
+};
 
 use super::*;
 
@@ -105,4 +107,43 @@ fn an_unrepresentable_element_is_rejected() {
         error.to_string(),
         "array element `42` cannot be represented as `narrow`"
     );
+}
+
+/// Verifies the runtime half of the store rule the compiler proves.
+///
+/// A value whose base already matches crosses unchanged, including the subtype it
+/// carries. The container therefore never stamps the declared element subtype
+/// onto a value it did not convert, because the compiler converts a constrained
+/// element subtype before the value reaches storage. The predicate that decides
+/// this is the same rule the compiler proves when it emits a store without a
+/// runtime check.
+#[test]
+fn a_base_match_crosses_with_the_subtype_it_carries() {
+    let (mut registry, wide, _) = registry();
+    let stored_subtype = registry.allocate_subtype_id();
+    registry
+        .register_subtype(SubtypeDescriptor {
+            id: stored_subtype,
+            name: "stored",
+            suffixes: &["stored"],
+        })
+        .expect("the stored test subtype registers");
+    let declared_subtype = registry.allocate_subtype_id();
+    registry
+        .register_subtype(SubtypeDescriptor {
+            id: declared_subtype,
+            name: "declared",
+            suffixes: &["declared"],
+        })
+        .expect("the declared test subtype registers");
+    let configuration = registry.default_runtime_configuration();
+    let value = Value::new(wide, 7_i64).with_subtype(Some(stored_subtype));
+    let element = ValueType::qualified(wide, declared_subtype);
+
+    assert!(element_crosses_unchanged(&value, element));
+
+    let stored = apply_element_contract(&registry, &configuration, value, element)
+        .expect("a value whose base matches crosses unchanged");
+    assert_eq!(stored.type_id(), wide);
+    assert_eq!(stored.subtype_id(), Some(stored_subtype));
 }
