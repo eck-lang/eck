@@ -264,4 +264,67 @@ impl Compiler<'_> {
             ),
         ))
     }
+
+    /// Resolves a generic one-value function for a container argument.
+    pub(super) fn resolve_source_any_single_function(
+        &self,
+        namespace: Option<&SourceIdentifier>,
+        function: &SourceIdentifier,
+        call_span: crate::syntax::Span,
+    ) -> Result<crate::semantic::FunctionId, CompileError> {
+        if let Some(namespace) = namespace {
+            let namespace_import =
+                self.resolve_namespace_import(&namespace.name)
+                    .ok_or_else(|| {
+                        CompileError::new(
+                            namespace.span,
+                            format!("namespace `{}` is not imported", namespace.name),
+                        )
+                    })?;
+            return self
+                .registry
+                .resolve_namespace_any_single_function(&namespace_import.namespace, &function.name)
+                .map_err(|error| CompileError::core(function.span, error));
+        }
+
+        if let Some(import) = self.resolve_function_import(&function.name) {
+            return match import {
+                FunctionImport::Unique(source) => self
+                    .registry
+                    .resolve_namespace_any_single_function(&source.namespace, &source.member)
+                    .map_err(|error| CompileError::core(call_span, error)),
+                FunctionImport::Ambiguous(sources) => {
+                    let mut candidates: Vec<_> = sources
+                        .iter()
+                        .map(|source| format!("{}.{}", source.namespace, source.member))
+                        .collect();
+                    candidates.sort();
+                    candidates.dedup();
+                    Err(CompileError::new(
+                        function.span,
+                        format!(
+                            "imported function `{}` is ambiguous; possible sources: {}",
+                            function.name,
+                            candidates.join(", ")
+                        ),
+                    ))
+                }
+            };
+        }
+
+        if self.registry.is_global_function(&function.name) {
+            return self
+                .registry
+                .resolve_any_single_function(&function.name)
+                .map_err(|error| CompileError::core(call_span, error));
+        }
+
+        Err(CompileError::new(
+            function.span,
+            format!(
+                "function `{}` is not in scope; import it with `use` or call it through an imported namespace",
+                function.name
+            ),
+        ))
+    }
 }

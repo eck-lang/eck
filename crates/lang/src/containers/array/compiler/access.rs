@@ -1,7 +1,7 @@
 //! Element access: index compilation and the recorded element facts.
 
 use crate::ir::{CompleteTypeDomain, TypedExpression, TypedExpressionKind, TypedIndexDispatch};
-use crate::semantic::{ArrayElementMode, ArrayType, IndexExtractor, SemanticType, ValueType};
+use crate::semantic::{ArrayType, IndexExtractor, ScalarRepresentation, SemanticType, ValueType};
 use crate::syntax::Expression;
 use std::sync::Arc;
 
@@ -10,6 +10,64 @@ use crate::CompileError;
 use crate::compiler::Compiler;
 
 impl Compiler<'_> {
+    /// Describes a finite observed element set without creating an array contract.
+    pub(crate) fn finite_array_element_output(
+        &self,
+        types: impl IntoIterator<Item = SemanticType>,
+    ) -> Option<(SemanticType, Option<Arc<CompleteTypeDomain>>)> {
+        let types = types.into_iter().collect::<Vec<_>>();
+        if types.is_empty() {
+            return None;
+        }
+        let semantic_type = SemanticType::union(types);
+        let scalar_candidates = match &semantic_type {
+            SemanticType::Scalar(value_type) => vec![*value_type],
+            SemanticType::Union(members)
+                if members
+                    .iter()
+                    .all(|member| matches!(member, SemanticType::Scalar(_))) =>
+            {
+                members.iter().filter_map(SemanticType::as_scalar).collect()
+            }
+            SemanticType::Array(_) | SemanticType::Union(_) => {
+                return Some((semantic_type, None));
+            }
+        };
+        if scalar_candidates.len() <= 1 {
+            return Some((semantic_type, None));
+        }
+        Some((
+            SemanticType::Scalar(scalar_candidates[0]),
+            Some(CompleteTypeDomain::from_candidates(
+                self.registry,
+                scalar_candidates,
+            )),
+        ))
+    }
+
+    /// Returns every concrete array contract a static array union may carry.
+    /// A nullable array is intentionally excluded until its null branch has
+    /// been narrowed; a union of arrays remains homogeneous per runtime value.
+    pub(crate) fn array_types_for_access(
+        &self,
+        expression: &TypedExpression,
+    ) -> Option<Vec<ArrayType>> {
+        match expression.output.as_ref()? {
+            SemanticType::Array(array_type) => Some(vec![(**array_type).clone()]),
+            SemanticType::Union(members) => {
+                let array_types = members
+                    .iter()
+                    .map(|member| match member {
+                        SemanticType::Array(array_type) => Some((**array_type).clone()),
+                        SemanticType::Scalar(_) | SemanticType::Union(_) => None,
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+                (!array_types.is_empty()).then_some(array_types)
+            }
+            SemanticType::Scalar(_) => None,
+        }
+    }
+
     /// Compiles one array index and resolves its runtime conversion once.
     ///
     /// The index must be a plain integer whose type registered an index
@@ -33,7 +91,7 @@ impl Compiler<'_> {
         self.require_scalar_expression(&typed)?;
         let index_type = match typed.output {
             Some(SemanticType::Scalar(index_type)) => index_type,
-            Some(SemanticType::Array(_)) => {
+            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects array semantic types")
             }
             None => {
@@ -121,12 +179,17 @@ impl Compiler<'_> {
         &self,
         array_type: ArrayType,
     ) -> Arc<CompleteTypeDomain> {
-        let bases = if array_type.element_mode == ArrayElementMode::AdaptiveInt {
+        let Some(SemanticType::Scalar(element)) = array_type.static_semantic_type() else {
+            return CompleteTypeDomain::from_candidates(self.registry, []);
+        };
+        let bases = if array_type.static_representation()
+            == Some(ScalarRepresentation::AdaptiveSignedInteger)
+        {
             self.registry.signed_integer_widening_types()
         } else {
-            vec![array_type.element.base]
+            vec![element.base]
         };
-        let subtypes = match array_type.element.subtype {
+        let subtypes = match element.subtype {
             Some(subtype) => vec![Some(subtype)],
             None => std::iter::once(None)
                 .chain(self.registry.registered_subtype_ids().map(Some))

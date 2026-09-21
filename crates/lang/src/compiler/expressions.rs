@@ -103,15 +103,29 @@ impl Compiler<'_> {
                 let variable = self
                     .resolve_variable(name)
                     .ok_or_else(|| CompileError::new(*span, format!("unknown binding `{name}`")))?;
+                let current_type = self.effective_variable_semantic_type(&variable);
+                let (output, flow_domain) = match (&variable.contract, &current_type) {
+                    (crate::ir::BindingContract::Dynamic, SemanticType::Union(members))
+                        if members
+                            .iter()
+                            .all(|member| matches!(member, SemanticType::Scalar(_))) =>
+                    {
+                        let candidates = members.iter().filter_map(SemanticType::as_scalar);
+                        let domain = crate::ir::CompleteTypeDomain::from_candidates(
+                            self.registry,
+                            candidates,
+                        );
+                        (members.first().cloned(), Some(domain))
+                    }
+                    _ => (Some(current_type), variable.complete_type_domain.clone()),
+                };
                 Ok(TypedExpression {
-                    output: Some(variable.semantic_type),
+                    output,
                     kind: TypedExpressionKind::Variable {
                         name: name.clone(),
                         binding: variable.binding,
                         slot: variable.slot,
-                        nullable: variable.nullable
-                            && !self.narrowed_bindings.contains_key(&variable.binding),
-                        complete_type_domain: variable.complete_type_domain.clone(),
+                        complete_type_domain: flow_domain,
                     },
                     span: *span,
                 })
@@ -128,6 +142,31 @@ impl Compiler<'_> {
                     return Ok(typed);
                 }
                 let operand = self.compile_expression(operand, expected)?;
+                if operand.is_open_value() {
+                    return match operator {
+                        UnaryOperator::Negation => Ok(TypedExpression {
+                            output: None,
+                            kind: TypedExpressionKind::OpenNegation {
+                                dispatch: crate::ir::TypedOpenBinaryDispatch::default(),
+                                operand: Box::new(operand),
+                            },
+                            span: *span,
+                        }),
+                        UnaryOperator::LogicalNot => {
+                            let boolean_type = self
+                                .registry
+                                .default_boolean()
+                                .map_err(|error| CompileError::core(*span, error))?;
+                            Ok(TypedExpression {
+                                output: Some(SemanticType::Scalar(ValueType::plain(boolean_type))),
+                                kind: TypedExpressionKind::LogicalNot {
+                                    operand: Box::new(operand),
+                                },
+                                span: *span,
+                            })
+                        }
+                    };
+                }
                 let operand_type =
                     self.scalar_expression_type(&operand, "unary operand has no value")?;
                 match operator {
@@ -202,10 +241,6 @@ impl Compiler<'_> {
                 };
                 let mut left_operand = self.compile_expression(left_operand, operand_expected)?;
                 let mut right_operand = self.compile_expression(right_operand, operand_expected)?;
-                let mut left_operand_type =
-                    self.scalar_expression_type(&left_operand, "left operand has no value")?;
-                let mut right_operand_type =
-                    self.scalar_expression_type(&right_operand, "right operand has no value")?;
                 let core_binary_operator = match operator {
                     BinaryOperator::Addition => CoreBinaryOperator::Addition,
                     BinaryOperator::Subtraction => CoreBinaryOperator::Subtraction,
@@ -214,6 +249,22 @@ impl Compiler<'_> {
                     BinaryOperator::Remainder => CoreBinaryOperator::Remainder,
                     BinaryOperator::Power => CoreBinaryOperator::Power,
                 };
+                if left_operand.is_open_value() || right_operand.is_open_value() {
+                    return Ok(TypedExpression {
+                        output: None,
+                        kind: TypedExpressionKind::OpenBinary {
+                            operator: core_binary_operator,
+                            dispatch: crate::ir::TypedOpenBinaryDispatch::default(),
+                            left_operand: Box::new(left_operand),
+                            right_operand: Box::new(right_operand),
+                        },
+                        span: *span,
+                    });
+                }
+                let mut left_operand_type =
+                    self.scalar_expression_type(&left_operand, "left operand has no value")?;
+                let mut right_operand_type =
+                    self.scalar_expression_type(&right_operand, "right operand has no value")?;
 
                 if core_binary_operator == CoreBinaryOperator::Addition
                     && let Some(string_type) = default_string
@@ -373,12 +424,14 @@ impl Compiler<'_> {
                         // compiled operand and the declaration are consulted.
                         let declared_nullable = self.expression_is_nullable(&typed_operand)
                             || match nullable_operand {
-                                Expression::Variable { name, .. } => self
-                                    .resolve_variable(name)
-                                    .is_some_and(|variable| variable.nullable),
+                                Expression::Variable { name, .. } => {
+                                    self.resolve_variable(name).is_some_and(|variable| {
+                                        self.semantic_type_is_nullable(&variable.semantic_type)
+                                    })
+                                }
                                 _ => false,
                             };
-                        if declared_nullable {
+                        if declared_nullable || typed_operand.is_open_value() {
                             let boolean_type = self
                                 .registry
                                 .default_boolean()
@@ -400,14 +453,6 @@ impl Compiler<'_> {
                 // `int == decimal` inside a `bool` declaration.
                 let left_operand = self.compile_expression(left_operand, None)?;
                 let right_operand = self.compile_expression(right_operand, None)?;
-                let left_operand_type = self.scalar_expression_type(
-                    &left_operand,
-                    "left comparison operand has no value",
-                )?;
-                let right_operand_type = self.scalar_expression_type(
-                    &right_operand,
-                    "right comparison operand has no value",
-                )?;
                 let core_comparison_operator = match operator {
                     ComparisonOperator::Equal => CoreComparisonOperator::Equal,
                     ComparisonOperator::NotEqual => CoreComparisonOperator::NotEqual,
@@ -416,6 +461,30 @@ impl Compiler<'_> {
                     ComparisonOperator::Greater => CoreComparisonOperator::Greater,
                     ComparisonOperator::GreaterOrEqual => CoreComparisonOperator::GreaterOrEqual,
                 };
+                if left_operand.is_open_value() || right_operand.is_open_value() {
+                    let boolean_type = self
+                        .registry
+                        .default_boolean()
+                        .map_err(|error| CompileError::core(*span, error))?;
+                    return Ok(TypedExpression {
+                        output: Some(SemanticType::Scalar(ValueType::plain(boolean_type))),
+                        kind: TypedExpressionKind::OpenComparison {
+                            operator: core_comparison_operator,
+                            dispatch: crate::ir::TypedOpenComparisonDispatch::default(),
+                            left_operand: Box::new(left_operand),
+                            right_operand: Box::new(right_operand),
+                        },
+                        span: *span,
+                    });
+                }
+                let left_operand_type = self.scalar_expression_type(
+                    &left_operand,
+                    "left comparison operand has no value",
+                )?;
+                let right_operand_type = self.scalar_expression_type(
+                    &right_operand,
+                    "right comparison operand has no value",
+                )?;
                 let dynamic_operands = left_operand.complete_type_domain().is_some()
                     || right_operand.complete_type_domain().is_some();
                 if dynamic_operands {
@@ -618,25 +687,45 @@ impl Compiler<'_> {
                 span,
             } => {
                 let mut typed_arguments = Vec::with_capacity(arguments.len());
-                let mut argument_types = Vec::with_capacity(arguments.len());
                 for argument in arguments {
                     let typed = self.compile_expression(argument, None)?;
                     // Nullability is rejected here; whether a container may be
                     // passed is decided once the called function is known.
                     self.require_non_nullable_expression(&typed)?;
-                    let base_type = self.expression_base_type(
-                        &typed,
-                        "void expression cannot be passed as an argument",
-                    )?;
-                    argument_types.push(base_type);
                     typed_arguments.push(typed);
                 }
-                let function = self.resolve_source_function(
-                    namespace.as_ref(),
-                    function,
-                    &argument_types,
-                    *span,
-                )?;
+                let has_structural_argument = typed_arguments.iter().any(|argument| {
+                    argument.is_open_value()
+                        || argument.output.as_ref().is_some_and(|semantic_type| {
+                            matches!(semantic_type, SemanticType::Union(_))
+                                || Self::type_contains_array(semantic_type)
+                        })
+                });
+                if has_structural_argument && typed_arguments.len() != 1 {
+                    return Err(CompileError::new(
+                        *span,
+                        "a structural value can only be passed as the single argument of a generic function",
+                    ));
+                }
+                let function = if has_structural_argument {
+                    self.resolve_source_any_single_function(namespace.as_ref(), function, *span)?
+                } else {
+                    let argument_types = typed_arguments
+                        .iter()
+                        .map(|typed| {
+                            self.expression_base_type(
+                                typed,
+                                "void expression cannot be passed as an argument",
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    self.resolve_source_function(
+                        namespace.as_ref(),
+                        function,
+                        &argument_types,
+                        *span,
+                    )?
+                };
                 self.require_scalar_arguments(function, &typed_arguments, *span)?;
                 let output = self
                     .registry
@@ -660,34 +749,90 @@ impl Compiler<'_> {
                 span,
             } => {
                 let typed_array = self.compile_expression(array, None)?;
-                let array_type = typed_array.array_type().ok_or_else(|| {
+                let array_types = self.array_types_for_access(&typed_array).ok_or_else(|| {
                     CompileError::new(array.span(), "only an array can be indexed with `[]`")
                 })?;
+                let array_type = array_types.first().cloned();
                 let (typed_index, constant_index, index_extractor, index_dispatch) =
                     self.compile_array_index(index)?;
-                let (output, type_domain) =
-                    match self.array_element_type(&typed_array, constant_index) {
+                let (output, type_domain) = if array_types.len() == 1 {
+                    let array_type = array_type.expect("one array contract was collected");
+                    let (output, type_domain) = match self
+                        .array_element_type(&typed_array, constant_index)
+                    {
                         // A recorded literal element keeps its own complete type,
                         // including a widened adaptive representation.
-                        Some(Some(element_type)) => (element_type, false),
+                        Some(Some(element_type)) => self
+                            .finite_array_element_output([element_type])
+                            .expect("one recorded element type is a finite domain"),
                         // Exact constrained contracts fix both axes. Adaptive
                         // constrained contracts fix only the subtype; a value may
                         // still carry a promoted signed base.
-                        Some(None) | None
-                            if array_type.element_mode
-                                == crate::semantic::ArrayElementMode::AdaptiveInt =>
-                        {
-                            (array_type.element, true)
-                        }
-                        Some(None) | None if array_type.element.subtype.is_none() => {
-                            (array_type.element, true)
-                        }
-                        Some(None) | None => (array_type.element, false),
+                        Some(None) | None => match array_type.static_semantic_type() {
+                            Some(element_type) => {
+                                let dynamic = matches!(
+                                    element_type,
+                                    SemanticType::Scalar(element)
+                                        if element.subtype.is_none()
+                                            || array_type.static_representation()
+                                                == Some(crate::semantic::ScalarRepresentation::AdaptiveSignedInteger)
+                                );
+                                (
+                                    element_type.clone(),
+                                    dynamic.then(|| {
+                                        self.array_element_complete_type_domain(array_type.clone())
+                                    }),
+                                )
+                            }
+                            None => {
+                                let Some(known) = self.array_known_element_types(&typed_array)
+                                else {
+                                    return Ok(TypedExpression {
+                                        output: None,
+                                        kind: TypedExpressionKind::ElementAccess {
+                                            array: Box::new(typed_array),
+                                            index: Box::new(typed_index),
+                                            constant_index,
+                                            index_extractor,
+                                            type_domain: None,
+                                            index_dispatch: index_dispatch.map(Box::new),
+                                        },
+                                        span: *span,
+                                    });
+                                };
+                                match self.finite_array_element_output(known) {
+                                    Some(known) => known,
+                                    None => {
+                                        return Ok(TypedExpression {
+                                            output: None,
+                                            kind: TypedExpressionKind::ElementAccess {
+                                                array: Box::new(typed_array),
+                                                index: Box::new(typed_index),
+                                                constant_index,
+                                                index_extractor,
+                                                type_domain: None,
+                                                index_dispatch: index_dispatch.map(Box::new),
+                                            },
+                                            span: *span,
+                                        });
+                                    }
+                                }
+                            }
+                        },
                     };
-                let type_domain =
-                    type_domain.then(|| self.array_element_complete_type_domain(array_type));
+                    (output, type_domain)
+                } else {
+                    (
+                        SemanticType::union(
+                            array_types.iter().filter_map(|array_type| {
+                                array_type.static_semantic_type().cloned()
+                            }),
+                        ),
+                        None,
+                    )
+                };
                 Ok(TypedExpression {
-                    output: Some(SemanticType::Scalar(output)),
+                    output: Some(output),
                     kind: TypedExpressionKind::ElementAccess {
                         array: Box::new(typed_array),
                         index: Box::new(typed_index),

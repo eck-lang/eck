@@ -1,7 +1,7 @@
 //! The array element flow state and the operations merged across a program.
 
 use crate::ir::{BindingId, TypedExpression, TypedExpressionKind};
-use crate::semantic::{SemanticType, ValueType};
+use crate::semantic::SemanticType;
 use std::collections::HashMap;
 
 use crate::compiler::Compiler;
@@ -14,16 +14,18 @@ use crate::compiler::Compiler;
 /// for constant reads, and a constant write updates one entry while a dynamic
 /// write removes the record and falls back to the array contract.
 ///
-/// A slot holds `Some` for an element whose complete type the compiler knows and
-/// `None` for one whose subtype is only known at runtime, so a read can tell a
-/// precise element type from a dynamic one.
+/// A slot holds `Some` for exact or finite semantic alternatives and `None` only
+/// when its identity is genuinely open. The separate whole-array domain remains
+/// available when a mutation loses positional knowledge, so finite observations
+/// survive loop joins and dynamic-index writes without becoming contracts.
 ///
 /// Every control-flow join in the compiler is expressed as an operation on this
 /// state, so a branch, a loop pass, and a loop exit each merge through the same
 /// type instead of rebuilding the map themselves.
 #[derive(Clone, Default, PartialEq)]
 pub(crate) struct ArrayElementFlow {
-    records: HashMap<BindingId, Vec<Option<ValueType>>>,
+    records: HashMap<BindingId, Vec<Option<SemanticType>>>,
+    known_domains: HashMap<BindingId, Vec<SemanticType>>,
 }
 
 impl ArrayElementFlow {
@@ -42,18 +44,14 @@ impl ArrayElementFlow {
         *self = snapshot;
     }
 
-    /// Replaces the state with the join of every given path state.
-    pub(crate) fn merge(&mut self, snapshots: &[Self]) {
-        *self = Self::join(snapshots);
-    }
-
     /// Joins element states into the state every path agrees on.
     ///
     /// The join is the analysis' meet operation on one abstract flow state. A
     /// binding survives only when every state records it with the same length,
     /// and an element keeps its complete type only when every state records that
-    /// exact type. Every other element becomes dynamic, so a later read
-    /// dispatches on the subtype the stored value actually holds.
+    /// exact type. Differing finite alternatives form a semantic union; an open
+    /// input remains open, so a later read chooses finite or open dispatch from
+    /// current knowledge rather than from the array contract.
     ///
     /// Returning the joined state instead of assigning it lets a loop compare the
     /// head of one iteration with the head of the next while looking for a fixed
@@ -76,36 +74,56 @@ impl ArrayElementFlow {
             let joined = elements
                 .iter()
                 .enumerate()
-                .map(|(index, element)| {
-                    let agrees = recorded.iter().all(|other| other[index] == *element);
-                    match agrees {
-                        true => *element,
-                        false => None,
-                    }
+                .map(|(index, _element)| {
+                    let candidates = recorded
+                        .iter()
+                        .map(|other| other[index].clone())
+                        .collect::<Option<Vec<_>>>();
+                    candidates.map(SemanticType::union)
                 })
                 .collect();
             merged.insert(*binding, joined);
         }
-        Self { records: merged }
+        let mut known_domains = HashMap::new();
+        for binding in first.known_domains.keys() {
+            let domains = snapshots
+                .iter()
+                .filter_map(|snapshot| snapshot.known_domains.get(binding))
+                .collect::<Vec<_>>();
+            if domains.len() == snapshots.len() {
+                known_domains.insert(
+                    *binding,
+                    flatten_semantic_types(domains.into_iter().flatten().cloned()),
+                );
+            }
+        }
+        Self {
+            records: merged,
+            known_domains,
+        }
     }
 
     /// Drops every recorded element type.
     pub(crate) fn clear(&mut self) {
         self.records.clear();
+        self.known_domains.clear();
     }
 
     /// Drops the record of one binding.
     pub(crate) fn remove(&mut self, binding: BindingId) {
         self.records.remove(&binding);
+        self.known_domains.remove(&binding);
     }
 
     /// Stores the element slots of one binding.
-    pub(crate) fn record(&mut self, binding: BindingId, element_types: Vec<Option<ValueType>>) {
+    pub(crate) fn record(&mut self, binding: BindingId, element_types: Vec<Option<SemanticType>>) {
+        let known = flatten_semantic_types(element_types.iter().filter_map(Clone::clone));
         self.records.insert(binding, element_types);
+        self.known_domains.insert(binding, known);
     }
 
     /// Borrows the element slots recorded for one binding.
-    pub(crate) fn element_types(&self, binding: BindingId) -> Option<Vec<Option<ValueType>>> {
+    pub(crate) fn element_types(&self, binding: BindingId) -> Option<Vec<Option<SemanticType>>> {
         self.records.get(&binding).cloned()
     }
 
@@ -118,31 +136,112 @@ impl ArrayElementFlow {
         &self,
         binding: BindingId,
         index: usize,
-    ) -> Option<Option<ValueType>> {
+    ) -> Option<Option<SemanticType>> {
         self.records
             .get(&binding)?
             .get(index)
-            .copied()
+            .cloned()
             .or(Some(None))
     }
 
     /// Updates one constant element slot after a write.
     ///
-    /// `None` records a dynamic slot, because the written value's subtype is only
-    /// known at runtime. An index outside the recorded range, or a binding without
-    /// a record, leaves the record as it is; the read then falls back to
-    /// dispatching on the stored subtype.
+    /// `None` records a genuinely open slot. An index outside the recorded range,
+    /// or a binding without a positional record, leaves the record as it is.
     pub(crate) fn update_element(
         &mut self,
         binding: BindingId,
         index: usize,
-        element_slot: Option<ValueType>,
+        element_slot: Option<SemanticType>,
     ) {
         if let Some(element_types) = self.records.get_mut(&binding)
             && index < element_types.len()
         {
             element_types[index] = element_slot;
+            self.refresh_known_domain(binding);
         }
+    }
+
+    /// Forgets slot positions while preserving the finite set any element may hold.
+    pub(crate) fn update_unknown_index(
+        &mut self,
+        binding: BindingId,
+        element_types: Vec<SemanticType>,
+    ) {
+        self.records.remove(&binding);
+        if let Some(known) = self.known_domains.get_mut(&binding) {
+            known.extend(element_types);
+            *known = flatten_semantic_types(std::mem::take(known));
+        }
+    }
+
+    /// Adds one known element at the selected end of a recorded array.
+    pub(crate) fn insert_end(
+        &mut self,
+        binding: BindingId,
+        at_front: bool,
+        element: Option<SemanticType>,
+    ) {
+        if let Some(elements) = self.records.get_mut(&binding) {
+            if at_front {
+                elements.insert(0, element);
+            } else {
+                elements.push(element);
+            }
+            self.refresh_known_domain(binding);
+        } else if let Some(element) = element {
+            let known = self.known_domains.entry(binding).or_default();
+            known.extend(flatten_semantic_types([element]));
+            *known = flatten_semantic_types(std::mem::take(known));
+        }
+    }
+
+    /// Removes one recorded element from the selected end.
+    pub(crate) fn remove_end(&mut self, binding: BindingId, at_front: bool) {
+        let Some(elements) = self.records.get_mut(&binding) else {
+            return;
+        };
+        if elements.is_empty() {
+            return;
+        }
+        if at_front {
+            elements.remove(0);
+        } else {
+            elements.pop();
+        }
+        self.refresh_known_domain(binding);
+    }
+
+    /// Returns the finite set of currently recorded concrete element types.
+    pub(crate) fn known_types(&self, binding: BindingId) -> Option<Vec<SemanticType>> {
+        self.known_domains.get(&binding).cloned()
+    }
+
+    /// Rebuilds one binding's finite domain after a positional mutation.
+    fn refresh_known_domain(&mut self, binding: BindingId) {
+        let Some(elements) = self.records.get(&binding) else {
+            return;
+        };
+        let known = flatten_semantic_types(elements.iter().filter_map(Clone::clone));
+        self.known_domains.insert(binding, known);
+    }
+}
+
+/// Flattens structural unions and removes duplicate semantic alternatives.
+fn flatten_semantic_types(types: impl IntoIterator<Item = SemanticType>) -> Vec<SemanticType> {
+    let mut flattened = Vec::new();
+    for semantic_type in types {
+        match semantic_type {
+            SemanticType::Union(members) => flattened.extend(members.iter().cloned()),
+            other => flattened.push(other),
+        }
+    }
+    if flattened.is_empty() {
+        return flattened;
+    }
+    match SemanticType::union(flattened) {
+        SemanticType::Union(members) => members.iter().cloned().collect(),
+        single => vec![single],
     }
 }
 
@@ -162,18 +261,9 @@ impl Compiler<'_> {
     ) {
         match &expression.kind {
             TypedExpressionKind::ArrayLiteral { elements, .. } => {
-                let element_types: Vec<Option<ValueType>> = elements
+                let element_types: Vec<Option<SemanticType>> = elements
                     .iter()
-                    .map(|element| {
-                        if element.complete_type_domain().is_some() {
-                            None
-                        } else {
-                            match element.output {
-                                Some(SemanticType::Scalar(element_type)) => Some(element_type),
-                                Some(SemanticType::Array(_)) | None => None,
-                            }
-                        }
-                    })
+                    .map(|element| self.array_flow_type_for_expression(element))
                     .collect();
                 self.element_flow.record(binding, element_types);
             }
@@ -196,7 +286,7 @@ impl Compiler<'_> {
         &self,
         array: &TypedExpression,
         constant_index: Option<usize>,
-    ) -> Option<Option<ValueType>> {
+    ) -> Option<Option<SemanticType>> {
         let TypedExpressionKind::Variable { binding, .. } = &array.kind else {
             return None;
         };
@@ -204,14 +294,55 @@ impl Compiler<'_> {
         self.element_flow.element_type(*binding, index)
     }
 
+    /// Returns the finite element types currently known for one array binding.
+    pub(crate) fn array_known_element_types(
+        &self,
+        array: &TypedExpression,
+    ) -> Option<Vec<SemanticType>> {
+        let TypedExpressionKind::Variable { binding, .. } = &array.kind else {
+            return None;
+        };
+        self.element_flow.known_types(*binding)
+    }
+
     /// Updates one recorded element slot after a constant element write.
     pub(crate) fn update_array_element_type(
         &mut self,
         binding: BindingId,
         index: usize,
-        element_slot: Option<ValueType>,
+        element_slot: Option<SemanticType>,
     ) {
         self.element_flow
             .update_element(binding, index, element_slot);
+    }
+
+    /// Preserves every finite runtime alternative an expression can produce.
+    pub(crate) fn array_flow_type_for_expression(
+        &self,
+        expression: &TypedExpression,
+    ) -> Option<SemanticType> {
+        expression
+            .complete_type_domain()
+            .map(|domain| {
+                SemanticType::union(domain.candidates.iter().copied().map(SemanticType::Scalar))
+            })
+            .or_else(|| expression.output.clone())
+    }
+
+    /// Updates a dynamic-index write without discarding the array's finite domain.
+    pub(crate) fn update_array_unknown_index_type(
+        &mut self,
+        binding: BindingId,
+        expression: &TypedExpression,
+    ) {
+        let types = self
+            .array_flow_type_for_expression(expression)
+            .into_iter()
+            .flat_map(|semantic_type| match semantic_type {
+                SemanticType::Union(members) => members.iter().cloned().collect(),
+                other => vec![other],
+            })
+            .collect();
+        self.element_flow.update_unknown_index(binding, types);
     }
 }

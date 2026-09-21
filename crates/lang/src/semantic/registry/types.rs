@@ -1,8 +1,8 @@
 //! Type registration, literal parsing, defaults, and value formatting.
 
 use crate::semantic::{
-    BooleanEvaluator, CoreError, IndexExtractor, SemanticType, TypeDescriptor, TypeId, Value,
-    ValueType,
+    BooleanEvaluator, CoreError, IndexExtractor, ScalarRepresentation, SemanticType,
+    TypeDescriptor, TypeId, Value, ValueType,
 };
 
 use super::Registry;
@@ -35,6 +35,8 @@ impl Registry {
 
         let name = descriptor.name;
         self.types_by_name.insert(name, id);
+        self.type_representations
+            .insert(name, ScalarRepresentation::Exact);
         self.types.insert(id, descriptor);
         self.allocated_type_ids.remove(&id);
         self.activate_comparison_declarations_for(name);
@@ -51,11 +53,22 @@ impl Registry {
         alias: &'static str,
         target: TypeId,
     ) -> Result<(), CoreError> {
+        self.register_type_alias_with_representation(alias, target, ScalarRepresentation::Exact)
+    }
+
+    /// Registers an alias with an explicit scalar representation policy.
+    pub fn register_type_alias_with_representation(
+        &mut self,
+        alias: &'static str,
+        target: TypeId,
+        representation: ScalarRepresentation,
+    ) -> Result<(), CoreError> {
         self.type_descriptor(target)?;
         if self.types_by_name.contains_key(alias) {
             return Err(CoreError::DuplicateType(alias.to_string()));
         }
         self.types_by_name.insert(alias, target);
+        self.type_representations.insert(alias, representation);
         self.activate_comparison_declarations_for(alias);
         Ok(())
     }
@@ -65,6 +78,16 @@ impl Registry {
     /// Returns `None` when no extension registered that exact name.
     pub fn type_by_name(&self, name: &str) -> Option<TypeId> {
         self.types_by_name.get(name).copied()
+    }
+
+    /// Returns the representation policy associated with a declared type name.
+    pub fn type_representation(&self, name: &str) -> Option<ScalarRepresentation> {
+        self.type_representations.get(name).copied()
+    }
+
+    /// Returns the policy used for an unannotated integer literal or inferred integer array.
+    pub fn default_integer_representation(&self) -> ScalarRepresentation {
+        ScalarRepresentation::AdaptiveSignedInteger
     }
 
     /// Returns all registered type names in deterministic sorted order.
@@ -284,6 +307,12 @@ impl Registry {
                     actual: "array".into(),
                 });
             }
+            SemanticType::Union(_) => {
+                return Err(CoreError::UnexpectedBooleanValueType {
+                    expected: self.value_type_name(expected),
+                    actual: "union".into(),
+                });
+            }
         };
         if actual != expected {
             return Err(CoreError::UnexpectedBooleanValueType {
@@ -437,13 +466,31 @@ impl Registry {
                 }
                 Ok(())
             }
-            SemanticType::Array(array_type) => {
-                self.type_descriptor(array_type.element.base)?;
-                if let Some(subtype_id) = array_type.element.subtype {
+            SemanticType::Array(array_type) => array_type
+                .static_semantic_type()
+                .map_or(Ok(()), |element| self.validate_semantic_type(element)),
+            SemanticType::Union(members) => members
+                .iter()
+                .try_for_each(|member| self.validate_semantic_type(member)),
+        }
+    }
+
+    /// Verifies that every scalar leaf in a recursive semantic type is registered.
+    fn validate_semantic_type(&self, semantic_type: &SemanticType) -> Result<(), CoreError> {
+        match semantic_type {
+            SemanticType::Scalar(value_type) => {
+                self.type_descriptor(value_type.base)?;
+                if let Some(subtype_id) = value_type.subtype {
                     self.subtype_descriptor(subtype_id)?;
                 }
                 Ok(())
             }
+            SemanticType::Array(array_type) => array_type
+                .static_semantic_type()
+                .map_or(Ok(()), |element| self.validate_semantic_type(element)),
+            SemanticType::Union(members) => members
+                .iter()
+                .try_for_each(|member| self.validate_semantic_type(member)),
         }
     }
 }

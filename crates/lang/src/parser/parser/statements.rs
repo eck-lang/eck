@@ -3,8 +3,8 @@
 use crate::syntax::{
     BindingKind, Block, ConfigurationEntry, ConfigurationValue, RelationBinding,
     RelationCardinality, RelationDefinition, RelationRole, RelationRoleBinding, SourceIdentifier,
-    Span, Statement, TypeDefinition, TypeExpression, TypeField, UseClause, UseDeclaration,
-    UseMember,
+    Span, Statement, TypeAliasDefinition, TypeDefinition, TypeExpression, TypeField, UseClause,
+    UseDeclaration, UseMember,
 };
 
 use crate::parser::{ParseError, lexer::TokenKind};
@@ -150,6 +150,22 @@ impl Parser {
         let start = self.advance().span.start;
         let name = self.expect_identifier("expected type name after `type`")?;
         self.skip_newlines();
+        if matches!(&self.peek().kind, TokenKind::Equal) {
+            self.advance();
+            let expression = self.parse_type_expression()?;
+            let span = Span {
+                start,
+                end: expression.span().end,
+            };
+            return Ok(Statement::TypeAlias {
+                definition: TypeAliasDefinition {
+                    name,
+                    expression,
+                    span,
+                },
+                span,
+            });
+        }
         self.expect_simple(TokenKind::LeftBrace)?;
         self.skip_newlines();
         let mut fields = Vec::new();
@@ -625,7 +641,7 @@ impl Parser {
         let name = self.expect_identifier("expected binding name after declaration keyword")?;
         let type_expression = if matches!(&self.peek().kind, TokenKind::Colon) {
             self.advance();
-            Some(self.parse_binding_type_expression()?)
+            Some(self.parse_type_expression()?)
         } else {
             None
         };
@@ -643,8 +659,65 @@ impl Parser {
         })
     }
 
-    /// Parses the currently supported postfix type annotation forms.
-    fn parse_binding_type_expression(&mut self) -> Result<TypeExpression, ParseError> {
+    /// Parses a complete type expression with union and postfix precedence.
+    fn parse_type_expression(&mut self) -> Result<TypeExpression, ParseError> {
+        let first = self.parse_type_postfix_expression()?;
+        let mut members = vec![first];
+        while matches!(&self.peek().kind, TokenKind::Pipe) {
+            self.advance();
+            members.push(self.parse_type_postfix_expression()?);
+        }
+        if members.len() == 1 {
+            return Ok(members.pop().expect("one type member was parsed"));
+        }
+        let span = Span {
+            start: members[0].span().start,
+            end: members.last().expect("union has a member").span().end,
+        };
+        Ok(TypeExpression::Union { members, span })
+    }
+
+    /// Parses a primary type followed by any number of `[]` and `?` postfixes.
+    fn parse_type_postfix_expression(&mut self) -> Result<TypeExpression, ParseError> {
+        let mut type_expression = self.parse_type_primary_expression()?;
+        loop {
+            if matches!(&self.peek().kind, TokenKind::Question) {
+                let question = self.advance().span;
+                let span = Span {
+                    start: type_expression.span().start,
+                    end: question.end,
+                };
+                type_expression = TypeExpression::Nullable {
+                    inner: Box::new(type_expression),
+                    span,
+                };
+                continue;
+            }
+            if matches!(&self.peek().kind, TokenKind::LeftBracket)
+                && matches!(
+                    self.peek_n(1).map(|token| &token.kind),
+                    Some(TokenKind::RightBracket)
+                )
+            {
+                self.advance();
+                let closing = self.advance().span;
+                let span = Span {
+                    start: type_expression.span().start,
+                    end: closing.end,
+                };
+                type_expression = TypeExpression::Array {
+                    element: Box::new(type_expression),
+                    span,
+                };
+                continue;
+            }
+            break;
+        }
+        Ok(type_expression)
+    }
+
+    /// Parses one named or parenthesized type primary, including a subtype qualifier.
+    fn parse_type_primary_expression(&mut self) -> Result<TypeExpression, ParseError> {
         let token = self.advance().clone();
         let mut type_expression = match token.kind {
             TokenKind::Ident(name) => TypeExpression::Named {
@@ -655,10 +728,18 @@ impl Parser {
                 name: "null".into(),
                 span: token.span,
             },
+            TokenKind::LeftParenthesis => {
+                let expression = self.parse_type_expression()?;
+                self.expect_simple(TokenKind::RightParenthesis)?;
+                expression
+            }
             _ => return Err(self.error_at(token.span, "expected type name after `:`")),
         };
 
         if matches!(&self.peek().kind, TokenKind::Less) {
+            if !matches!(&type_expression, TypeExpression::Named { .. }) {
+                return Err(self.error_here("a subtype qualifier requires a named type"));
+            }
             self.advance();
             let subtype = self.expect_identifier("expected subtype name after `<`")?;
             let closing = self.expect_simple(TokenKind::Greater)?;
@@ -672,37 +753,6 @@ impl Parser {
                 span,
             };
         }
-
-        if matches!(&self.peek().kind, TokenKind::LeftBracket)
-            && matches!(
-                self.peek_n(1).map(|token| &token.kind),
-                Some(TokenKind::RightBracket)
-            )
-        {
-            self.advance();
-            let closing = self.advance().span;
-            let span = Span {
-                start: type_expression.span().start,
-                end: closing.end,
-            };
-            type_expression = TypeExpression::Array {
-                element: Box::new(type_expression),
-                span,
-            };
-        }
-
-        if matches!(&self.peek().kind, TokenKind::Question) {
-            let question = self.advance().span;
-            let span = Span {
-                start: type_expression.span().start,
-                end: question.end,
-            };
-            type_expression = TypeExpression::Nullable {
-                inner: Box::new(type_expression),
-                span,
-            };
-        }
-
         Ok(type_expression)
     }
 

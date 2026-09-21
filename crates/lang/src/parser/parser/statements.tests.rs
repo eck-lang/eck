@@ -521,6 +521,107 @@ fn parses_structured_binding_type_annotations() {
     ));
 }
 
+/// Verifies aliases, single-pipe unions, and postfix operators use the documented
+/// precedence without changing the existing row-type declaration form.
+#[test]
+fn parses_structural_aliases_and_recursive_type_precedence() {
+    let program = parse(
+        "type Value = string | int\n\
+         type Matrix = (int | string)[][]\n\
+         let first: string | int[] = 1\n\
+         let second: (string | int)[] = ['x', 1]\n\
+         let third: int?[]? = [null]\n",
+    )
+    .unwrap();
+
+    assert!(matches!(
+        &program.statements[0],
+        Statement::TypeAlias { definition, .. }
+            if definition.name == "Value"
+                && definition.expression.to_string() == "string | int"
+    ));
+    assert!(matches!(
+        &program.statements[1],
+        Statement::TypeAlias { definition, .. }
+            if definition.name == "Matrix"
+                && definition.expression.to_string() == "(int | string)[][]"
+    ));
+    assert!(matches!(
+        &program.statements[2],
+        Statement::BindingDeclaration {
+            type_expression: Some(type_expression), ..
+        } if type_expression.to_string() == "string | int[]"
+    ));
+    assert!(matches!(
+        &program.statements[3],
+        Statement::BindingDeclaration {
+            type_expression: Some(type_expression), ..
+        } if type_expression.to_string() == "(string | int)[]"
+    ));
+    assert!(matches!(
+        &program.statements[4],
+        Statement::BindingDeclaration {
+            type_expression: Some(type_expression), ..
+        } if type_expression.to_string() == "int?[]?"
+    ));
+}
+
+/// Verifies deeply nested unions and repeated postfixes preserve source order.
+#[test]
+fn parses_deep_recursive_type_expressions() {
+    let program = parse(
+        "let cube: int[][][] = [[[1]]]\n\
+         let nested: ((string | int)[] | decimal[])[] = []\n\
+         let nullable: (int[] | string[])? = null\n",
+    )
+    .unwrap();
+
+    let rendered = program
+        .statements
+        .iter()
+        .map(|statement| match statement {
+            Statement::BindingDeclaration {
+                type_expression: Some(type_expression),
+                ..
+            } => type_expression.to_string(),
+            _ => panic!("expected typed binding"),
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        rendered,
+        [
+            "int[][][]",
+            "((string | int)[] | decimal[])[]",
+            "(int[] | string[])?",
+        ]
+    );
+}
+
+/// Verifies qualified members remain distinct inside a structural union.
+#[test]
+fn parses_qualified_union_members() {
+    let program = parse("let value: int<mm> | decimal<cm> = 1mm\n").unwrap();
+
+    assert!(matches!(
+        &program.statements[0],
+        Statement::BindingDeclaration {
+            type_expression: Some(type_expression),
+            ..
+        } if type_expression.to_string() == "int<mm> | decimal<cm>"
+    ));
+}
+
+/// Verifies a union requires a type expression on both sides of one `|`.
+#[test]
+fn rejects_incomplete_type_unions() {
+    let trailing = parse("let value: int | = 1\n").unwrap_err();
+    assert!(trailing.message.contains("expected type name"));
+
+    let logical = parse("let value: int || string = 1\n").unwrap_err();
+    assert!(logical.message.contains("expected"));
+}
+
 /// Verifies declarations without `let` or `const` are rejected.
 #[test]
 fn rejects_legacy_variable_declaration_syntax() {

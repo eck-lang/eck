@@ -1,9 +1,9 @@
 use super::*;
 
 use crate::semantic::{
-    ArrayElementMode, ArrayType, ConfigurationDescriptor, ConfigurationValue, CoreError, Registry,
-    RuntimeConfiguration, SemanticType, TypeConfigurationDescriptor, TypeDescriptor, Value,
-    ValueType,
+    ArrayType, ConfigurationDescriptor, ConfigurationValue, CoreError, Registry,
+    RuntimeConfiguration, ScalarRepresentation, SemanticType, TypeConfigurationDescriptor,
+    TypeDescriptor, Value, ValueType,
 };
 
 /// Formats the integer payload used to prove recursive array dispatch.
@@ -61,16 +61,19 @@ fn extension_registers_array_formatting_without_a_type_id() {
             format: format_integer,
         })
         .unwrap();
-    let array_type = ArrayType {
-        element: ValueType::plain(element_type),
-        element_mode: ArrayElementMode::Exact,
-    };
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(element_type)),
+        ScalarRepresentation::Exact,
+    );
     let value = Value::new_array(
-        array_type,
+        array_type.clone(),
         ArrayValue::new(vec![Value::new(element_type, 1_i64)]),
     );
 
-    assert_eq!(value.semantic_type(), SemanticType::Array(array_type));
+    assert_eq!(
+        value.semantic_type(),
+        SemanticType::array(array_type.clone())
+    );
     assert_eq!(registry.registered_type_count(), registered_type_count + 1);
     assert_eq!(registry.format_value(&value).unwrap(), "[1]");
 }
@@ -114,10 +117,10 @@ fn formatter_recurses_with_the_active_configuration() {
         .unwrap();
     ArrayExtension.register(&mut registry).unwrap();
 
-    let array_type = ArrayType {
-        element: ValueType::plain(element_type),
-        element_mode: ArrayElementMode::Exact,
-    };
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(element_type)),
+        ScalarRepresentation::Exact,
+    );
     let value = Value::new_array(
         array_type,
         ArrayValue::new(vec![Value::new(element_type, 1_i64)]),

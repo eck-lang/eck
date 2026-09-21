@@ -25,6 +25,11 @@ pub enum TypeExpression {
         inner: Box<TypeExpression>,
         span: Span,
     },
+    /// Describes a value that may have one of several structural types.
+    Union {
+        members: Vec<TypeExpression>,
+        span: Span,
+    },
 }
 
 impl TypeExpression {
@@ -34,7 +39,8 @@ impl TypeExpression {
             Self::Named { span, .. }
             | Self::Qualified { span, .. }
             | Self::Array { span, .. }
-            | Self::Nullable { span, .. } => *span,
+            | Self::Nullable { span, .. }
+            | Self::Union { span, .. } => *span,
         }
     }
 }
@@ -42,12 +48,53 @@ impl TypeExpression {
 impl fmt::Display for TypeExpression {
     /// Renders this syntax tree in the source spelling used by diagnostics and tooling.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Named { name, .. } => formatter.write_str(name),
-            Self::Qualified { base, subtype, .. } => write!(formatter, "{base}<{subtype}>",),
-            Self::Array { element, .. } => write!(formatter, "{element}[]",),
-            Self::Nullable { inner, .. } => write!(formatter, "{inner}?",),
+        self.format_with_precedence(formatter, 0)
+    }
+}
+
+impl TypeExpression {
+    /// Renders one type expression while adding parentheses required by postfix precedence.
+    fn format_with_precedence(
+        &self,
+        formatter: &mut fmt::Formatter<'_>,
+        parent_precedence: u8,
+    ) -> fmt::Result {
+        let precedence = match self {
+            Self::Union { .. } => 1,
+            Self::Array { .. } | Self::Nullable { .. } => 2,
+            Self::Named { .. } | Self::Qualified { .. } => 3,
+        };
+        let parenthesized = precedence < parent_precedence;
+        if parenthesized {
+            formatter.write_str("(")?;
         }
+        match self {
+            Self::Named { name, .. } => formatter.write_str(name)?,
+            Self::Qualified { base, subtype, .. } => {
+                base.format_with_precedence(formatter, 3)?;
+                write!(formatter, "<{subtype}>")?;
+            }
+            Self::Array { element, .. } => {
+                element.format_with_precedence(formatter, 2)?;
+                formatter.write_str("[]")?;
+            }
+            Self::Nullable { inner, .. } => {
+                inner.format_with_precedence(formatter, 2)?;
+                formatter.write_str("?")?;
+            }
+            Self::Union { members, .. } => {
+                for (index, member) in members.iter().enumerate() {
+                    if index > 0 {
+                        formatter.write_str(" | ")?;
+                    }
+                    member.format_with_precedence(formatter, 1)?;
+                }
+            }
+        }
+        if parenthesized {
+            formatter.write_str(")")?;
+        }
+        Ok(())
     }
 }
 

@@ -7,7 +7,8 @@
 
 use crate::measures::MeasuresExtension;
 use crate::semantic::{
-    ArrayElementMode, ArrayEndOperation, ArrayType, Extension, Registry, SemanticType, ValueType,
+    ArrayElementContract, ArrayEndOperation, ArrayType, Extension, Registry, ScalarRepresentation,
+    SemanticType, ValueType,
 };
 
 use crate::ir::{TypedExpression, TypedExpressionKind, TypedProgram};
@@ -66,9 +67,15 @@ fn first_element_access(program: &TypedProgram) -> (Option<usize>, ValueType) {
         {
             return (
                 *constant_index,
-                match expression.output.expect("element access produces a value") {
-                    SemanticType::Scalar(value_type) => value_type,
-                    SemanticType::Array(_) => panic!("element access cannot produce an array"),
+                match expression
+                    .output
+                    .as_ref()
+                    .expect("element access produces a value")
+                {
+                    SemanticType::Scalar(value_type) => *value_type,
+                    SemanticType::Array(_) | SemanticType::Union(_) => {
+                        panic!("element access cannot produce a container or union")
+                    }
                 },
             );
         }
@@ -84,31 +91,72 @@ fn keeps_declared_element_subtype() {
     let program = crate::parser::parse("let sizes: int<mm>[] = [10mm, 20mm, 30mm]\n").unwrap();
     let program = compile(&program, &registry).unwrap();
     let array_type = first_array_type(&program);
-    assert_eq!(array_type.element.subtype, Some(millimeter));
-    assert_eq!(array_type.element_mode, ArrayElementMode::AdaptiveInt);
+    assert_eq!(
+        array_type
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .subtype,
+        Some(millimeter)
+    );
+    assert_eq!(
+        array_type.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
 }
 
 /// Verifies structured array annotations preserve adaptive, qualified, and fixed contracts.
 #[test]
 fn resolves_structured_array_type_annotations() {
     let adaptive = first_array_type(&compile_source("let values: int[] = []\n"));
-    assert_eq!(adaptive.element_mode, ArrayElementMode::AdaptiveInt);
+    assert_eq!(
+        adaptive.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
 
     let qualified = first_array_type(&compile_source("let values: int<mm>[] = []\n"));
-    assert!(qualified.element.subtype.is_some());
-    assert_eq!(qualified.element_mode, ArrayElementMode::AdaptiveInt);
+    assert!(
+        qualified
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .subtype
+            .is_some()
+    );
+    assert_eq!(
+        qualified.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
 
     let fixed = first_array_type(&compile_source("let values: int64<mm>[] = []\n"));
-    assert!(fixed.element.subtype.is_some());
-    assert_eq!(fixed.element_mode, ArrayElementMode::Exact);
+    assert!(
+        fixed
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .subtype
+            .is_some()
+    );
+    assert_eq!(
+        fixed.static_representation(),
+        Some(ScalarRepresentation::Exact)
+    );
 }
 
-/// Verifies nullable array annotations retain the existing rejection diagnostic.
+/// Verifies nullable array annotations lower to an array-or-null union.
 #[test]
-fn rejects_nullable_structured_array_annotations() {
-    let error = compile_error("let values: int<mm>[]? = []\n");
-
-    assert_eq!(error.message, "array bindings cannot be nullable");
+fn accepts_nullable_structured_array_annotations() {
+    let program = compile_source("let values: int<mm>[]? = []\n");
+    assert!(matches!(
+        program
+            .bindings
+            .first()
+            .map(|binding| &binding.semantic_type),
+        Some(SemanticType::Union(_))
+    ));
 }
 
 /// Verifies `int64[]` is fixed while `int[]` is adaptive.
@@ -119,57 +167,119 @@ fn distinguishes_adaptive_int_from_fixed_width() {
     let fixed_program = crate::parser::parse("let values: int64[] = [1]\n").unwrap();
     let adaptive = first_array_type(&compile(&adaptive_program, &registry).unwrap());
     let fixed = first_array_type(&compile(&fixed_program, &registry).unwrap());
-    assert_eq!(adaptive.element_mode, ArrayElementMode::AdaptiveInt);
-    assert_eq!(fixed.element_mode, ArrayElementMode::Exact);
-    assert_eq!(adaptive.element.base, fixed.element.base);
+    assert_eq!(
+        adaptive.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
+    assert_eq!(
+        fixed.static_representation(),
+        Some(ScalarRepresentation::Exact)
+    );
+    assert_eq!(
+        adaptive
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .base,
+        fixed
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .base
+    );
 }
 
-/// Verifies an inferred literal keeps an identical complete element type.
+/// Verifies an unannotated literal creates a dynamic element contract.
 #[test]
 fn infers_identical_complete_element_type() {
     let program = compile_source("let sizes = [10mm, 20mm, 30mm]\n");
     let array_type = first_array_type(&program);
-    assert!(array_type.element.subtype.is_some());
-    assert_eq!(array_type.element_mode, ArrayElementMode::AdaptiveInt);
+    assert!(matches!(
+        array_type.element_contract,
+        ArrayElementContract::Dynamic
+    ));
 }
 
-/// Verifies differing subtypes infer the common base with no element subtype.
+/// Verifies differing subtypes remain concrete values in a dynamic array.
 #[test]
 fn infers_common_base_for_differing_subtypes() {
     let program = compile_source("let sizes = [10mm, 2cm, 3dm]\n");
     let array_type = first_array_type(&program);
-    assert_eq!(array_type.element.subtype, None);
-    assert_eq!(array_type.element_mode, ArrayElementMode::AdaptiveInt);
+    assert!(matches!(
+        array_type.element_contract,
+        ArrayElementContract::Dynamic
+    ));
 }
 
-/// Verifies an untyped integer literal array infers the adaptive `int` element.
+/// Verifies an untyped integer literal array is dynamically extensible.
 #[test]
 fn infers_adaptive_integer_elements() {
     let program = compile_source("let numbers = [1, 2, 3]\n");
     let array_type = first_array_type(&program);
-    assert_eq!(array_type.element.subtype, None);
-    assert_eq!(array_type.element_mode, ArrayElementMode::AdaptiveInt);
+    assert!(matches!(
+        array_type.element_contract,
+        ArrayElementContract::Dynamic
+    ));
 }
 
-/// Verifies an empty literal without an annotation cannot infer a type.
+/// Verifies an empty literal needs no element type contract.
 #[test]
-fn rejects_empty_array_without_annotation() {
-    let error = compile_error("let values = []\n");
-    assert!(error.message.contains("empty array"));
+fn accepts_empty_array_without_annotation() {
+    let program = compile_source("let values = []\nvalues->push(1)\nvalues->push('one')\n");
+    assert!(matches!(
+        first_array_type(&program).element_contract,
+        ArrayElementContract::Dynamic
+    ));
+}
+
+/// Verifies an element with no finite observations lowers to open dispatch.
+#[test]
+fn compiles_open_dispatch_for_an_unobserved_dynamic_element() {
+    let program = compile_source("let values = []\nvalues[0] + 1\n-values[0]\nvalues[0] < 1\n");
+    let TypedStatement::Expression(expression) = &program.statements[1] else {
+        panic!("expected expression statement");
+    };
+    assert!(matches!(
+        expression.kind,
+        TypedExpressionKind::OpenBinary { .. }
+    ));
+    let TypedStatement::Expression(expression) = &program.statements[2] else {
+        panic!("expected expression statement");
+    };
+    assert!(matches!(
+        expression.kind,
+        TypedExpressionKind::OpenNegation { .. }
+    ));
+    let TypedStatement::Expression(expression) = &program.statements[3] else {
+        panic!("expected expression statement");
+    };
+    assert!(matches!(
+        expression.kind,
+        TypedExpressionKind::OpenComparison { .. }
+    ));
 }
 
 /// Verifies a typed empty array compiles from its declared element contract.
 #[test]
 fn accepts_typed_empty_array() {
     let program = compile_source("let values: int[] = []\n");
-    assert_eq!(first_array_type(&program).element.subtype, None);
+    assert_eq!(
+        first_array_type(&program)
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .subtype,
+        None
+    );
 }
 
-/// Verifies elements that share no base type cannot form an array.
+/// Verifies dynamic array elements may have unrelated concrete types.
 #[test]
-fn rejects_elements_with_incompatible_bases() {
-    let error = compile_error("let values = [10mm, \"hello\"]\n");
-    assert!(error.message.contains("share a base type"));
+fn accepts_elements_with_unrelated_bases() {
+    compile_source("let values = [10mm, \"hello\", true, null]\n");
 }
 
 /// Verifies compatible elements are converted to the constrained subtype.
@@ -272,7 +382,9 @@ fn drops_element_record_after_dynamic_write() {
     assert_eq!(
         match read.semantic_type {
             SemanticType::Scalar(value_type) => value_type.subtype,
-            SemanticType::Array(_) => panic!("an element read cannot be an array"),
+            SemanticType::Array(_) | SemanticType::Union(_) => {
+                panic!("an element read cannot be a container or union")
+            }
         },
         None,
         "a dynamic write falls back to the declared element contract"
@@ -300,11 +412,15 @@ fn rejects_array_in_scalar_binding() {
     assert!(error.message.contains("array"));
 }
 
-/// Verifies nested array literals are rejected instead of mis-inferred.
+/// Verifies nested arrays are ordinary values in an outer dynamic array.
 #[test]
-fn rejects_nested_array_literals() {
-    let error = compile_error("let values = [[1, 2], [3, 4]]\n");
-    assert!(error.message.contains("nested arrays"));
+fn compiles_nested_array_literals() {
+    let program = compile_source("let values = [[1, 2], [3, 4]]\n");
+    let outer = first_array_type(&program);
+    assert!(matches!(
+        outer.element_contract,
+        ArrayElementContract::Dynamic
+    ));
 }
 
 /// Verifies indexed mutation is accepted on a mutable array binding.
@@ -336,12 +452,25 @@ fn widens_adaptive_int_element_beyond_declared_width() {
     let TypedStatement::IndexedAssignment { expression, .. } = &program.statements[1] else {
         panic!("expected an indexed assignment");
     };
-    let output = expression.output.expect("the element produces a value");
+    let output = expression
+        .output
+        .clone()
+        .expect("the element produces a value");
     let output = match output {
         SemanticType::Scalar(value_type) => value_type,
-        SemanticType::Array(_) => panic!("an element store cannot produce an array"),
+        SemanticType::Array(_) | SemanticType::Union(_) => {
+            panic!("an element store cannot produce a container or union")
+        }
     };
-    assert_ne!(output.base, first_array_type(&program).element.base);
+    assert_ne!(
+        output.base,
+        first_array_type(&program)
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .base
+    );
 }
 
 /// Verifies a fixed-width store carries the declared element contract.
@@ -420,12 +549,12 @@ fn embeds_the_declared_subtype_in_a_constrained_store() {
     assert_eq!(*element, ValueType::qualified(int8, millimeter));
 }
 
-/// Verifies an inferred fixed-width element is checked like a declared one.
+/// Verifies an unannotated array does not inherit a value's static contract.
 #[test]
 fn checks_an_inferred_fixed_width_array_element() {
     let program = compile_source("let x: int8 = 127\nlet y: int8 = 1\nlet values = [x + y]\n");
     let elements = array_literal_elements(binding_initializer(&program, "values"));
-    assert!(matches!(
+    assert!(!matches!(
         elements[0].kind,
         TypedExpressionKind::ElementStore { .. }
     ));
@@ -696,7 +825,15 @@ fn rejects_inexact_literal_element_conversion() {
 #[test]
 fn accepts_exact_literal_element_conversion() {
     let program = compile_source("let sizes: int<cm>[] = [10mm]\n");
-    assert!(first_array_type(&program).element.subtype.is_some());
+    assert!(
+        first_array_type(&program)
+            .static_semantic_type()
+            .expect("static array element")
+            .as_scalar()
+            .expect("scalar element")
+            .subtype
+            .is_some()
+    );
 }
 
 /// Verifies a conversion of a dynamic element pre-resolves one plan per subtype.
@@ -1043,10 +1180,16 @@ fn distinguishes_insertion_and_removal_results() {
         .bindings
         .first()
         .expect("the array binding is declared")
-        .semantic_type;
+        .semantic_type
+        .clone();
     let element = match element {
-        SemanticType::Array(array_type) => array_type.element,
-        SemanticType::Scalar(_) => panic!("an array binding must have an array semantic type"),
+        SemanticType::Array(array_type) => array_type
+            .static_semantic_type()
+            .expect("typed array element")
+            .clone(),
+        SemanticType::Scalar(_) | SemanticType::Union(_) => {
+            panic!("an array binding must have an array semantic type")
+        }
     };
 
     assert!(
@@ -1054,10 +1197,14 @@ fn distinguishes_insertion_and_removal_results() {
             .message
             .contains("a void expression cannot initialize a binding")
     );
-    assert_eq!(
-        binding_initializer(&program, "removed").output,
-        Some(SemanticType::Scalar(element))
-    );
+    let output = binding_initializer(&program, "removed")
+        .output
+        .clone()
+        .expect("removal produces a value");
+    let SemanticType::Union(members) = output else {
+        panic!("removal output must include the empty-array null case");
+    };
+    assert!(members.iter().any(|member| member == &element));
 }
 
 /// Verifies an inferred removal binding is nullable without an annotation.
@@ -1073,7 +1220,7 @@ fn infers_a_nullable_binding_from_a_removal() {
         .find(|binding| binding.name == "removed")
         .expect("the removed binding is declared");
 
-    assert!(binding.nullable);
+    assert!(matches!(binding.semantic_type, SemanticType::Union(_)));
 }
 
 /// Verifies a removal cannot initialize or be used as a non-null scalar.
@@ -1115,15 +1262,24 @@ fn rejects_an_inserted_value_the_element_contract_cannot_hold() {
 fn converts_an_inserted_element_to_the_declared_subtype() {
     let program = compile_source("let sizes: int<mm>[] = []\nsizes->push(2cm)\n");
     let stored = first_array_method_argument(&program);
-    let output = stored.output.expect("the stored value produces a type");
+    let output = stored
+        .output
+        .clone()
+        .expect("the stored value produces a type");
     let element = program
         .bindings
         .first()
         .expect("the array binding is declared")
-        .semantic_type;
+        .semantic_type
+        .clone();
     let element = match element {
-        SemanticType::Array(array_type) => array_type.element,
-        SemanticType::Scalar(_) => panic!("an array binding must have an array semantic type"),
+        SemanticType::Array(array_type) => array_type
+            .static_semantic_type()
+            .expect("typed array element")
+            .clone(),
+        SemanticType::Scalar(_) | SemanticType::Union(_) => {
+            panic!("an array binding must have an array semantic type")
+        }
     };
 
     assert!(
@@ -1136,14 +1292,13 @@ fn converts_an_inserted_element_to_the_declared_subtype() {
         ),
         "a constrained element must be converted before it is stored"
     );
-    assert_eq!(output, SemanticType::Scalar(element));
+    assert_eq!(
+        output,
+        SemanticType::Scalar(element.as_scalar().expect("scalar element"))
+    );
 }
 
-/// Verifies inserting a value makes earlier element types unavailable.
-///
-/// The stored value's runtime representation is not guaranteed, so a later read
-/// of the array must dispatch on the subtype the element actually carries
-/// instead of the type recorded when the literal was compiled.
+/// Verifies insertion preserves unaffected constant-index flow knowledge.
 #[test]
 fn invalidates_recorded_element_types_after_an_insertion() {
     let program = compile_source(
@@ -1155,15 +1310,12 @@ fn invalidates_recorded_element_types_after_an_insertion() {
     let sum = binding_initializer(&program, "sum");
 
     assert!(
-        matches!(sum.kind, TypedExpressionKind::DynamicBinary { .. }),
-        "an insertion must invalidate the recorded element types"
+        matches!(sum.kind, TypedExpressionKind::Binary { .. }),
+        "insertion at the back must preserve the first element's type"
     );
 }
 
-/// Verifies removing an element makes earlier element types unavailable.
-///
-/// A removal repositions every remaining element, so a recorded type would
-/// describe the wrong slot; the read must dispatch on the stored subtype.
+/// Verifies removal shifts the recorded element types with their values.
 #[test]
 fn invalidates_recorded_element_types_after_a_removal() {
     let program = compile_source(
@@ -1175,8 +1327,8 @@ fn invalidates_recorded_element_types_after_a_removal() {
     let sum = binding_initializer(&program, "sum");
 
     assert!(
-        matches!(sum.kind, TypedExpressionKind::DynamicBinary { .. }),
-        "a removal must invalidate the recorded element types"
+        matches!(sum.kind, TypedExpressionKind::Binary { .. }),
+        "a removal must retain the shifted element's concrete type"
     );
 }
 
@@ -1194,12 +1346,12 @@ fn first_array_method_argument(program: &TypedProgram) -> &TypedExpression {
     panic!("program calls no array method");
 }
 
-/// Verifies every array storage ingress rejects a value that may be null.
+/// Verifies non-nullable array storage rejects nullable values while nullable
+/// array contracts retain them as concrete null values.
 #[test]
-fn rejects_nullable_values_at_every_array_storage_boundary() {
+fn handles_nullable_values_at_every_array_storage_boundary() {
     for source in [
         "let item: int? = 1\nlet values: int[] = [item]\n",
-        "let item: int? = 1\nlet values = [item]\n",
         "let item: int? = 1\nlet values: int[] = [0]\nvalues[0] = item\n",
         "let item: int? = 1\nlet values: int[] = []\nvalues->push(item)\n",
         "let item: int? = 1\nlet values: int[] = []\nvalues->append(item)\n",
@@ -1214,6 +1366,12 @@ fn rejects_nullable_values_at_every_array_storage_boundary() {
             "nullable value must be narrowed before this operation"
         );
     }
+    let inferred = compile_source("let item: int? = 1\nlet values = [item]\n");
+    assert!(matches!(
+        first_array_type(&inferred).element_contract,
+        ArrayElementContract::Dynamic
+    ));
+    compile_source("let values: int?[] = [null, 1]\n");
 }
 
 /// Verifies a non-null proof remains valid when its value enters array storage.
@@ -1252,6 +1410,7 @@ fn widens_adaptive_literals_through_int128_before_bigint() {
     let program = compile(&program, &registry).unwrap();
     let element = array_literal_elements(binding_initializer(&program, "values"))[0]
         .output
+        .clone()
         .expect("the literal produces a value");
     assert_eq!(element, SemanticType::Scalar(ValueType::plain(int128)));
 }
@@ -1269,6 +1428,7 @@ fn widens_adaptive_literals_to_bigint_after_int128() {
     let program = compile(&program, &registry).unwrap();
     let element = array_literal_elements(binding_initializer(&program, "values"))[0]
         .output
+        .clone()
         .expect("the literal produces a value");
     assert_eq!(element, SemanticType::Scalar(ValueType::plain(bigint)));
 }
@@ -1284,6 +1444,7 @@ fn widens_negative_adaptive_literals_as_signed_values() {
     let program = compile(&program, &registry).unwrap();
     let element = array_literal_elements(binding_initializer(&program, "values"))[0]
         .output
+        .clone()
         .expect("the literal produces a value");
     assert_eq!(element, SemanticType::Scalar(ValueType::plain(int128)));
 }
@@ -1297,6 +1458,7 @@ fn accepts_a_signed_minimum_in_fixed_width_array_storage() {
     let program = compile(&source, &registry).unwrap();
     let element = array_literal_elements(binding_initializer(&program, "values"))[0]
         .output
+        .clone()
         .expect("the literal produces a value");
     assert_eq!(element, SemanticType::Scalar(ValueType::plain(int8)));
 }
@@ -1314,6 +1476,7 @@ fn widens_constrained_adaptive_literals_without_forcing_int64() {
     let program = compile(&program, &registry).unwrap();
     let element = array_literal_elements(binding_initializer(&program, "values"))[0]
         .output
+        .clone()
         .expect("the converted literal produces a value");
     assert_eq!(
         element,
@@ -1321,42 +1484,39 @@ fn widens_constrained_adaptive_literals_without_forcing_int64() {
     );
 }
 
-/// Verifies inferred literal arrays use adaptive signed storage for widened values.
+/// Verifies dynamic arrays preserve widened literal identities.
 #[test]
 fn infers_adaptive_storage_for_widened_signed_literals() {
     let registry = array_registry();
     let int128 = registry
         .type_by_name("int128")
         .expect("int128 is registered");
-    let int64 = registry.type_by_name("int64").expect("int64 is registered");
     let program =
         crate::parser::parse("let values = [1, 999999999999999999999999999999999]\n").unwrap();
     let program = compile(&program, &registry).unwrap();
     let array_type = first_array_type(&program);
-    assert_eq!(array_type.element.base, int64);
-    assert_eq!(array_type.element_mode, ArrayElementMode::AdaptiveInt);
+    assert!(matches!(
+        array_type.element_contract,
+        ArrayElementContract::Dynamic
+    ));
     let element = array_literal_elements(binding_initializer(&program, "values"))[1]
         .output
+        .clone()
         .expect("the widened literal produces a value");
     assert_eq!(element, SemanticType::Scalar(ValueType::plain(int128)));
 }
 
-/// Verifies inferred arrays do not turn an explicitly fixed `int64` source adaptive.
+/// Verifies a fixed-width source does not constrain an unannotated array.
 #[test]
 fn keeps_fixed_integer_sources_exact_when_inferring_an_array() {
-    let error = compile_error(
+    compile_source(
         "let source: int64 = 1\n\
          let values = [source]\n\
          values[0] = 9223372036854775808\n",
     );
-    assert!(
-        error.message.contains("invalid literal") || error.message.contains("int64"),
-        "unexpected diagnostic: {}",
-        error.message
-    );
 }
 
-/// Verifies an explicit adaptive source keeps adaptive semantics when inferred.
+/// Verifies an explicit adaptive source can enter a dynamic array.
 #[test]
 fn keeps_adaptive_integer_sources_adaptive_when_inferring_an_array() {
     compile_source(
@@ -1371,4 +1531,285 @@ fn keeps_adaptive_integer_sources_adaptive_when_inferring_an_array() {
 fn rejects_unsigned_values_in_adaptive_integer_storage() {
     let error = compile_error("let item: uint8 = 1\nlet values: int[] = [item]\n");
     assert!(error.message.contains("type mismatch"));
+}
+
+/// Verifies aliases compose with unions and recursive array declarations.
+#[test]
+fn resolves_alias_composition_and_representation_policies() {
+    let program = compile_source(
+        "type Number = int | decimal\n\
+         type Row = Number[]\n\
+         type Matrix = Row[]\n\
+         type IntegerFamily = int | int64\n\
+         type Exact = int64\n\
+         let value: Number = 10\n\
+         let row: Row = [1, 2]\n\
+         let matrix: Matrix = [[1, 2]]\n\
+         let integer_family: IntegerFamily[] = [9223372036854775808]\n\
+         let adaptive: Number[] = []\n\
+         let fixed: Exact[] = []\n",
+    );
+
+    let value = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "value")
+        .expect("union binding is recorded");
+    assert!(matches!(value.semantic_type, SemanticType::Union(_)));
+
+    let row = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "row")
+        .expect("row binding is recorded");
+    let SemanticType::Array(row_type) = &row.semantic_type else {
+        panic!("row alias must resolve to an array");
+    };
+    assert_eq!(
+        row_type.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
+
+    let matrix = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "matrix")
+        .expect("matrix binding is recorded");
+    let SemanticType::Array(matrix_type) = &matrix.semantic_type else {
+        panic!("matrix alias must resolve to an array");
+    };
+    assert_eq!(
+        matrix_type.static_representation(),
+        Some(ScalarRepresentation::Exact)
+    );
+    assert!(matches!(
+        matrix_type.static_semantic_type(),
+        Some(SemanticType::Array(_))
+    ));
+
+    let adaptive = first_array_type(&program);
+    assert_eq!(
+        adaptive.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
+    let fixed = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "fixed")
+        .expect("fixed binding is recorded");
+    let SemanticType::Array(fixed_type) = &fixed.semantic_type else {
+        panic!("fixed alias must resolve to an array");
+    };
+    assert_eq!(
+        fixed_type.static_representation(),
+        Some(ScalarRepresentation::Exact)
+    );
+}
+
+/// Verifies inline unions, union-element arrays, and unions of homogeneous arrays.
+#[test]
+fn compiles_union_arrays_without_changing_their_shape() {
+    let program = compile_source(
+        "let elements: (int | string)[] = [1, 'one']\n\
+         let arrays: int[] | string[] = [1, 2]\n\
+         let wide: int128 = 1\n\
+         let adaptive: (int | string)[] = [wide]\n\
+         let widened_literal: (int | string)[] = [9223372036854775808]\n",
+    );
+    let elements = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "elements")
+        .expect("union-element array is recorded");
+    let SemanticType::Array(elements_type) = &elements.semantic_type else {
+        panic!("union-element declaration must remain one array");
+    };
+    assert!(matches!(
+        elements_type.static_semantic_type(),
+        Some(SemanticType::Union(_))
+    ));
+
+    let arrays = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "arrays")
+        .expect("array union is recorded");
+    assert!(matches!(arrays.semantic_type, SemanticType::Union(_)));
+    let adaptive = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "adaptive")
+        .expect("adaptive union-element array is recorded");
+    let SemanticType::Array(adaptive_type) = &adaptive.semantic_type else {
+        panic!("adaptive union-element declaration must remain one array");
+    };
+    assert_eq!(
+        adaptive_type.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
+    let widened_literal = program
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "widened_literal")
+        .expect("adaptive union literal is recorded");
+    let SemanticType::Array(widened_type) = &widened_literal.semantic_type else {
+        panic!("adaptive literal declaration must remain one array");
+    };
+    assert_eq!(
+        widened_type.static_representation(),
+        Some(ScalarRepresentation::AdaptiveSignedInteger)
+    );
+    let rejected = compile_error(
+        "let ints: int[] = [1, 2]\n\
+         let values: (int | string)[] = ints\n",
+    );
+    assert!(rejected.message.contains("type mismatch"));
+
+    let rejected = compile_error(
+        "let wide: int128 = 1\n\
+         let values: (int64 | string)[] = [wide]\n",
+    );
+    assert!(rejected.message.contains("array element does not satisfy"));
+}
+
+/// Verifies nullable lowering at scalar, array, and array-element positions.
+#[test]
+fn lowers_nested_nullable_array_shapes() {
+    let program = compile_source(
+        "let maybe_values: int[]? = null\n\
+         let nullable_elements: int?[] = [null, 1]\n\
+         let nested: int?[]? = [null, 1]\n",
+    );
+    assert!(program.bindings.iter().all(|binding| {
+        binding.name == "nullable_elements"
+            || binding.name == "nested"
+            || matches!(binding.semantic_type, SemanticType::Union(_))
+    }));
+    assert!(matches!(
+        program
+            .bindings
+            .iter()
+            .find(|binding| binding.name == "nullable_elements")
+            .map(|binding| &binding.semantic_type),
+        Some(SemanticType::Array(_))
+    ));
+    assert!(matches!(
+        program
+            .bindings
+            .iter()
+            .find(|binding| binding.name == "nested")
+            .map(|binding| &binding.semantic_type),
+        Some(SemanticType::Union(_))
+    ));
+}
+
+/// Verifies alias cycles are diagnosed without recursive resolution.
+#[test]
+fn rejects_structural_alias_cycles() {
+    let error = compile_error("type A = B\ntype B = A\nlet value: A = 1\n");
+    assert!(
+        error.message.contains("type alias cycle: A -> B -> A"),
+        "unexpected diagnostic: {}",
+        error.message
+    );
+
+    let error = compile_error("type A = A[]\nlet value: A = []\n");
+    assert!(error.message.contains("type alias cycle: A -> A"));
+
+    let error = compile_error("type A = A[]\n");
+    assert!(error.message.contains("type alias cycle: A -> A"));
+}
+
+/// Verifies aliases can resolve declarations that appear later in the program.
+#[test]
+fn resolves_forward_structural_aliases() {
+    compile_source(
+        "type Row = Number[]\n\
+         type Number = int | decimal\n\
+         let row: Row = [1, 2]\n",
+    );
+}
+
+/// Verifies invariant-array diagnostics render ECK structural type syntax.
+#[test]
+fn renders_structural_array_assignment_diagnostics() {
+    let error = compile_error(
+        "let ints: int[] = [1, 2]\n\
+         let values: (int | string)[] = ints\n",
+    );
+
+    assert!(
+        error.message.contains("int64[]") && error.message.contains("(int64 | string)[]"),
+        "unexpected diagnostic: {}",
+        error.message
+    );
+}
+
+/// Verifies scalar unions accept each member and reject unrelated identities.
+#[test]
+fn enforces_inline_union_membership() {
+    compile_source(
+        "let integer: int | string = 1\n\
+         let text: int | string = 'one'\n",
+    );
+
+    let error = compile_error("let value: int | string = true\n");
+    assert!(
+        error.message.contains("bool")
+            && error.message.contains("int64")
+            && error.message.contains("string"),
+        "unexpected diagnostic: {}",
+        error.message
+    );
+}
+
+/// Verifies union-element arrays accept each member at initialization and mutation.
+#[test]
+fn mutates_union_element_arrays_with_each_member() {
+    compile_source(
+        "let values: (int | string)[] = [1]\n\
+         values[0] = 'one'\n",
+    );
+}
+
+/// Verifies union-element arrays reject values outside their element contract.
+#[test]
+fn rejects_non_member_union_element_mutation() {
+    let error = compile_error(
+        "let values: (int | string)[] = [1]\n\
+         values[0] = true\n",
+    );
+    assert_eq!(
+        error.message,
+        "array element does not satisfy its recursive array contract"
+    );
+}
+
+/// Verifies source unions assign only to destinations containing every member.
+#[test]
+fn assigns_union_subsets_but_rejects_union_supersets() {
+    compile_source(
+        "let source: int | string = 1\n\
+         let destination: int | string | decimal = source\n",
+    );
+
+    let error = compile_error(
+        "let source: int | string | decimal = 1\n\
+         let destination: int | string = source\n",
+    );
+    assert!(error.message.contains("type mismatch"));
+}
+
+/// Verifies duplicate and unknown aliases receive stable declaration diagnostics.
+#[test]
+fn rejects_duplicate_and_unknown_structural_aliases() {
+    let duplicate = compile_error("type Value = int\ntype Value = string\n");
+    assert!(
+        duplicate
+            .message
+            .contains("type alias `Value` is already declared")
+    );
+
+    let unknown = compile_error("type Value = Missing\n");
+    assert!(unknown.message.contains("unknown type `Missing`"));
 }

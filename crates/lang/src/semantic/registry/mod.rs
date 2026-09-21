@@ -14,8 +14,8 @@ use crate::semantic::configuration::{ArrayValueFormatter, RegisteredTypeConfigur
 use crate::semantic::{
     BinaryOperator, BinaryOperatorDescriptor, BooleanEvaluator, ComparisonDescriptor, ComparisonId,
     ComparisonOperator, ConfigurationDescriptor, FunctionDescriptor, FunctionId, IndexExtractor,
-    OperatorId, Scale, SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeId,
-    SubtypeRelativeRule, TypeDescriptor, TypeId,
+    OperatorId, ScalarRepresentation, Scale, SubtypeBinaryRule, SubtypeComparisonRule,
+    SubtypeDescriptor, SubtypeId, SubtypeRelativeRule, TypeDescriptor, TypeId,
 };
 
 pub mod bootstrap;
@@ -53,6 +53,8 @@ pub struct Registry {
 
     /// Resolves a declared type name to its compact ID.
     types_by_name: HashMap<&'static str, TypeId>,
+    /// Selects the scalar representation policy associated with each declared name.
+    type_representations: HashMap<&'static str, ScalarRepresentation>,
     /// Stores type descriptors keyed by ID.
     types: HashMap<TypeId, TypeDescriptor>,
     /// Resolves how one integer base type converts its values into array indices.
@@ -142,6 +144,7 @@ impl Default for Registry {
             allocated_type_ids: HashSet::new(),
             allocated_subtype_ids: HashSet::new(),
             types_by_name: HashMap::new(),
+            type_representations: HashMap::new(),
             types: HashMap::new(),
             index_extractors: HashMap::new(),
             subtypes_by_name: HashMap::new(),

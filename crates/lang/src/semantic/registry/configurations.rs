@@ -208,7 +208,7 @@ impl Registry {
             let formatter = self
                 .array_formatter
                 .ok_or(CoreError::MissingArrayFormatter)?;
-            return formatter(self, value, array_type, configuration);
+            return formatter(self, value, (*array_type).clone(), configuration);
         }
         let formatted = match self.type_configuration(value.type_id()) {
             Some(registered) => match registered.descriptor.format {

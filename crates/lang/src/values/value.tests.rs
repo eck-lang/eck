@@ -6,7 +6,7 @@ use std::sync::{
 };
 
 use super::*;
-use crate::{ArrayElementMode, Registry};
+use crate::{Registry, ScalarRepresentation};
 
 /// A payload that is too large to live inside a value and records its drops.
 ///
@@ -231,14 +231,17 @@ fn value_representation_stays_within_one_cache_line() {
 /// Verifies an array value retains its exact element contract without a scalar ID.
 #[test]
 fn array_identity_preserves_the_complete_semantic_type() {
-    let array_type = ArrayType {
-        element: ValueType::qualified(base_type(), subtype()),
-        element_mode: ArrayElementMode::Exact,
-    };
-    let value = Value::new_array(array_type, SixteenBytePayload([3, 5]));
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::qualified(base_type(), subtype())),
+        ScalarRepresentation::Exact,
+    );
+    let value = Value::new_array(array_type.clone(), SixteenBytePayload([3, 5]));
 
-    assert_eq!(value.semantic_type(), SemanticType::Array(array_type));
-    assert_eq!(value.array_type(), Some(array_type));
+    assert_eq!(
+        value.semantic_type(),
+        SemanticType::array(array_type.clone())
+    );
+    assert_eq!(value.array_type(), Some(array_type.clone()));
     assert_eq!(value.scalar_type(), None);
     assert!(value.is_uniquely_owned());
     assert_eq!(
@@ -250,11 +253,11 @@ fn array_identity_preserves_the_complete_semantic_type() {
 /// Verifies scalar-only accessors reject arrays instead of fabricating a type ID.
 #[test]
 fn scalar_accessors_reject_array_identities() {
-    let array_type = ArrayType {
-        element: ValueType::plain(base_type()),
-        element_mode: ArrayElementMode::AdaptiveInt,
-    };
-    let value = Value::new_array(array_type, 7_u64);
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(base_type())),
+        ScalarRepresentation::AdaptiveSignedInteger,
+    );
+    let value = Value::new_array(array_type.clone(), 7_u64);
 
     assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| value.type_id())).is_err());
     assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| value.subtype_id())).is_err());
@@ -270,11 +273,11 @@ fn scalar_accessors_reject_array_identities() {
 /// Verifies array identity ownership does not affect payload copy-on-write state.
 #[test]
 fn array_identity_is_not_counted_as_payload_ownership() {
-    let array_type = ArrayType {
-        element: ValueType::plain(base_type()),
-        element_mode: ArrayElementMode::Exact,
-    };
-    let value = Value::new_array(array_type, SixteenBytePayload([11, 13]));
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(base_type())),
+        ScalarRepresentation::Exact,
+    );
+    let value = Value::new_array(array_type.clone(), SixteenBytePayload([11, 13]));
     let clone = value.clone();
 
     assert!(value.is_uniquely_owned());

@@ -93,6 +93,8 @@ enum RawTokenKind {
     AmpersandAmpersand,
     #[token("||")]
     PipePipe,
+    #[token("|")]
+    Pipe,
 
     #[token("if")]
     If,
@@ -208,6 +210,7 @@ pub(crate) enum TokenKind {
     DotDot,
     AmpersandAmpersand,
     PipePipe,
+    Pipe,
     Eof,
 }
 
@@ -316,6 +319,7 @@ fn convert_raw_token(
         RawTokenKind::DotDot => TokenKind::DotDot,
         RawTokenKind::AmpersandAmpersand => TokenKind::AmpersandAmpersand,
         RawTokenKind::PipePipe => TokenKind::PipePipe,
+        RawTokenKind::Pipe => TokenKind::Pipe,
         RawTokenKind::If => TokenKind::If,
         RawTokenKind::Else => TokenKind::Else,
         RawTokenKind::For => TokenKind::For,

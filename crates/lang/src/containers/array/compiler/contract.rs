@@ -2,8 +2,8 @@
 
 use crate::ir::{TypedExpression, TypedExpressionKind};
 use crate::semantic::{
-    ArrayElementMode, ArrayType, BinaryOperator as CoreBinaryOperator, ResolvedSubtypeConversion,
-    SemanticType, TypeId, Value, ValueType,
+    ArrayType, BinaryOperator as CoreBinaryOperator, ResolvedSubtypeConversion,
+    ScalarRepresentation, SemanticType, TypeId, Value, ValueType,
 };
 use crate::syntax::Expression;
 
@@ -33,21 +33,24 @@ impl Compiler<'_> {
         element: TypedExpression,
         array_type: ArrayType,
     ) -> Result<TypedExpression, CompileError> {
-        self.validate_element_for_storage(&element)?;
         let span = element.span;
-        if array_type.element_mode == ArrayElementMode::AdaptiveInt
+        let Some(SemanticType::Scalar(declared)) = array_type.static_semantic_type() else {
+            return Ok(element);
+        };
+        self.validate_element_for_storage(&element)?;
+        if array_type.static_representation() == Some(ScalarRepresentation::AdaptiveSignedInteger)
             || !self
                 .registry
-                .is_integer_type(array_type.element.base)
+                .is_integer_type(declared.base)
                 .map_err(|error| CompileError::core(span, error))?
             || Self::element_representation_is_exact(&element)
         {
             return Ok(element);
         }
         Ok(TypedExpression {
-            output: element.output,
+            output: element.output.clone(),
             kind: TypedExpressionKind::ElementStore {
-                element: array_type.element,
+                element: *declared,
                 expression: Box::new(element),
             },
             span,
@@ -79,6 +82,41 @@ impl Compiler<'_> {
         Ok(())
     }
 
+    /// Applies structural membership plus the array's scalar representation policy.
+    ///
+    /// The ordinary semantic predicate handles exact union membership and
+    /// invariant recursive arrays. An adaptive `int` member is the one case
+    /// where a concrete scalar may legitimately widen beyond the member's
+    /// default `TypeId`; that policy is local to this array boundary and never
+    /// creates a runtime union identity.
+    fn array_element_is_assignable(
+        &self,
+        source: &SemanticType,
+        destination: &SemanticType,
+        representation: ScalarRepresentation,
+    ) -> bool {
+        if crate::semantic::is_assignable(source, destination) {
+            return true;
+        }
+        if representation != ScalarRepresentation::AdaptiveSignedInteger {
+            return false;
+        }
+        match (source, destination) {
+            (SemanticType::Union(source_members), _) => source_members.iter().all(|member| {
+                self.array_element_is_assignable(member, destination, representation)
+            }),
+            (_, SemanticType::Union(destination_members)) => destination_members
+                .iter()
+                .any(|member| self.array_element_is_assignable(source, member, representation)),
+            (SemanticType::Scalar(source), SemanticType::Scalar(destination)) => {
+                self.registry.default_integer().ok() == Some(destination.base)
+                    && self.is_signed_integer_base(source.base)
+                    && (destination.subtype.is_none() || source.subtype == destination.subtype)
+            }
+            _ => false,
+        }
+    }
+
     /// Reports whether an element already carries the declared representation.
     ///
     /// Only the shapes the compiler can prove leave a fixed-width store free of
@@ -98,9 +136,11 @@ impl Compiler<'_> {
                 target_base: Some(_),
                 ..
             } => true,
-            TypedExpressionKind::ElementAccess { array, .. } => array
-                .array_type()
-                .is_some_and(|array_type| array_type.element_mode == ArrayElementMode::Exact),
+            TypedExpressionKind::ElementAccess { array, .. } => {
+                array.array_type().is_some_and(|array_type| {
+                    array_type.static_representation() == Some(ScalarRepresentation::Exact)
+                })
+            }
             _ => false,
         }
     }
@@ -118,11 +158,69 @@ impl Compiler<'_> {
         expression: &Expression,
         array_type: ArrayType,
     ) -> Result<TypedExpression, CompileError> {
-        let declared = array_type.element;
+        let Some(static_element) = array_type.static_semantic_type() else {
+            return match self.compile_expression(expression, None) {
+                Ok(typed) => Ok(typed),
+                Err(error) if Self::is_integer_literal_range_error(&error) => {
+                    let default_integer = self
+                        .registry
+                        .default_integer()
+                        .map_err(|core| CompileError::core(expression.span(), core))?;
+                    self.compile_widened_integer_literal(expression, default_integer)?
+                        .ok_or(error)
+                }
+                Err(error) => Err(error),
+            };
+        };
+        let SemanticType::Scalar(declared) = static_element else {
+            let typed = match static_element {
+                SemanticType::Array(inner)
+                    if matches!(expression, Expression::ArrayLiteral { .. }) =>
+                {
+                    self.compile_array_expression(expression, Some((**inner).clone()))?
+                }
+                _ => match self.compile_expression(expression, None) {
+                    Ok(typed) => typed,
+                    Err(error)
+                        if array_type.static_representation()
+                            == Some(ScalarRepresentation::AdaptiveSignedInteger)
+                            && Self::is_integer_literal_expression(expression)
+                            && Self::is_integer_literal_range_error(&error) =>
+                    {
+                        let Some(default_integer) = self.registry.default_integer().ok() else {
+                            return Err(error);
+                        };
+                        match self.compile_widened_integer_literal(expression, default_integer)? {
+                            Some(typed) => typed,
+                            None => return Err(error),
+                        }
+                    }
+                    Err(error) => return Err(error),
+                },
+            };
+            let actual = typed.output.as_ref().ok_or_else(|| {
+                CompileError::new(expression.span(), "an array element must produce a value")
+            })?;
+            if !self.array_element_is_assignable(
+                actual,
+                static_element,
+                array_type
+                    .static_representation()
+                    .expect("a static element has a representation"),
+            ) {
+                return Err(CompileError::new(
+                    expression.span(),
+                    "array element does not satisfy its recursive array contract",
+                ));
+            }
+            return Ok(typed);
+        };
+        let declared = *declared;
         let typed = match self.compile_expression(expression, Some(declared.base)) {
             Ok(typed) => typed,
             Err(error) => {
-                let widened = array_type.element_mode == ArrayElementMode::AdaptiveInt
+                let widened = array_type.static_representation()
+                    == Some(ScalarRepresentation::AdaptiveSignedInteger)
                     && Self::is_integer_literal_expression(expression)
                     && Self::is_integer_literal_range_error(&error);
                 match widened {
@@ -137,15 +235,9 @@ impl Compiler<'_> {
             }
         };
         self.validate_element_for_storage(&typed)?;
-        if typed.array_type().is_some() {
-            return Err(CompileError::new(
-                expression.span(),
-                "nested arrays are not supported",
-            ));
-        }
         let actual = match typed.output {
             Some(SemanticType::Scalar(actual)) => actual,
-            Some(SemanticType::Array(_)) => {
+            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
                 unreachable!("array elements are rejected before scalar matching")
             }
             None => {
@@ -162,7 +254,7 @@ impl Compiler<'_> {
                 .iter()
                 .all(|candidate| self.is_signed_integer_base(candidate.base))
         });
-        if array_type.element_mode == ArrayElementMode::AdaptiveInt
+        if array_type.static_representation() == Some(ScalarRepresentation::AdaptiveSignedInteger)
             && (!adaptive_domain_is_valid
                 || complete_type_domain.is_none() && !self.is_signed_integer_base(actual.base))
         {
@@ -196,7 +288,8 @@ impl Compiler<'_> {
                 .registry
                 .resolve_subtype_conversion(actual, target_subtype)
                 .map_err(|error| CompileError::core(expression.span(), error))?;
-            let target_base = if array_type.element_mode == ArrayElementMode::AdaptiveInt
+            let target_base = if array_type.static_representation()
+                == Some(ScalarRepresentation::AdaptiveSignedInteger)
                 && conversion.output.base != declared.base
                 && self.is_signed_integer_base(conversion.output.base)
             {
@@ -261,7 +354,7 @@ impl Compiler<'_> {
         if actual.base == declared.base {
             return Ok(typed);
         }
-        if array_type.element_mode == ArrayElementMode::AdaptiveInt
+        if array_type.static_representation() == Some(ScalarRepresentation::AdaptiveSignedInteger)
             && self.is_signed_integer_base(actual.base)
         {
             return Ok(typed);

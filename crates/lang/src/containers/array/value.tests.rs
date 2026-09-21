@@ -1,5 +1,5 @@
 use crate::semantic::{
-    ArrayElementMode, ArrayType, CoreError, Registry, SemanticType, Value, ValueType,
+    ArrayType, CoreError, Registry, ScalarRepresentation, SemanticType, Value, ValueType,
 };
 
 use super::*;
@@ -16,10 +16,10 @@ fn value(number: i64) -> Value {
 
 /// Creates the array identity used by public payload tests.
 fn array_type() -> ArrayType {
-    ArrayType {
-        element: ValueType::plain(value_type()),
-        element_mode: ArrayElementMode::Exact,
-    }
+    ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(value_type())),
+        ScalarRepresentation::Exact,
+    )
 }
 
 /// Reads an integer fixture from an array element.
@@ -36,9 +36,12 @@ fn public_api_preserves_array_identity_and_order() {
     let mut array = ArrayValue::new(vec![value(1), value(2)]);
     array.unshift(value(0));
     array.elements_mut()[1] = value(9);
-    let wrapped = Value::new_array(array_type, array);
+    let wrapped = Value::new_array(array_type.clone(), array);
 
-    assert_eq!(wrapped.semantic_type(), SemanticType::Array(array_type));
+    assert_eq!(
+        wrapped.semantic_type(),
+        SemanticType::array(array_type.clone())
+    );
     let borrowed = ArrayValue::from_value(&wrapped).unwrap();
     assert_eq!(borrowed.length(), 3);
     assert_eq!(
@@ -51,7 +54,7 @@ fn public_api_preserves_array_identity_and_order() {
 #[test]
 fn mutable_extraction_rejects_shared_payloads() {
     let array_type = array_type();
-    let mut value = Value::new_array(array_type, ArrayValue::new(vec![value(1)]));
+    let mut value = Value::new_array(array_type.clone(), ArrayValue::new(vec![value(1)]));
     let clone = value.clone();
 
     assert!(ArrayValue::from_value_mut(&mut value).is_err());
@@ -93,7 +96,7 @@ fn clone_is_independent_and_compact() {
     let mut clone = source.clone();
     clone.pop();
 
-    let source_value = Value::new_array(array_type, source);
+    let source_value = Value::new_array(array_type.clone(), source);
     assert_eq!(ArrayValue::from_value(&source_value).unwrap().length(), 9);
     assert_eq!(
         clone.elements().iter().map(integer).collect::<Vec<_>>(),

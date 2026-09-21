@@ -1,7 +1,11 @@
-use crate::ir::{TypedBinaryExecutionPlan, TypedExpression, TypedExpressionKind, TypedScalePlan};
+use crate::ir::{
+    TypedBinaryExecutionPlan, TypedBinaryPlan, TypedComparisonPlan, TypedExpression,
+    TypedExpressionKind, TypedOpenBinaryDispatch, TypedOpenComparisonDispatch, TypedScalePlan,
+    TypedScaleStep,
+};
 use crate::semantic::{
     BinaryOperator, BinaryOperatorDescriptor, ComparisonOperator, CoreError, ExecutionContext,
-    ResolvedBinaryOperator, Value,
+    ResolvedBinaryOperator, Scale, Value, ValueType,
 };
 use crate::syntax::LogicalOperator;
 
@@ -19,6 +23,15 @@ impl<'registry> Runtime<'registry> {
                 .clone()
                 .map(Some)
                 .ok_or_else(|| RuntimeError::Message(format!("unknown runtime variable `{name}`"))),
+            TypedExpressionKind::ArrayBoundary {
+                array_type,
+                expression,
+            } => {
+                let value = self.eval(expression)?.ok_or_else(|| {
+                    RuntimeError::Message("array boundary expression returned no value".into())
+                })?;
+                self.retype_array_value(value, array_type.clone()).map(Some)
+            }
             TypedExpressionKind::Binary {
                 resolution,
                 execution_plan,
@@ -63,6 +76,28 @@ impl<'registry> Runtime<'registry> {
                 )?;
                 Ok(Some(value))
             }
+            TypedExpressionKind::OpenBinary {
+                operator,
+                dispatch,
+                left_operand,
+                right_operand,
+            } => {
+                let left_operand = self.eval(left_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("left operand returned no value".into())
+                })?;
+                let right_operand = self.eval(right_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("right operand returned no value".into())
+                })?;
+                let plan =
+                    self.open_binary_plan(*operator, dispatch, &left_operand, &right_operand)?;
+                self.execute_compiled_binary(
+                    &plan.resolution,
+                    &plan.execution_plan,
+                    left_operand,
+                    right_operand,
+                )
+                .map(Some)
+            }
             TypedExpressionKind::DynamicNegation { dispatch, operand } => {
                 let operand = self.eval(operand)?.ok_or_else(|| {
                     RuntimeError::Message("unary negation operand returned no value".into())
@@ -93,6 +128,22 @@ impl<'registry> Runtime<'registry> {
                     operand,
                 )?;
                 Ok(Some(value))
+            }
+            TypedExpressionKind::OpenNegation { dispatch, operand } => {
+                let operand = self.eval(operand)?.ok_or_else(|| {
+                    RuntimeError::Message("unary negation operand returned no value".into())
+                })?;
+                let operand_type = operand.scalar_type().ok_or_else(|| {
+                    RuntimeError::Message("unary negation is not defined for an array".into())
+                })?;
+                let zero = self
+                    .registry
+                    .parse_numeric("0", Some(operand_type.base))?
+                    .with_subtype(operand_type.subtype);
+                let plan =
+                    self.open_binary_plan(BinaryOperator::Subtraction, dispatch, &zero, &operand)?;
+                self.execute_compiled_binary(&plan.resolution, &plan.execution_plan, zero, operand)
+                    .map(Some)
             }
             TypedExpressionKind::Comparison {
                 execution_plan,
@@ -135,6 +186,23 @@ impl<'registry> Runtime<'registry> {
                     self.execute_compiled_comparison(resolution, &left_operand, &right_operand)?;
                 Ok(Some(value))
             }
+            TypedExpressionKind::OpenComparison {
+                operator,
+                dispatch,
+                left_operand,
+                right_operand,
+            } => {
+                let left_operand = self.eval(left_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("left comparison operand returned no value".into())
+                })?;
+                let right_operand = self.eval(right_operand)?.ok_or_else(|| {
+                    RuntimeError::Message("right comparison operand returned no value".into())
+                })?;
+                let plan =
+                    self.open_comparison_plan(*operator, dispatch, &left_operand, &right_operand)?;
+                self.execute_compiled_comparison(&plan, &left_operand, &right_operand)
+                    .map(Some)
+            }
             TypedExpressionKind::NullCheck {
                 operand,
                 equal,
@@ -143,7 +211,8 @@ impl<'registry> Runtime<'registry> {
                 let value = self.eval(operand)?.ok_or_else(|| {
                     RuntimeError::Message("null-check operand returned no value".into())
                 })?;
-                let is_null = value.type_id() == self.registry.default_null()?;
+                let is_null =
+                    value.scalar_type() == Some(ValueType::plain(self.registry.default_null()?));
                 Ok(Some(Value::new(*boolean_type, is_null == *equal)))
             }
             TypedExpressionKind::Logical {
@@ -593,6 +662,157 @@ impl<'registry> Runtime<'registry> {
         Ok(self
             .registry
             .transform_owned_configured_result(value, &self.configuration)?)
+    }
+
+    /// Resolves one genuinely open operator site and caches its prepared plan.
+    fn open_binary_plan(
+        &self,
+        operator: BinaryOperator,
+        dispatch: &TypedOpenBinaryDispatch,
+        left_operand: &Value,
+        right_operand: &Value,
+    ) -> Result<TypedBinaryPlan, RuntimeError> {
+        let left_type = left_operand.scalar_type().ok_or_else(|| {
+            RuntimeError::Message(format!("operator `{operator}` is not defined for an array"))
+        })?;
+        let right_type = right_operand.scalar_type().ok_or_else(|| {
+            RuntimeError::Message(format!("operator `{operator}` is not defined for an array"))
+        })?;
+        let key = (left_type, right_type);
+        if let Some(plan) = dispatch.get(key) {
+            return Ok(plan);
+        }
+        let resolution = match operator {
+            BinaryOperator::Addition | BinaryOperator::Subtraction => self
+                .registry
+                .resolve_subtype_relative_rule(operator, left_type, right_type)
+                .or_else(|error| match error {
+                    CoreError::SubtypeRelativeOperatorNotDefined { .. } => self
+                        .registry
+                        .resolve_binary_operation(operator, left_type, right_type),
+                    other => Err(other),
+                })?,
+            _ => self
+                .registry
+                .resolve_binary_operation(operator, left_type, right_type)?,
+        };
+        let (left_operand_scale, scaled_left_type) =
+            self.prepare_open_scale_plan(left_type.base, resolution.left_operand_scale)?;
+        let right_scale = resolution
+            .relative_adjustment
+            .unwrap_or(resolution.right_operand_scale);
+        let (right_operand_scale, scaled_right_type) =
+            self.prepare_open_scale_plan(right_type.base, right_scale)?;
+        let relative_adjustment_operator = resolution
+            .relative_adjustment
+            .map(|_| {
+                self.registry.resolve_binary_operator(
+                    BinaryOperator::Multiplication,
+                    scaled_left_type,
+                    scaled_right_type,
+                )
+            })
+            .transpose()?;
+        let plan = TypedBinaryPlan {
+            resolution,
+            execution_plan: TypedBinaryExecutionPlan {
+                left_operand_scale,
+                right_operand_scale,
+                relative_adjustment_operator,
+                result_domain: None,
+            },
+        };
+        dispatch.insert(key, plan.clone());
+        Ok(plan)
+    }
+
+    /// Resolves one genuinely open comparison site and caches its prepared plan.
+    fn open_comparison_plan(
+        &self,
+        operator: ComparisonOperator,
+        dispatch: &TypedOpenComparisonDispatch,
+        left_operand: &Value,
+        right_operand: &Value,
+    ) -> Result<TypedComparisonPlan, RuntimeError> {
+        let left_type = left_operand.scalar_type().ok_or_else(|| {
+            RuntimeError::Message(format!(
+                "comparison `{operator}` is not defined for an array"
+            ))
+        })?;
+        let right_type = right_operand.scalar_type().ok_or_else(|| {
+            RuntimeError::Message(format!(
+                "comparison `{operator}` is not defined for an array"
+            ))
+        })?;
+        let key = (left_type, right_type);
+        if let Some(plan) = dispatch.get(key) {
+            return Ok(plan);
+        }
+        let resolution = self
+            .registry
+            .resolve_comparison_operation(operator, left_type, right_type)?;
+        let left_operand_scale = self
+            .prepare_open_scale_plan(left_type.base, resolution.left_operand_scale)?
+            .0;
+        let right_operand_scale = self
+            .prepare_open_scale_plan(right_type.base, resolution.right_operand_scale)?
+            .0;
+        let plan = TypedComparisonPlan {
+            resolution,
+            left_operand_scale,
+            right_operand_scale,
+        };
+        dispatch.insert(key, plan.clone());
+        Ok(plan)
+    }
+
+    /// Builds the numeric scaling steps required by one open cache miss.
+    fn prepare_open_scale_plan(
+        &self,
+        base_type: crate::semantic::TypeId,
+        scale: Scale,
+    ) -> Result<(TypedScalePlan, crate::semantic::TypeId), RuntimeError> {
+        let mut scaled_type = base_type;
+        let numerator = if scale.numerator == 1 {
+            None
+        } else {
+            let factor = self
+                .registry
+                .parse_numeric(&scale.numerator.to_string(), Some(scaled_type))?;
+            let operator = self.registry.resolve_binary_operator(
+                BinaryOperator::Multiplication,
+                scaled_type,
+                factor.type_id(),
+            )?;
+            scaled_type = self.registry.operator(operator)?.result_type;
+            Some(TypedScaleStep { operator, factor })
+        };
+        let denominator = if scale.denominator == 1 {
+            None
+        } else {
+            let divisor_type = if self.registry.default_integer().ok() == Some(scaled_type) {
+                self.registry.default_fractional()?
+            } else {
+                scaled_type
+            };
+            let factor = self
+                .registry
+                .parse_numeric(&scale.denominator.to_string(), Some(divisor_type))?;
+            let operator = self.registry.resolve_binary_operator(
+                BinaryOperator::Division,
+                scaled_type,
+                factor.type_id(),
+            )?;
+            scaled_type = self.registry.operator(operator)?.result_type;
+            Some(TypedScaleStep { operator, factor })
+        };
+        Ok((
+            TypedScalePlan {
+                numerator,
+                denominator,
+            },
+            scaled_type,
+        ))
     }
 
     /// Selects the plan a dynamic operand pair's runtime subtypes call for.

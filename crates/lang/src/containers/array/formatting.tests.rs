@@ -1,4 +1,6 @@
-use crate::semantic::{ArrayElementMode, ArrayType, CoreError, Registry, Value, ValueType};
+use crate::semantic::{
+    ArrayType, CoreError, Registry, ScalarRepresentation, SemanticType, Value, ValueType,
+};
 
 use super::*;
 use crate::ArrayValue;
@@ -15,10 +17,10 @@ fn value(number: i64) -> Value {
 
 /// Creates the array identity used by formatter tests.
 fn array_type() -> ArrayType {
-    ArrayType {
-        element: ValueType::plain(value_type()),
-        element_mode: ArrayElementMode::Exact,
-    }
+    ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(value_type())),
+        ScalarRepresentation::Exact,
+    )
 }
 
 /// Verifies formatting an array without a registered formatter fails stably.

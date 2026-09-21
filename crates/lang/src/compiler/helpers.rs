@@ -12,6 +12,7 @@ pub(super) fn statement_span(statement: &Statement) -> crate::syntax::Span {
     match statement {
         Statement::Use(declaration) => declaration.span,
         Statement::TypeDeclaration { span, .. }
+        | Statement::TypeAlias { span, .. }
         | Statement::FrameDeclaration { span, .. }
         | Statement::RelationDefinition { span, .. }
         | Statement::RelationBinding { span, .. }

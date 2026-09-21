@@ -7,10 +7,10 @@ use super::*;
 fn array_shape_comes_from_semantic_output() {
     let mut registry = crate::semantic::Registry::new();
     let element = ValueType::plain(registry.allocate_type_id());
-    let array_type = ArrayType {
-        element,
-        element_mode: crate::semantic::ArrayElementMode::Exact,
-    };
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(element),
+        crate::semantic::ScalarRepresentation::Exact,
+    );
 
     let scalar_expression = TypedExpression {
         kind: TypedExpressionKind::ArrayLiteral {
@@ -22,10 +22,10 @@ fn array_shape_comes_from_semantic_output() {
     assert_eq!(scalar_expression.array_type(), None);
 
     let array_expression = TypedExpression {
-        output: Some(SemanticType::Array(array_type)),
+        output: Some(SemanticType::array(array_type.clone())),
         ..scalar_expression
     };
-    assert_eq!(array_expression.array_type(), Some(array_type));
+    assert_eq!(array_expression.array_type(), Some(array_type.clone()));
 }
 
 /// Verifies dense dispatch distinguishes both the base and subtype axes.

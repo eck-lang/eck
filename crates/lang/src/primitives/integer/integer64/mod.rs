@@ -4,7 +4,7 @@ mod literal;
 pub(crate) mod operations;
 mod value;
 
-use crate::semantic::{CoreError, Extension, Registry, TypeDescriptor};
+use crate::semantic::{CoreError, Extension, Registry, ScalarRepresentation, TypeDescriptor};
 
 /// Registers the built-in signed 64-bit integer type and its operators.
 pub struct IntegerExtension;
@@ -40,7 +40,11 @@ impl Extension for IntegerExtension {
             format: formatting::format,
         })?;
         registry.register_index_extractor(id, value::to_index)?;
-        registry.register_type_alias("int", id)?;
+        registry.register_type_alias_with_representation(
+            "int",
+            id,
+            ScalarRepresentation::AdaptiveSignedInteger,
+        )?;
         registry.set_default_integer(id)?;
         operations::register(registry, id)?;
         comparisons::register(registry)
