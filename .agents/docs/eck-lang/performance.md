@@ -66,6 +66,30 @@ operate on whole columns and batches, not one row at a time, and apply the same
 rules to `ColumnExpression` and aggregation state so partial states stay cheap
 to merge.
 
+## Array execution boundary
+
+Arrays follow the same compile-first rule. Exact element knowledge uses the
+ordinary monomorphic plan, and finite runtime base-plus-subtype domains use
+dense IR dispatch tables. Only a genuinely open element site resolves through
+the Registry at runtime; that site keeps a four-entry linear inline cache keyed
+by compact runtime identities, so stable sites pay resolution once and never
+perform type-name lookup on their successful hot path.
+
+The current payload is contiguous with reusable front and back spare capacity,
+growth/recentering, copy-on-write through existing `Value` ownership, and
+deterministic lexical-slot release. These choices keep end operations and
+indexed updates on the intended storage path while preserving value semantics.
+They do not settle a future packed, chunked, or SIMD representation: those
+choices require controlled benchmarks.
+
+Dynamic arrays store an incoming `Value` directly. They do not run a registry
+lookup merely to accept an element. The compiler keeps exact per-index flow
+knowledge plus a conservative finite whole-array domain across branches, loops,
+dynamic-index writes, and end mutations. Typed boundaries validate once and
+produce a statically contracted array value. No payload profile, run partition,
+or SIMD metadata is maintained until benchmarks demonstrate that its update
+cost pays for a real vectorized operation.
+
 ## Choose data structures deliberately
 
 Pick algorithms and containers for their asymptotic behavior and their
@@ -78,8 +102,8 @@ change the abstraction instead of accepting the cost.
 ## Measurement
 
 Never describe a change as faster without measuring it. Performance claims must
-be backed by a benchmark under `benchmarks/` or by an existing benchmark that
-the change improves.
+be backed by a benchmark under `testing/benchmarks/` or by an existing benchmark
+that the change improves.
 
 - Add or extend a benchmark when a change touches a hot path.
 - State the operations, inputs, and units a benchmark measures so results are
