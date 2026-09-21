@@ -41,3 +41,11 @@ fn selects_focused_run_without_a_binary_flag() {
         })
     );
 }
+
+/// Selects the benchmark mode when the explicit subcommand is present.
+#[test]
+fn selects_benchmark_run_with_search_roots() {
+    let mode = select_mode(os_arguments(&["benchmark", "benchmarks/eck"])).unwrap();
+
+    assert_eq!(mode, Mode::Benchmark(vec!["benchmarks/eck".into()]));
+}

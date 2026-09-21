@@ -3,11 +3,13 @@
 //! Without arguments the runner executes every Rust test followed by every
 //! `.eckt` language test. With `[--binary <eck-binary>] <paths>...` it
 //! executes one focused `.eckt` subset instead, building `eck-cli` when no
-//! binary is supplied.
+//! binary is supplied. The explicit `benchmark <paths>...` command executes
+//! `.eckb` benchmarks.
 
 use std::{env, process};
 
 use arguments::RunnerArguments;
+use benchmark::execute_benchmarks;
 use cargo::{CargoOutput, default_eck_binary, project_root, run_cargo};
 use execution::execute_language_tests;
 
@@ -16,10 +18,13 @@ use execution::execute_language_tests;
 mod tests;
 
 mod arguments;
+mod benchmark;
 mod cargo;
 mod discovery;
+mod eckb;
 mod eckt;
 mod execution;
+mod format;
 
 /// Selects the test scope from the raw command-line arguments.
 #[derive(Debug, PartialEq, Eq)]
@@ -28,6 +33,8 @@ enum Mode {
     Complete,
     /// Runs one focused `.eckt` subset, defaulting to a built binary.
     Focused(RunnerArguments),
+    /// Runs one focused `.eckb` benchmark subset.
+    Benchmark(Vec<std::path::PathBuf>),
 }
 
 /// Runs the language-test runner and maps failures to process exit codes.
@@ -53,6 +60,7 @@ fn run() -> Result<bool, String> {
             };
             execute_language_tests(&arguments.search_roots, &eck_binary)
         }
+        Mode::Benchmark(search_roots) => execute_benchmarks(&search_roots),
     }
 }
 
@@ -61,6 +69,13 @@ fn select_mode(arguments: impl Iterator<Item = std::ffi::OsString>) -> Result<Mo
     let raw_arguments: Vec<std::ffi::OsString> = arguments.collect();
     if raw_arguments.is_empty() {
         return Ok(Mode::Complete);
+    }
+    if raw_arguments
+        .first()
+        .is_some_and(|argument| argument == "benchmark")
+    {
+        return arguments::parse_benchmark_arguments(raw_arguments.into_iter().skip(1))
+            .map(|arguments| Mode::Benchmark(arguments.search_roots));
     }
     arguments::parse_arguments(raw_arguments.into_iter()).map(Mode::Focused)
 }

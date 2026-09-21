@@ -41,6 +41,21 @@ fn discovers_nested_eckt_files() {
     );
 }
 
+/// Discovers nested `.eckb` files without accepting differently cased extensions.
+#[test]
+fn discovers_nested_eckb_files_case_sensitively() {
+    let root = scratch_directory("benchmarks");
+    fs::create_dir_all(root.join("decimal")).unwrap();
+    fs::write(root.join("decimal").join("addition.eckb"), "# Addition").unwrap();
+    fs::write(root.join("decimal").join("addition.eckB"), "# Wrong case").unwrap();
+    fs::write(root.join("decimal").join("addition.eckt"), "# Test").unwrap();
+
+    let found = discover_benchmark_paths(std::slice::from_ref(&root)).unwrap();
+    fs::remove_dir_all(&root).unwrap();
+
+    assert_eq!(found, vec![root.join("decimal").join("addition.eckb")]);
+}
+
 /// Deduplicates roots that resolve to the same `.eckt` file.
 #[test]
 fn deduplicates_overlapping_roots() {
@@ -75,4 +90,17 @@ fn rejects_non_eckt_files() {
     fs::remove_dir_all(&root).unwrap();
 
     assert!(error.contains("must use `.eckt`"));
+}
+
+/// Rejects a directly requested benchmark file with a non-standard extension.
+#[test]
+fn rejects_non_eckb_benchmark_files() {
+    let root = scratch_directory("benchmark-rejected");
+    let benchmark = root.join("decimal.eckB");
+    fs::write(&benchmark, "# Decimal").unwrap();
+
+    let error = discover_benchmark_paths(&[benchmark]).unwrap_err();
+    fs::remove_dir_all(&root).unwrap();
+
+    assert!(error.contains("must use `.eckb`"));
 }

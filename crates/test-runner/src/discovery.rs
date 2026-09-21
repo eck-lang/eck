@@ -1,4 +1,4 @@
-//! Recursive discovery of `.eckt` test files.
+//! Recursive discovery of Eck test and benchmark documents.
 
 use std::{
     collections::BTreeSet,
@@ -12,30 +12,49 @@ mod tests;
 
 /// Recursively discovers `.eckt` files below all requested roots.
 pub(crate) fn discover_test_paths(search_roots: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
-    let mut test_paths = BTreeSet::new();
-    for search_root in search_roots {
-        discover_test_paths_below(search_root, &mut test_paths)?;
-    }
-    Ok(test_paths.into_iter().collect())
+    discover_paths(search_roots, "eckt", "test")
 }
 
-/// Adds the `.eckt` files represented by one file or directory to the result set.
-fn discover_test_paths_below(
+/// Recursively discovers case-sensitive `.eckb` files below all requested roots.
+pub(crate) fn discover_benchmark_paths(search_roots: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
+    discover_paths(search_roots, "eckb", "benchmark")
+}
+
+/// Recursively discovers documents with one extension below all requested roots.
+///
+/// The sorted set preserves deterministic output while accepting overlapping
+/// roots without returning the same document twice.
+fn discover_paths(
+    search_roots: &[PathBuf],
+    extension: &str,
+    document_kind: &str,
+) -> Result<Vec<PathBuf>, String> {
+    let mut document_paths = BTreeSet::new();
+    for search_root in search_roots {
+        discover_paths_below(search_root, extension, document_kind, &mut document_paths)?;
+    }
+    Ok(document_paths.into_iter().collect())
+}
+
+/// Adds documents represented by one file or directory to the result set.
+fn discover_paths_below(
     path: &Path,
-    test_paths: &mut BTreeSet<PathBuf>,
+    extension: &str,
+    document_kind: &str,
+    document_paths: &mut BTreeSet<PathBuf>,
 ) -> Result<(), String> {
     let metadata = fs::metadata(path)
         .map_err(|error| format!("cannot inspect `{}`: {error}", path.display()))?;
 
     if metadata.is_file() {
-        if path
-            .extension()
-            .is_some_and(|extension| extension == "eckt")
-        {
-            test_paths.insert(path.to_path_buf());
+        if has_extension(path, extension) {
+            document_paths.insert(path.to_path_buf());
             return Ok(());
         }
-        return Err(format!("test file `{}` must use `.eckt`", path.display()));
+        return Err(format!(
+            "{document_kind} file `{}` must use `.{extension}`",
+            path.display()
+        ));
     }
 
     if !metadata.is_dir() {
@@ -57,15 +76,17 @@ fn discover_test_paths_below(
             .file_type()
             .map_err(|error| format!("cannot inspect `{}`: {error}", entry_path.display()))?;
         if file_type.is_dir() {
-            discover_test_paths_below(&entry_path, test_paths)?;
-        } else if file_type.is_file()
-            && entry_path
-                .extension()
-                .is_some_and(|extension| extension == "eckt")
-        {
-            test_paths.insert(entry_path);
+            discover_paths_below(&entry_path, extension, document_kind, document_paths)?;
+        } else if file_type.is_file() && has_extension(&entry_path, extension) {
+            document_paths.insert(entry_path);
         }
     }
 
     Ok(())
+}
+
+/// Returns whether one path uses the requested case-sensitive file extension.
+fn has_extension(path: &Path, extension: &str) -> bool {
+    path.extension()
+        .is_some_and(|candidate| candidate == extension)
 }

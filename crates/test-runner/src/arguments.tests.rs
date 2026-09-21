@@ -80,3 +80,45 @@ fn rejects_missing_search_roots() {
 
     assert!(error.starts_with("usage:"));
 }
+
+/// Parses several roots passed to the explicit benchmark command.
+#[test]
+fn parses_benchmark_search_roots() {
+    let arguments = parse_benchmark_arguments(
+        ["benchmarks/eck", "benchmarks/regressions"]
+            .into_iter()
+            .map(std::ffi::OsString::from),
+    )
+    .unwrap();
+
+    assert_eq!(
+        arguments,
+        BenchmarkArguments {
+            search_roots: vec!["benchmarks/eck".into(), "benchmarks/regressions".into()],
+        }
+    );
+}
+
+/// Accepts Cargo's optional separator before the benchmark roots.
+#[test]
+fn accepts_separator_before_benchmark_search_roots() {
+    let arguments = parse_benchmark_arguments(
+        ["--", "benchmarks/eck"]
+            .into_iter()
+            .map(std::ffi::OsString::from),
+    )
+    .unwrap();
+
+    assert_eq!(
+        arguments.search_roots,
+        vec![std::path::PathBuf::from("benchmarks/eck")]
+    );
+}
+
+/// Rejects a benchmark command that names no files or directories.
+#[test]
+fn rejects_missing_benchmark_search_roots() {
+    let error = parse_benchmark_arguments(Vec::new().into_iter()).unwrap_err();
+
+    assert!(error.starts_with("usage:"));
+}

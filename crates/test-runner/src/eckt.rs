@@ -5,6 +5,10 @@
 
 use std::collections::BTreeMap;
 
+use super::format::{
+    finish_required_description, parse_title_line, remove_line_ending, remove_separator_blank_line,
+};
+
 #[cfg(test)]
 #[path = "eckt.tests.rs"]
 mod tests;
@@ -37,13 +41,7 @@ pub(crate) fn parse_language_test(contents: &str) -> Result<LanguageTest, String
     let title_line = lines
         .next()
         .ok_or_else(|| "the file is empty".to_string())?;
-    let title_line = remove_line_ending(title_line);
-    let title = title_line
-        .strip_prefix("# ")
-        .filter(|title| !title.trim().is_empty())
-        .ok_or_else(|| "the first line must be `# <title>`".to_string())?
-        .trim()
-        .to_string();
+    let title = parse_title_line(title_line)?;
 
     let mut description = String::new();
     let mut sections = BTreeMap::new();
@@ -65,7 +63,7 @@ pub(crate) fn parse_language_test(contents: &str) -> Result<LanguageTest, String
                     ));
                 }
             } else {
-                description = description.trim().to_string();
+                description = finish_required_description(&mut description)?;
             }
             current_section = Some(section);
         } else if current_section.is_some() {
@@ -81,10 +79,6 @@ pub(crate) fn parse_language_test(contents: &str) -> Result<LanguageTest, String
             "section `{}` occurs more than once",
             section_name(final_section)
         ));
-    }
-
-    if description.is_empty() {
-        return Err("a description is required between the title and first section".into());
     }
 
     let configuration = sections.remove(&Section::Configuration);
@@ -124,26 +118,6 @@ fn parse_section_marker(line: &str) -> Result<Option<Section>, String> {
         _ => None,
     };
     Ok(section)
-}
-
-/// Removes one blank line used only to separate adjacent sections visually.
-fn remove_separator_blank_line(contents: &mut String) {
-    if let Some(prefix) = contents.strip_suffix("\r\n") {
-        if prefix.is_empty() || prefix.ends_with('\n') {
-            contents.truncate(contents.len() - 2);
-        }
-    } else if let Some(prefix) = contents.strip_suffix('\n')
-        && (prefix.is_empty() || prefix.ends_with('\n'))
-    {
-        contents.truncate(contents.len() - 1);
-    }
-}
-
-/// Removes a single line ending from a structural line without changing its body.
-fn remove_line_ending(line: &str) -> &str {
-    line.strip_suffix("\r\n")
-        .or_else(|| line.strip_suffix('\n'))
-        .unwrap_or(line)
 }
 
 /// Removes a mandatory section from the parsed section map.
