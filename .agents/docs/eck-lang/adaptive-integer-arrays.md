@@ -1,37 +1,51 @@
 # Adaptive integer array storage
 
-This document records the intended direction for `int[]` storage and for the
-vectorized execution that may build on it. It is a design note, not language
-semantics: the current contract is the one in
-[`syntax/array-declaration.md`](syntax/array-declaration.md), and everything
-below that is not implemented yet stays a proposal until it is benchmarked and
-accepted into the syntax or performance documentation.
+This document records the current adaptive `int[]` contract and the future
+storage and vectorized execution work that may build on it. It is not a
+replacement for the language contract in
+[`syntax/array-declaration.md`](syntax/array-declaration.md): sections marked
+as future directions remain proposals until they are benchmarked and accepted.
 
-## Two different element contracts
+## Static and dynamic element contracts
+
+An unannotated mutable array has `ArrayElementContract::Dynamic`. Every concrete
+`Value` is accepted directly, so integer values, strings, booleans, null, and
+nested arrays may coexist without conversion. The compiler may retain a current
+element profile for optimization, but that profile is not a contract.
+
+Explicit array annotations create the static contracts described below.
 
 `int8[]`, `int16[]`, `int32[]`, `int64[]`, and `int128[]` declare a fixed
 representation. Every successfully stored element must actually carry that
-representation, an out-of-range value is rejected, and the array never widens
-itself to accommodate one. The element may be evaluated with a wider temporary
-representation, but the contract applies to the final value that crosses into
-storage.
+representation, an out-of-range or inexact value is rejected, and the array
+never widens itself to accommodate one. The element may be evaluated with a
+wider temporary representation, but the contract applies to the final value
+that crosses into storage.
 
-`int[]` declares the adaptive `int` semantics instead. Integer values may widen
-when integer arithmetic requires it, so an element is not tied to the width the
-array was declared with. Fixed-width and adaptive destinations therefore make
-different promises, and the implementation keeps them separate:
+`int[]` declares adaptive signed-integer semantics. Its widening progression is
+`int8 -> int16 -> int32 -> int64 -> int128 -> bigint`; an element may retain
+the first representation in that progression that can represent its final
+value. Fixed-width and adaptive destinations therefore make different promises,
+and the implementation keeps them separate:
 
 ```text
 int8[] / int16[] / ...   fixed-width representation contract
-int[]                    auto-widening integer semantic type
+int[]                    adaptive signed integer semantic type
 ```
 
-Today an adaptive array stores one complete runtime value per element, so a
-widened element keeps its wider representation and the neighbouring elements
-keep theirs. That per-element representation is the baseline the direction below
-would replace for large arrays, not a limitation to preserve.
+The current implementation stores one complete runtime value per element. Each
+element therefore retains its actual base and subtype, including a widened
+representation, while neighboring elements retain theirs. This per-element
+identity is a current semantic and storage boundary, not a name-based lookup
+contract.
 
-## Preferred direction: chunked adaptive storage
+The current array payload is one contiguous live window with reusable front and
+back spare capacity. It grows or recenters when an end operation needs space;
+copy-on-write reuses the existing `Value` ownership model, and lexical slot
+cleanup releases expired owners deterministically. These are implementation
+details, not source-level type syntax.
+
+## Future direction: chunked adaptive storage
 
 A logical `int[]` would be divided into contiguous chunks, and each chunk would
 carry its own physical representation:
@@ -50,7 +64,7 @@ instead of rewriting a hundred-million-element array because one outlier needs
 onto column-oriented processing far more directly than arbitrary per-element
 tagged integers do.
 
-## Alternative direction: sparse exceptional values
+## Future direction: sparse exceptional values
 
 Instead of widening a chunk, its base storage could stay narrow and only the
 exceptionally wide elements could be held aside:
@@ -92,23 +106,25 @@ may run different kernels for different chunks and combine their results. An
 expression such as `c = a + b` could therefore become a sequence of chunk-local
 kernel invocations that preserve ordinary ECK semantics.
 
-The exact vectorized-array contract is not defined. What is fixed here is the
-constraint that the physical layout must not force a semantic difference, and
-that no kernel contract should be frozen before it exists.
+The exact vectorized-array contract is not defined. Controlled benchmarks are
+required before choosing chunking, sparse exceptions, or a kernel contract.
+The physical layout must not force a semantic difference.
 
 ## Widening policy and materialization
 
-Automatic widening should be triggered by the final value being stored, not by a
+Automatic widening is triggered by the final value being stored, not by a
 temporary width used while its expression was evaluated. An expression that
-promotes to `int32` and finishes with `42` fits `int8` and must not widen
-anything. This is the same rule the fixed-width boundary already enforces, and
-sharing it keeps the two contracts consistent.
+promotes during evaluation and finishes with a value representable by a
+narrower adaptive width may use that narrower width; a fixed-width destination
+still requires its exact declared representation. Unit conversion for a fixed
+integer destination must establish exact representability before division or
+truncation.
 
 Ordinary mutation should widen monotonically along
-`int8 -> int16 -> int32 -> int64 -> int128`. Automatically narrowing again after
-individual stores is not worth the repeated widen/compact oscillation; a later
-explicit compaction or repacking phase may choose narrower representations when
-that pays off.
+`int8 -> int16 -> int32 -> int64 -> int128 -> bigint`. Automatically narrowing
+again after individual stores is not worth the repeated widen/compact
+oscillation; a later explicit compaction or repacking phase may choose narrower
+representations when that pays off.
 
 An array that has grown fragmented may eventually be cheaper to materialize into
 one common representation than to keep dispatching per chunk. Candidate signals
@@ -123,7 +139,7 @@ and no threshold should be adopted without measurement.
 
 The fixed-width fix introduced one destination contract at the point where a
 value enters array storage. The compiler resolves an element destination and the
-runtime applies exactly the work that destination requires:
+container applies exactly the work that destination requires:
 
 ```text
 fixed representation   normalize to the declared representation, or reject
@@ -140,6 +156,10 @@ A future adaptive physical layout plugs into the same boundary rather than
 duplicating the store pipeline: the destination for `int[]` would keep the
 adaptive contract and gain the policy the storage implements, such as storing
 directly, widening the affected chunk, or requesting materialization. The
-implemented contract is deliberately the simplest one that is correct, and the
-compiler and runtime do not yet implement chunking, sparse promotion, SIMD
-kernels, or any materialization threshold.
+current compiler resolves complete runtime element identities and dynamic
+conversion/index plans into dense IR tables; the runtime selects those plans
+without name lookup in hot paths. A genuinely open operation site uses the
+stored runtime identity to query the Registry on a cache miss and retains the
+prepared plan in a bounded inline cache. Chunking, sparse promotion, SIMD
+kernels, and materialization thresholds remain deferred until controlled
+benchmarks justify them.

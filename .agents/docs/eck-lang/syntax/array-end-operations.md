@@ -1,8 +1,7 @@
 # Array end operations
 
-A mutable array supports built-in methods that add or remove one value at
-either end. They use the same `->` method syntax as every other ECK
-operation:
+A mutable array supports built-in operations that add or remove one value at
+either end. They use the same `->` method syntax as every other ECK operation:
 
 ```eck
 let values: int[] = []
@@ -29,6 +28,11 @@ values->shift()
   receiver are invalid.
 * An adding method requires exactly one value; a removing method takes no
   argument.
+
+These current array operations are compiler/runtime intrinsics. They are not
+standard-library functions or registry-native methods, so this syntax does not
+imply a generic array functions directory or a separately registered function
+family.
 
 ## Element order
 
@@ -108,6 +112,15 @@ values->push(10)
 values->append(20)
 ```
 
+An unannotated array has a dynamic element contract, so insertion stores the
+concrete `Value` directly without validation or conversion:
+
+```eck
+let values = []
+values->push(10)
+values->push("10") // remains a string
+```
+
 A subtype-constrained array converts a compatible value before storing it, so
 `sizes->push(2cm)` stores `20mm` in `int<mm>[]`.
 
@@ -125,7 +138,12 @@ it does for a literal element. A later read dispatches on the subtype the
 element actually carries, because an insertion and a removal both change which
 values occupy the array's positions.
 
-## Cost
+## Implementation notes
+
+The following details describe the current implementation rather than adding
+observable syntax requirements.
+
+### Cost
 
 Both ends of an array are constant-time:
 
@@ -137,12 +155,8 @@ shift             O(1)
 indexing          O(1)
 ```
 
-An array keeps one contiguous payload, so its elements remain a single
-pointer-and-length range for bulk operations, slices, and vectorized code. The
-amortized cost comes from occasionally growing and recentering the allocation,
-which is the same kind of occasional work a vector performs when it reallocates.
-
-This is part of the language contract rather than an implementation detail: an
-implementation that moves the remaining elements on every `unshift` or
-`shift` does not satisfy the documented behavior.
-
+The current array keeps one contiguous live payload with reusable front and back
+spare capacity. The amortized cost comes from occasionally growing and
+recentering the allocation; `unshift` and `shift` do not move every remaining
+element on each call. Copy-on-write uses the existing `Value` ownership model,
+and lexical slot cleanup releases expired owners while preserving live aliases.
