@@ -5,6 +5,15 @@ use crate::syntax::Span;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BindingId(pub usize);
 
+/// The assignment promise created by one source declaration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BindingContract {
+    /// Every assigned value must satisfy the explicit or immutable type.
+    Static(SemanticType),
+    /// A mutable unannotated binding accepts every concrete ECK value.
+    Dynamic,
+}
+
 /// Records the declaration information needed by later static-analysis passes.
 #[derive(Clone)]
 pub struct BindingMetadata {
@@ -12,8 +21,8 @@ pub struct BindingMetadata {
     pub slot: LocalVariableSlot,
     pub name: String,
     pub mutable: bool,
+    pub contract: BindingContract,
     pub semantic_type: SemanticType,
-    pub nullable: bool,
     pub declaration_span: Span,
     pub scope_depth: usize,
 }

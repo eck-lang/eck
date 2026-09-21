@@ -1,6 +1,5 @@
 //! Semantic vocabulary and registry for an ECK language instance.
 
-mod array;
 mod configuration;
 mod descriptor;
 mod error;
@@ -11,8 +10,10 @@ pub mod registry;
 mod subtype;
 mod types;
 
+pub use crate::containers::array::{
+    ArrayElementContract, ArrayEndOperation, ArrayType, StaticArrayElementContract,
+};
 pub use crate::values::Value;
-pub use array::{ArrayElementMode, ArrayEndOperation, ArrayType};
 pub use configuration::{
     ArrayValueFormatter, ConfigurationDescriptor, ConfigurationNormalizer, ConfigurationOverride,
     ConfigurationValue, ConfiguredValueFormatter, ConfiguredValueTransformer, ExecutionContext,
@@ -33,6 +34,6 @@ pub use subtype::{
     ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion, Scale,
     SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeRelativeRule, ValueType,
 };
-pub use types::SemanticType;
+pub use types::{DeclaredType, ScalarRepresentation, SemanticType, is_assignable};
 
 pub use registry::bootstrap::{default_registry, register_all};

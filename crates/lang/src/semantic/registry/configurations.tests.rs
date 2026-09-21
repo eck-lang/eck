@@ -1,7 +1,7 @@
 use super::*;
 use crate::semantic::{
-    ArrayElementMode, ArrayType, ConfigurationOverride, RuntimeConfiguration, SemanticType, Value,
-    ValueType,
+    ArrayType, ConfigurationOverride, RuntimeConfiguration, ScalarRepresentation, SemanticType,
+    Value, ValueType,
 };
 
 /// A payload used to exercise array formatting without depending on the array crate.
@@ -18,7 +18,7 @@ fn format_fake_array(
     let payload = value
         .downcast_ref::<FakeArrayPayload>()
         .ok_or_else(|| CoreError::InvalidValueRepresentation("fake array".into()))?;
-    if value.semantic_type() != SemanticType::Array(array_type) {
+    if value.semantic_type() != SemanticType::array(array_type.clone()) {
         return Err(CoreError::InvalidValueRepresentation(
             "array identity changed".into(),
         ));
@@ -165,11 +165,11 @@ fn reports_initial_result_transform_identity_for_registered_types() {
 #[test]
 fn registers_and_dispatches_the_array_formatter() {
     let mut registry = Registry::new();
-    let array_type = ArrayType {
-        element: ValueType::plain(registry.allocate_type_id()),
-        element_mode: ArrayElementMode::Exact,
-    };
-    let value = Value::new_array(array_type, FakeArrayPayload("[fake]"));
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(registry.allocate_type_id())),
+        ScalarRepresentation::Exact,
+    );
+    let value = Value::new_array(array_type.clone(), FakeArrayPayload("[fake]"));
 
     assert!(matches!(
         registry.format_value(&value),
@@ -191,11 +191,11 @@ fn configured_result_transforms_leave_arrays_unchanged() {
     let mut registry = Registry::new();
     let element_type =
         crate::semantic::registry::test_support::register_type(&mut registry, "element");
-    let array_type = ArrayType {
-        element: ValueType::plain(element_type),
-        element_mode: ArrayElementMode::AdaptiveInt,
-    };
-    let value = Value::new_array(array_type, FakeArrayPayload("payload"));
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(element_type)),
+        ScalarRepresentation::AdaptiveSignedInteger,
+    );
+    let value = Value::new_array(array_type.clone(), FakeArrayPayload("payload"));
     let configuration = registry.default_runtime_configuration();
 
     let transformed = registry
@@ -205,10 +205,13 @@ fn configured_result_transforms_leave_arrays_unchanged() {
         .transform_owned_configured_result(value.clone(), &configuration)
         .unwrap();
 
-    assert_eq!(transformed.semantic_type(), SemanticType::Array(array_type));
+    assert_eq!(
+        transformed.semantic_type(),
+        SemanticType::array(array_type.clone())
+    );
     assert_eq!(
         transformed_owned.semantic_type(),
-        SemanticType::Array(array_type)
+        SemanticType::array(array_type.clone())
     );
     assert_eq!(
         transformed.downcast_ref::<FakeArrayPayload>(),

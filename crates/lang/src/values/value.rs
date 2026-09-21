@@ -180,7 +180,7 @@ impl Value {
     pub fn semantic_type(&self) -> SemanticType {
         match &self.identity {
             ValueIdentity::Scalar(value_type) => SemanticType::Scalar(*value_type),
-            ValueIdentity::Array(array_type) => SemanticType::Array(**array_type),
+            ValueIdentity::Array(array_type) => SemanticType::Array(array_type.clone()),
         }
     }
 
@@ -198,7 +198,7 @@ impl Value {
     pub fn array_type(&self) -> Option<ArrayType> {
         match &self.identity {
             ValueIdentity::Scalar(_) => None,
-            ValueIdentity::Array(array_type) => Some(**array_type),
+            ValueIdentity::Array(array_type) => Some((**array_type).clone()),
         }
     }
 

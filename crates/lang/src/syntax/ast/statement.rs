@@ -1,6 +1,6 @@
 use super::{
-    ConfigurationEntry, Expression, RelationBinding, RelationDefinition, TypeDefinition,
-    TypeExpression, UseDeclaration,
+    ConfigurationEntry, Expression, RelationBinding, RelationDefinition, TypeAliasDefinition,
+    TypeDefinition, TypeExpression, UseDeclaration,
 };
 use crate::syntax::Span;
 
@@ -29,6 +29,10 @@ pub enum Statement {
     Use(UseDeclaration),
     TypeDeclaration {
         definition: TypeDefinition,
+        span: Span,
+    },
+    TypeAlias {
+        definition: TypeAliasDefinition,
         span: Span,
     },
     FrameDeclaration {

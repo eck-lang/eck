@@ -1,4 +1,4 @@
-use super::Expression;
+use super::{Expression, TypeExpression};
 use crate::syntax::Span;
 
 /// Represents one compile-time namespace import declaration.
@@ -46,6 +46,14 @@ pub struct SourceIdentifier {
 pub struct TypeDefinition {
     pub name: String,
     pub fields: Vec<TypeField>,
+    pub span: Span,
+}
+
+/// Describes a structural alias for a reusable source type expression.
+#[derive(Clone, Debug)]
+pub struct TypeAliasDefinition {
+    pub name: String,
+    pub expression: TypeExpression,
     pub span: Span,
 }
 

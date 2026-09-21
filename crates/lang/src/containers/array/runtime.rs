@@ -10,12 +10,54 @@ use crate::containers::array::{
     ArrayValue, apply_element_contract, apply_end_operation, element_at, set_element,
 };
 use crate::ir::{LocalVariableSlot, TypedExpression, TypedIndexDispatch};
-use crate::semantic::{ArrayEndOperation, IndexExtractor, Value, ValueType};
+use crate::semantic::{
+    ArrayElementContract, ArrayEndOperation, ArrayType, IndexExtractor, SemanticType, Value,
+    ValueType,
+};
 
 use crate::RuntimeError;
 use crate::runtime::Runtime;
 
 impl Runtime<'_> {
+    /// Validates a dynamic array once while crossing into a static array contract.
+    pub(crate) fn retype_array_value(
+        &self,
+        value: Value,
+        array_type: ArrayType,
+    ) -> Result<Value, RuntimeError> {
+        let source = ArrayValue::from_value(&value)?;
+        let mut elements = Vec::with_capacity(source.length());
+        for element in source.elements() {
+            let prepared = match &array_type.element_contract {
+                ArrayElementContract::Dynamic => element.clone(),
+                ArrayElementContract::Static(contract)
+                    if matches!(contract.element, SemanticType::Scalar(_)) =>
+                {
+                    let SemanticType::Scalar(target) = contract.element else {
+                        unreachable!("the scalar shape was checked above")
+                    };
+                    apply_element_contract(
+                        self.registry,
+                        &self.configuration,
+                        element.clone(),
+                        target,
+                    )?
+                }
+                ArrayElementContract::Static(contract) => {
+                    if !crate::semantic::is_assignable(&element.semantic_type(), &contract.element)
+                    {
+                        return Err(RuntimeError::Message(
+                            "array value does not satisfy the destination element contract".into(),
+                        ));
+                    }
+                    element.clone()
+                }
+            };
+            elements.push(prepared);
+        }
+        Ok(Value::new_array(array_type, ArrayValue::new(elements)))
+    }
+
     /// Builds the array value one literal produces.
     ///
     /// Every element is evaluated in source order before the payload exists, so a

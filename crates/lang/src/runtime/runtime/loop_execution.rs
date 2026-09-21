@@ -217,12 +217,16 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
             | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::ArrayBoundary { .. }
             | TypedExpressionKind::ArrayMethod { .. }
             | TypedExpressionKind::ElementStore { .. }
             | TypedExpressionKind::ElementAccess { .. }
             | TypedExpressionKind::DynamicBinary { .. }
             | TypedExpressionKind::DynamicNegation { .. }
             | TypedExpressionKind::DynamicComparison { .. }
+            | TypedExpressionKind::OpenBinary { .. }
+            | TypedExpressionKind::OpenNegation { .. }
+            | TypedExpressionKind::OpenComparison { .. }
             | TypedExpressionKind::DynamicConvert { .. }
             | TypedExpressionKind::Pipe { .. } => None,
         }
@@ -317,12 +321,16 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
             | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::ArrayBoundary { .. }
             | TypedExpressionKind::ArrayMethod { .. }
             | TypedExpressionKind::ElementStore { .. }
             | TypedExpressionKind::ElementAccess { .. }
             | TypedExpressionKind::DynamicBinary { .. }
             | TypedExpressionKind::DynamicNegation { .. }
             | TypedExpressionKind::DynamicComparison { .. }
+            | TypedExpressionKind::OpenBinary { .. }
+            | TypedExpressionKind::OpenNegation { .. }
+            | TypedExpressionKind::OpenComparison { .. }
             | TypedExpressionKind::DynamicConvert { .. }
             | TypedExpressionKind::Pipe { .. } => Ok(false),
         }
@@ -431,11 +439,22 @@ impl<'registry> Runtime<'registry> {
                 left_operand,
                 right_operand,
                 ..
+            }
+            | TypedExpressionKind::OpenBinary {
+                left_operand,
+                right_operand,
+                ..
+            }
+            | TypedExpressionKind::OpenComparison {
+                left_operand,
+                right_operand,
+                ..
             } => {
                 Self::count_expression_local_uses(left_operand, local_uses);
                 Self::count_expression_local_uses(right_operand, local_uses);
             }
-            TypedExpressionKind::DynamicNegation { operand, .. } => {
+            TypedExpressionKind::DynamicNegation { operand, .. }
+            | TypedExpressionKind::OpenNegation { operand, .. } => {
                 Self::count_expression_local_uses(operand, local_uses);
             }
             TypedExpressionKind::Convert { expression, .. }
@@ -472,6 +491,9 @@ impl<'registry> Runtime<'registry> {
                 }
             }
             TypedExpressionKind::ElementStore { expression, .. } => {
+                Self::count_expression_local_uses(expression, local_uses);
+            }
+            TypedExpressionKind::ArrayBoundary { expression, .. } => {
                 Self::count_expression_local_uses(expression, local_uses);
             }
             TypedExpressionKind::ElementAccess { array, index, .. } => {
@@ -572,12 +594,7 @@ impl<'registry> Runtime<'registry> {
                             self.execute_binary_operator(descriptor, &left_operand, &right_operand)?
                         }
                     } else if plain_direct_execution {
-                        let value = self.execute_binary_operator(
-                            descriptor,
-                            &left_operand,
-                            &right_operand,
-                        )?;
-                        value
+                        self.execute_binary_operator(descriptor, &left_operand, &right_operand)?
                     } else {
                         self.execute_binary_plan_owned(
                             resolution,

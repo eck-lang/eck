@@ -8,21 +8,21 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::semantic::{
-    BinaryOperator as CoreBinaryOperator, ComparisonOperator as CoreComparisonOperator, Registry,
-    SemanticType, ValueType,
+    BinaryOperator as CoreBinaryOperator, ComparisonOperator as CoreComparisonOperator,
+    DeclaredType, Registry, ScalarRepresentation, SemanticType, ValueType,
 };
 use crate::syntax::{Block, Expression, Program, Statement, TypeExpression};
 
 use crate::containers::array::compiler::ArrayElementFlow;
 use crate::ir::{
-    BindingId, BindingMetadata, CompleteTypeDomain, LocalVariableSlot, TypedBlock, TypedExpression,
-    TypedProgram, TypedRangePlan, TypedStatement,
+    BindingContract, BindingId, BindingMetadata, CompleteTypeDomain, LocalVariableSlot, TypedBlock,
+    TypedExpression, TypedProgram, TypedRangePlan, TypedStatement,
 };
 
 mod configuration;
-mod dynamic;
 mod error;
 mod expressions;
+mod finite_dispatch;
 mod helpers;
 mod imports;
 mod scopes;
@@ -39,10 +39,14 @@ pub fn compile(program: &Program, registry: &Registry) -> Result<TypedProgram, C
         next_local_slot: 0,
         bindings: Vec::new(),
         narrowed_bindings: HashMap::new(),
+        binding_flow: BindingFlowState::default(),
         element_flow: ArrayElementFlow::new(),
         loop_depth: 0,
         loop_contexts: Vec::new(),
         import_scopes: vec![ImportScope::default()],
+        type_aliases: HashMap::new(),
+        alias_cache: HashMap::new(),
+        alias_resolution_stack: Vec::new(),
     }
     .compile_program(program)
 }
@@ -63,6 +67,7 @@ pub(crate) struct Compiler<'a> {
     next_local_slot: usize,
     bindings: Vec<BindingMetadata>,
     narrowed_bindings: HashMap<BindingId, usize>,
+    binding_flow: BindingFlowState,
     /// Records the static type of each element of a literal-initialized array.
     ///
     /// An unconstrained array keeps no element subtype in its contract, so a
@@ -83,6 +88,9 @@ pub(crate) struct Compiler<'a> {
     /// contribute to the state an exit propagates.
     loop_contexts: Vec<LoopContext>,
     import_scopes: Vec<ImportScope>,
+    type_aliases: HashMap<String, TypeExpression>,
+    alias_cache: HashMap<String, DeclaredType>,
+    alias_resolution_stack: Vec<String>,
 }
 
 /// Captures the control-flow facts one enclosing loop needs while its body is
@@ -93,7 +101,7 @@ struct LoopContext {
     /// Every pass over the body replaces this list, so a fixed-point pass that
     /// discards stale facts never leaves an exit recorded from an earlier and
     /// more precise pass behind.
-    break_exits: Vec<ArrayElementFlow>,
+    break_exits: Vec<CompilerFlowState>,
 }
 
 /// Records one compiled pass over a loop body.
@@ -112,7 +120,40 @@ struct CompiledLoop {
     /// The converged compiled pass.
     pass: CompiledLoopPass,
     /// The element flow state every reachable loop exit agrees on.
-    exit_state: ArrayElementFlow,
+    exit_state: CompilerFlowState,
+}
+
+/// Flow-sensitive knowledge kept independently from binding contracts.
+#[derive(Clone, Default, PartialEq)]
+struct BindingFlowState {
+    current_types: HashMap<BindingId, SemanticType>,
+}
+
+impl BindingFlowState {
+    /// Joins the current types reachable through every input path.
+    fn join(states: &[Self]) -> Self {
+        let Some(first) = states.first() else {
+            return Self::default();
+        };
+        let mut current_types = HashMap::new();
+        for binding in first.current_types.keys() {
+            let members = states
+                .iter()
+                .filter_map(|state| state.current_types.get(binding).cloned())
+                .collect::<Vec<_>>();
+            if members.len() == states.len() {
+                current_types.insert(*binding, SemanticType::union(members));
+            }
+        }
+        Self { current_types }
+    }
+}
+
+/// One snapshot of every domain-owned flow analysis.
+#[derive(Clone, PartialEq)]
+struct CompilerFlowState {
+    arrays: ArrayElementFlow,
+    bindings: BindingFlowState,
 }
 
 /// Stores the semantic type and statically allocated storage of one local variable.
@@ -122,16 +163,8 @@ pub(crate) struct LocalVariable {
     pub(crate) semantic_type: SemanticType,
     pub(crate) slot: LocalVariableSlot,
     pub(crate) mutable: bool,
-    pub(crate) nullable: bool,
+    pub(crate) contract: BindingContract,
     pub(crate) complete_type_domain: Option<Arc<CompleteTypeDomain>>,
-    pub(crate) adaptive_integer: bool,
-}
-
-/// Stores the semantic contract resolved from one explicit binding annotation.
-#[derive(Clone, Copy)]
-struct ResolvedBindingType {
-    semantic_type: SemanticType,
-    nullable: bool,
 }
 
 /// Stores namespace and function imports for one lexical source scope.
@@ -161,16 +194,79 @@ struct FunctionImportSource {
 }
 
 impl Compiler<'_> {
+    /// Captures every domain-owned flow analysis at the current program point.
+    fn flow_snapshot(&self) -> CompilerFlowState {
+        CompilerFlowState {
+            arrays: self.element_flow.snapshot(),
+            bindings: self.binding_flow.clone(),
+        }
+    }
+
+    /// Restores every domain-owned flow analysis to one earlier point.
+    fn restore_flow(&mut self, state: CompilerFlowState) {
+        self.element_flow.restore(state.arrays);
+        self.binding_flow = state.bindings;
+    }
+
+    /// Replaces every domain-owned flow analysis with their path join.
+    fn merge_flow(&mut self, states: &[CompilerFlowState]) {
+        self.restore_flow(Self::join_flow(states));
+    }
+
+    /// Joins snapshots without exposing domain internals to control-flow code.
+    fn join_flow(states: &[CompilerFlowState]) -> CompilerFlowState {
+        CompilerFlowState {
+            arrays: ArrayElementFlow::join(
+                &states
+                    .iter()
+                    .map(|state| state.arrays.clone())
+                    .collect::<Vec<_>>(),
+            ),
+            bindings: BindingFlowState::join(
+                &states
+                    .iter()
+                    .map(|state| state.bindings.clone())
+                    .collect::<Vec<_>>(),
+            ),
+        }
+    }
+
     /// Compiles every root statement into a typed program.
     ///
     /// Root-level `use` declarations apply to the root import scope and are
     /// consumed rather than lowered, so they never appear in the typed program.
     /// The result records the final local slot count and binding metadata.
     fn compile_program(&mut self, program: &Program) -> Result<TypedProgram, CompileError> {
+        for statement in &program.statements {
+            if let Statement::TypeAlias { definition, .. } = statement
+                && self
+                    .type_aliases
+                    .insert(definition.name.clone(), definition.expression.clone())
+                    .is_some()
+            {
+                return Err(CompileError::new(
+                    definition.span,
+                    format!("type alias `{}` is already declared", definition.name),
+                ));
+            }
+        }
+        let mut aliases = self.type_aliases.keys().cloned().collect::<Vec<_>>();
+        aliases.sort();
+        for alias in aliases {
+            let span = self
+                .type_aliases
+                .get(&alias)
+                .map(TypeExpression::span)
+                .expect("collected type alias has a source expression");
+            self.resolve_declared_type(&TypeExpression::Named { name: alias, span }, span)?;
+        }
         let mut statements = Vec::new();
         for statement in &program.statements {
             if let Statement::Use(declaration) = statement {
                 self.compile_use_declaration(declaration)?;
+                continue;
+            }
+            if matches!(statement, Statement::TypeAlias { .. }) {
                 continue;
             }
             statements.push(self.compile_statement(statement)?);
@@ -189,6 +285,10 @@ impl Compiler<'_> {
     fn compile_statement(&mut self, statement: &Statement) -> Result<TypedStatement, CompileError> {
         match statement {
             Statement::Use(_) => unreachable!("use declarations are compiled out before IR"),
+            Statement::TypeAlias { .. } => Err(CompileError::new(
+                statement_span(statement),
+                "type aliases are collected before lowering",
+            )),
             Statement::Configuration { entries, span } => Ok(TypedStatement::Configuration {
                 configuration_override: self.compile_configuration(entries)?,
                 span: *span,
@@ -243,7 +343,7 @@ impl Compiler<'_> {
                 span,
             } => {
                 let typed_condition = self.compile_boolean_condition(condition, "if")?;
-                let before = self.element_flow.snapshot();
+                let before = self.flow_snapshot();
                 let narrowed_binding = self.non_null_narrowing_binding(condition);
                 if let Some(binding) = narrowed_binding {
                     self.push_narrowing(binding);
@@ -253,14 +353,14 @@ impl Compiler<'_> {
                     self.pop_narrowing(binding);
                 }
                 let compiled_body = compiled_body?;
-                let then = self.element_flow.snapshot();
-                self.element_flow.restore(before.clone());
+                let then = self.flow_snapshot();
+                self.restore_flow(before.clone());
                 let compiled_else = else_body
                     .as_ref()
                     .map(|body| self.compile_block(body))
                     .transpose()?;
-                let otherwise = self.element_flow.snapshot();
-                self.element_flow.merge(&[then, otherwise]);
+                let otherwise = self.flow_snapshot();
+                self.merge_flow(&[then, otherwise]);
                 Ok(TypedStatement::If {
                     condition: typed_condition,
                     body: compiled_body,
@@ -328,7 +428,7 @@ impl Compiler<'_> {
         );
         let actual = match typed_condition.output {
             Some(SemanticType::Scalar(actual)) => actual,
-            Some(SemanticType::Array(_)) => {
+            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects array semantic types")
             }
             None => {
@@ -353,72 +453,191 @@ impl Compiler<'_> {
         }
         Ok(typed_condition)
     }
-    /// Resolves one parsed binding annotation without changing its syntax tree.
-    fn resolve_binding_type(
-        &self,
+    /// Resolves one parsed type expression, including aliases and recursive structure.
+    fn resolve_declared_type(
+        &mut self,
         type_expression: &TypeExpression,
         span: crate::syntax::Span,
-    ) -> Result<ResolvedBindingType, CompileError> {
+    ) -> Result<DeclaredType, CompileError> {
         match type_expression {
             TypeExpression::Named { name, .. } => {
+                if let Some(alias_expression) = self.type_aliases.get(name).cloned() {
+                    if let Some(resolved) = self.alias_cache.get(name) {
+                        return Ok(resolved.clone());
+                    }
+                    if let Some(index) = self
+                        .alias_resolution_stack
+                        .iter()
+                        .position(|active| active == name)
+                    {
+                        let mut cycle = self.alias_resolution_stack[index..].to_vec();
+                        cycle.push(name.clone());
+                        return Err(CompileError::new(
+                            span,
+                            format!("type alias cycle: {}", cycle.join(" -> ")),
+                        ));
+                    }
+                    self.alias_resolution_stack.push(name.clone());
+                    let result = self.resolve_declared_type(&alias_expression, span);
+                    self.alias_resolution_stack.pop();
+                    let resolved = result?;
+                    self.alias_cache.insert(name.clone(), resolved.clone());
+                    return Ok(resolved);
+                }
                 let base = self
                     .registry
                     .type_by_name(name)
                     .ok_or_else(|| CompileError::new(span, format!("unknown type `{name}`")))?;
-                Ok(ResolvedBindingType {
+                Ok(DeclaredType {
                     semantic_type: SemanticType::Scalar(ValueType::plain(base)),
-                    nullable: false,
+                    representation: self
+                        .registry
+                        .type_representation(name)
+                        .unwrap_or(ScalarRepresentation::Exact),
                 })
             }
-            TypeExpression::Qualified { .. } => Err(CompileError::new(
-                span,
-                format!("unknown type `{type_expression}`"),
-            )),
-            TypeExpression::Array { element, .. } => Ok(ResolvedBindingType {
-                semantic_type: SemanticType::Array(self.resolve_array_type(element, span)?),
-                nullable: false,
-            }),
-            TypeExpression::Nullable { inner, .. } => {
-                let mut resolved = self.resolve_binding_type(inner, span)?;
-                resolved.nullable = true;
+            TypeExpression::Qualified { base, subtype, .. } => {
+                let mut resolved = self.resolve_declared_type(base, span)?;
+                let SemanticType::Scalar(value_type) = resolved.semantic_type else {
+                    return Err(CompileError::new(
+                        span,
+                        "a subtype qualifier requires a scalar type",
+                    ));
+                };
+                let subtype_id = self
+                    .registry
+                    .subtype_by_suffix(subtype)
+                    .or_else(|| self.registry.subtype_by_name(subtype))
+                    .ok_or_else(|| {
+                        CompileError::new(span, format!("unknown type subtype `{subtype}`"))
+                    })?;
+                resolved.semantic_type = SemanticType::Scalar(ValueType {
+                    base: value_type.base,
+                    subtype: Some(subtype_id),
+                });
                 Ok(resolved)
             }
-        }
-    }
-
-    /// Reports whether a scalar binding carries adaptive `int` semantics.
-    ///
-    /// The source spelling matters here: `int` and `int64` resolve to the same
-    /// base type, but an inferred array made from an adaptive binding must not
-    /// silently turn a fixed-width `int64` source into an adaptive container.
-    fn binding_uses_adaptive_integer(
-        &self,
-        type_expression: Option<&TypeExpression>,
-        semantic_type: SemanticType,
-    ) -> bool {
-        let SemanticType::Scalar(value_type) = semantic_type else {
-            return false;
-        };
-        let Some(default_integer) = self.registry.default_integer().ok() else {
-            return false;
-        };
-        if value_type.base != default_integer {
-            return false;
-        }
-        match type_expression {
-            Some(type_expression) => Self::type_expression_is_adaptive_integer(type_expression),
-            None => true,
-        }
-    }
-
-    /// Reports whether an annotation spells the adaptive integer family.
-    fn type_expression_is_adaptive_integer(type_expression: &TypeExpression) -> bool {
-        match type_expression {
-            TypeExpression::Named { name, .. } => name == "int",
-            TypeExpression::Nullable { inner, .. } => {
-                Self::type_expression_is_adaptive_integer(inner)
+            TypeExpression::Array { element, .. } => {
+                let resolved = self.resolve_declared_type(element, span)?;
+                let element_representation = match &resolved.semantic_type {
+                    SemanticType::Scalar(_) => resolved.representation,
+                    SemanticType::Union(members)
+                        if members
+                            .iter()
+                            .all(|member| matches!(member, SemanticType::Scalar(_))) =>
+                    {
+                        resolved.representation
+                    }
+                    SemanticType::Array(_) | SemanticType::Union(_) => ScalarRepresentation::Exact,
+                };
+                Ok(DeclaredType {
+                    semantic_type: SemanticType::Array(Arc::new(
+                        crate::semantic::ArrayType::static_element(
+                            resolved.semantic_type,
+                            element_representation,
+                        ),
+                    )),
+                    representation: ScalarRepresentation::Exact,
+                })
             }
-            TypeExpression::Qualified { .. } | TypeExpression::Array { .. } => false,
+            TypeExpression::Nullable { inner, .. } => {
+                let resolved = self.resolve_declared_type(inner, span)?;
+                let null = self
+                    .registry
+                    .default_null()
+                    .map_err(|error| CompileError::core(span, error))?;
+                Ok(DeclaredType {
+                    semantic_type: SemanticType::union([
+                        resolved.semantic_type,
+                        SemanticType::Scalar(ValueType::plain(null)),
+                    ]),
+                    representation: resolved.representation,
+                })
+            }
+            TypeExpression::Union { members, .. } => {
+                let mut representation = ScalarRepresentation::Exact;
+                let mut resolved_members = Vec::with_capacity(members.len());
+                for member in members {
+                    let resolved = self.resolve_declared_type(member, span)?;
+                    representation = representation.join(resolved.representation);
+                    resolved_members.push(resolved.semantic_type);
+                }
+                Ok(DeclaredType {
+                    semantic_type: SemanticType::union(resolved_members),
+                    representation,
+                })
+            }
+        }
+    }
+
+    /// Resolves the single array member used to type-check an array literal.
+    fn array_member_for_type(semantic_type: &SemanticType) -> Option<crate::semantic::ArrayType> {
+        match semantic_type {
+            SemanticType::Array(array_type) => Some((**array_type).clone()),
+            SemanticType::Union(members) => {
+                let mut arrays = members.iter().filter_map(Self::array_member_for_type);
+                let first = arrays.next()?;
+                arrays.next().is_none().then_some(first)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns every array member that may contextually type one array literal.
+    fn array_members_for_type(semantic_type: &SemanticType) -> Vec<crate::semantic::ArrayType> {
+        match semantic_type {
+            SemanticType::Array(array_type) => vec![(**array_type).clone()],
+            SemanticType::Union(members) => members
+                .iter()
+                .flat_map(Self::array_members_for_type)
+                .collect(),
+            SemanticType::Scalar(_) => Vec::new(),
+        }
+    }
+
+    /// Returns the single scalar identity a type can use for literal context.
+    fn scalar_member_for_type(semantic_type: &SemanticType) -> Option<ValueType> {
+        match semantic_type {
+            SemanticType::Scalar(value_type) => Some(*value_type),
+            SemanticType::Union(members) => {
+                let mut scalars = members.iter().filter_map(Self::scalar_member_for_type);
+                let first = scalars.next()?;
+                scalars.next().is_none().then_some(first)
+            }
+            _ => None,
+        }
+    }
+
+    /// Reports whether a structural type contains an array alternative.
+    fn type_contains_array(semantic_type: &SemanticType) -> bool {
+        match semantic_type {
+            SemanticType::Array(_) => true,
+            SemanticType::Scalar(_) => false,
+            SemanticType::Union(members) => members.iter().any(Self::type_contains_array),
+        }
+    }
+
+    /// Renders a structural semantic type with ECK source-level precedence.
+    fn semantic_type_name(&self, semantic_type: &SemanticType) -> String {
+        match semantic_type {
+            SemanticType::Scalar(value_type) => {
+                self.registry.value_type_name(*value_type).to_owned()
+            }
+            SemanticType::Array(array_type) => {
+                let Some(element_type) = array_type.static_semantic_type() else {
+                    return "dynamic[]".into();
+                };
+                let element = self.semantic_type_name(element_type);
+                match element_type {
+                    SemanticType::Union(_) => format!("({element})[]"),
+                    _ => format!("{element}[]"),
+                }
+            }
+            SemanticType::Union(members) => members
+                .iter()
+                .map(|member| self.semantic_type_name(member))
+                .collect::<Vec<_>>()
+                .join(" | "),
         }
     }
 
@@ -438,144 +657,155 @@ impl Compiler<'_> {
             ));
         }
         let resolved_type = type_expression
-            .map(|type_expression| self.resolve_binding_type(type_expression, span))
+            .map(|type_expression| self.resolve_declared_type(type_expression, span))
             .transpose()?;
-        let nullable = resolved_type.is_some_and(|resolved| resolved.nullable);
-        let (array_annotation, expected) =
-            match resolved_type.map(|resolved| resolved.semantic_type) {
-                Some(SemanticType::Array(array_type)) => (Some(array_type), None),
-                Some(SemanticType::Scalar(value_type)) => (None, Some(value_type.base)),
-                None => (None, None),
-            };
-        if array_annotation.is_some() && nullable {
-            return Err(CompileError::new(span, "array bindings cannot be nullable"));
-        }
-        if nullable
-            && expected
-                == Some(
-                    self.registry
-                        .default_null()
-                        .map_err(|error| CompileError::core(span, error))?,
-                )
+        let dynamic_binding = mutable && resolved_type.is_none();
+        let array_annotation = resolved_type
+            .as_ref()
+            .and_then(|resolved| Self::array_member_for_type(&resolved.semantic_type));
+        let array_annotations = resolved_type
+            .as_ref()
+            .map(|resolved| Self::array_members_for_type(&resolved.semantic_type))
+            .unwrap_or_default();
+        let expected = resolved_type
+            .as_ref()
+            .and_then(|resolved| Self::scalar_member_for_type(&resolved.semantic_type))
+            .map(|value_type| value_type.base);
+        let mut typed_expression = if let Some(array_type) = array_annotation.clone() {
+            if !matches!(expression, Expression::ArrayLiteral { .. }) {
+                self.compile_expression(expression, expected)?
+            } else {
+                self.compile_array_expression(expression, Some(array_type))?
+            }
+        } else if matches!(expression, Expression::ArrayLiteral { .. })
+            && !array_annotations.is_empty()
         {
-            return Err(CompileError::new(
-                span,
-                "`null?` is not a valid nullable type",
-            ));
-        }
-        if nullable
-            && expected.is_some_and(|expected| {
-                ![
-                    self.registry.default_integer().ok(),
-                    self.registry.default_fractional().ok(),
-                    self.registry.default_string().ok(),
-                    self.registry.default_boolean().ok(),
-                ]
-                .into_iter()
-                .flatten()
-                .any(|supported| supported == expected)
-            })
-        {
-            return Err(CompileError::new(
-                span,
-                "nullable types are currently limited to `int?`, `decimal?`, `string?`, and `bool?`",
-            ));
-        }
-        let typed_expression = if let Some(array_type) = array_annotation {
-            self.compile_array_expression(expression, Some(array_type))?
+            let mut last_error = None;
+            let mut compiled = None;
+            for candidate in &array_annotations {
+                match self.compile_array_expression(expression, Some(candidate.clone())) {
+                    Ok(expression) => {
+                        compiled = Some(expression);
+                        break;
+                    }
+                    Err(error) => last_error = Some(error),
+                }
+            }
+            compiled.ok_or_else(|| {
+                last_error.expect("at least one contextual array candidate was compiled")
+            })?
         } else {
             self.compile_expression(expression, expected)?
         };
-        let actual = typed_expression.output.ok_or_else(|| {
+        let mut actual = typed_expression.output.clone().ok_or_else(|| {
             CompileError::new(
                 expression.span(),
                 "a void expression cannot initialize a binding",
             )
         })?;
-        if typed_expression.array_type().is_some()
-            && let Some(expected) = expected
+        if let Some(destination) = array_annotation
+            && matches!(&actual, SemanticType::Array(source) if source.static_semantic_type().is_none())
         {
-            return Err(CompileError::new(
-                expression.span(),
-                format!(
-                    "binding `{name}` expects `{}`, but the initializer is an array",
-                    self.registry.type_name(expected)
-                ),
-            ));
-        }
-        let initializer_is_null = matches!(expression, Expression::Null { .. });
-        let initializer_is_nullable = self.expression_is_nullable(&typed_expression);
-        if initializer_is_null && !nullable {
-            let Some(type_expression) = type_expression else {
+            if let Some(known_types) = self.array_known_element_types(&typed_expression)
+                && let Some(destination_element) = destination.static_semantic_type()
+                && known_types
+                    .iter()
+                    .any(|known| !crate::semantic::is_assignable(known, destination_element))
+            {
                 return Err(CompileError::new(
                     expression.span(),
-                    "cannot infer a binding type from `null`; add a nullable type annotation",
+                    format!(
+                        "dynamic array does not satisfy `{}`",
+                        self.semantic_type_name(&SemanticType::array(destination.clone()))
+                    ),
                 ));
+            }
+            typed_expression = TypedExpression {
+                output: Some(SemanticType::array(destination.clone())),
+                kind: crate::ir::TypedExpressionKind::ArrayBoundary {
+                    array_type: destination.clone(),
+                    expression: Box::new(typed_expression),
+                },
+                span: expression.span(),
             };
-            return Err(CompileError::new(
-                expression.span(),
-                format!("cannot assign null to non-nullable type `{type_expression}`"),
-            ));
+            actual = SemanticType::array(destination);
         }
-        if initializer_is_nullable && !nullable && expected.is_some() {
-            return Err(CompileError::new(
-                expression.span(),
-                format!("nullable value cannot initialize non-nullable binding `{name}`"),
-            ));
+        if let Some(resolved_type) = &resolved_type {
+            let destination_is_nullable =
+                self.semantic_type_is_nullable(&resolved_type.semantic_type);
+            if self.semantic_type_is_nullable(&actual) && !destination_is_nullable {
+                if matches!(expression, Expression::Null { .. }) {
+                    return Err(CompileError::new(
+                        expression.span(),
+                        format!(
+                            "cannot assign null to non-nullable type `{}`",
+                            type_expression.expect("resolved annotation")
+                        ),
+                    ));
+                }
+                return Err(CompileError::new(
+                    expression.span(),
+                    format!("nullable value cannot initialize non-nullable binding `{name}`"),
+                ));
+            }
+            if matches!(actual, SemanticType::Array(_))
+                && !Self::type_contains_array(&resolved_type.semantic_type)
+            {
+                let expected_name = Self::scalar_member_for_type(&resolved_type.semantic_type)
+                    .map(|value_type| self.registry.value_type_name(value_type).to_owned())
+                    .unwrap_or_else(|| type_expression.expect("resolved annotation").to_string());
+                return Err(CompileError::new(
+                    expression.span(),
+                    format!(
+                        "binding `{name}` expects `{expected_name}`, but the initializer is an array"
+                    ),
+                ));
+            }
+            if !crate::semantic::is_assignable(&actual, &resolved_type.semantic_type) {
+                let expected_name = self.semantic_type_name(&resolved_type.semantic_type);
+                let actual_name = self.semantic_type_name(&actual);
+                return Err(CompileError::new(
+                    expression.span(),
+                    format!(
+                        "type mismatch: binding `{name}` expects `{expected_name}`, expression produces `{actual_name}`"
+                    ),
+                ));
+            }
         }
-        if nullable && expected.is_none() {
-            return Err(CompileError::new(
-                span,
-                "nullable bindings require an explicit type annotation",
-            ));
-        }
-        // A declaration without an annotation takes the nullability of its
-        // initializer, so `let first = a->shift()` declares the nullable
-        // binding the removal's element type promises. An explicit annotation
-        // still decides, and a nullable initializer that contradicts a
-        // non-nullable annotation is rejected above.
-        let nullable = nullable || (initializer_is_nullable && expected.is_none());
-        if let Some(expected) = expected
-            && !initializer_is_null
-            && let SemanticType::Scalar(actual) = actual
-            && actual.base != expected
-        {
-            return Err(CompileError::new(
-                expression.span(),
-                format!(
-                    "type mismatch: binding `{name}` expects `{}`, expression produces `{}`",
-                    self.registry.type_name(expected),
-                    self.registry.value_type_name(actual)
-                ),
-            ));
-        }
-        let semantic_type = if initializer_is_null {
-            SemanticType::Scalar(ValueType::plain(
-                expected.expect("nullable null initializer has an annotation"),
-            ))
-        } else {
-            actual
+        let semantic_type = match resolved_type {
+            Some(resolved) => match (&resolved.semantic_type, &actual) {
+                // Preserve a concrete scalar subtype for the existing
+                // subtype-aware operator plans. A nullable or union
+                // declaration remains its declared structural type so
+                // nullability and membership are not erased from reads.
+                (SemanticType::Scalar(_), SemanticType::Scalar(actual)) => {
+                    SemanticType::Scalar(*actual)
+                }
+                _ => resolved.semantic_type,
+            },
+            None => actual,
         };
-        let adaptive_integer = self.binding_uses_adaptive_integer(type_expression, semantic_type);
         let complete_type_domain = typed_expression.complete_type_domain();
+        let contract = if dynamic_binding {
+            BindingContract::Dynamic
+        } else {
+            BindingContract::Static(semantic_type.clone())
+        };
         let variable = self.bind_local_variable(
             name.to_owned(),
-            semantic_type,
+            semantic_type.clone(),
             mutable,
-            nullable,
+            contract,
             complete_type_domain,
             span,
         );
-        if adaptive_integer {
-            self.mark_variable_adaptive_integer(name);
-        }
         self.record_array_element_types(variable.binding, &typed_expression);
         Ok(TypedStatement::VariableDeclaration {
             name: name.to_owned(),
             binding: variable.binding,
             slot: variable.slot,
             mutable,
-            semantic_type,
+            semantic_type: semantic_type.clone(),
             expression: typed_expression,
             span,
         })
@@ -597,59 +827,84 @@ impl Compiler<'_> {
                 format!("cannot assign to immutable binding `{name}`"),
             ));
         }
-        let value_type = match variable.semantic_type {
-            SemanticType::Scalar(value_type) => value_type,
-            SemanticType::Array(_) => {
+        // A non-null proof narrows reads, not the destination of an assignment:
+        // assigning `null` inside `if (value != null)` must be checked against
+        // the binding's declared union so the proof can then be invalidated.
+        let dynamic_binding = matches!(variable.contract, BindingContract::Dynamic);
+        let target_type = match variable.contract {
+            BindingContract::Dynamic => self.effective_variable_semantic_type(&variable),
+            BindingContract::Static(_) => variable.semantic_type.clone(),
+        };
+        let value_type = match &target_type {
+            SemanticType::Scalar(value_type) => Some(*value_type),
+            SemanticType::Array(_) | SemanticType::Union(_)
+                if !dynamic_binding && Self::type_contains_array(&target_type) =>
+            {
                 return Err(CompileError::new(
                     span,
                     "whole-array reassignment is not supported; assign individual elements",
                 ));
             }
+            _ => None,
         };
-        let typed_expression = self.compile_expression(expression, Some(value_type.base))?;
-        let actual = match typed_expression.output {
-            Some(SemanticType::Scalar(actual)) => actual,
-            Some(SemanticType::Array(_)) => {
-                return Err(CompileError::new(
-                    expression.span(),
-                    format!("cannot assign an array to binding `{name}`"),
-                ));
-            }
-            None => {
-                return Err(CompileError::new(
-                    expression.span(),
-                    "a void expression cannot be assigned",
-                ));
-            }
-        };
-        let assigned_null = matches!(expression, Expression::Null { .. });
-        let assigned_nullable = self.expression_is_nullable(&typed_expression);
-        if assigned_null && !variable.nullable {
-            return Err(CompileError::new(
-                expression.span(),
-                format!(
-                    "cannot assign null to non-nullable type `{}`",
-                    self.registry.value_type_name(value_type)
-                ),
-            ));
+        let typed_expression = self.compile_expression(
+            expression,
+            (!dynamic_binding)
+                .then(|| value_type.map(|value| value.base))
+                .flatten(),
+        )?;
+        let actual = typed_expression.output.as_ref().ok_or_else(|| {
+            CompileError::new(expression.span(), "a void expression cannot be assigned")
+        })?;
+        if dynamic_binding {
+            self.update_dynamic_binding_type(variable.binding, actual.clone());
+            self.record_array_element_types(variable.binding, &typed_expression);
+            self.narrowed_bindings.remove(&variable.binding);
+            return Ok(TypedStatement::Assignment {
+                name: name.to_owned(),
+                binding: variable.binding,
+                slot: variable.slot,
+                expression: typed_expression,
+                span,
+            });
         }
-        if assigned_nullable && !variable.nullable {
+        let target_is_nullable = self.semantic_type_is_nullable(&target_type);
+        if self.semantic_type_is_nullable(actual) && !target_is_nullable {
+            if matches!(expression, Expression::Null { .. }) {
+                return Err(CompileError::new(
+                    expression.span(),
+                    format!(
+                        "cannot assign null to non-nullable type `{}`",
+                        self.registry.value_type_name(
+                            Self::scalar_member_for_type(&target_type).ok_or_else(|| {
+                                CompileError::new(expression.span(), "binding is not scalar")
+                            })?
+                        )
+                    ),
+                ));
+            }
             return Err(CompileError::new(
                 expression.span(),
                 format!("nullable value cannot be assigned to binding `{name}`"),
             ));
         }
-        if !assigned_null && actual != value_type {
+        if matches!(actual, SemanticType::Array(_)) && !Self::type_contains_array(&target_type) {
+            return Err(CompileError::new(
+                expression.span(),
+                format!("cannot assign an array to binding `{name}`"),
+            ));
+        }
+        if !crate::semantic::is_assignable(actual, &target_type) {
+            let expected_name = self.semantic_type_name(&target_type);
+            let actual_name = self.semantic_type_name(actual);
             return Err(CompileError::new(
                 expression.span(),
                 format!(
-                    "type mismatch: binding `{name}` expects `{}`, expression produces `{}`",
-                    self.registry.value_type_name(value_type),
-                    self.registry.value_type_name(actual)
+                    "type mismatch: binding `{name}` expects `{expected_name}`, expression produces `{actual_name}`"
                 ),
             ));
         }
-        if variable.nullable {
+        if self.semantic_type_is_nullable(&variable.semantic_type) {
             self.narrowed_bindings.remove(&variable.binding);
         }
         if let Some(domain) = typed_expression.complete_type_domain() {
@@ -681,9 +936,9 @@ impl Compiler<'_> {
                 format!("cannot assign through immutable binding `{name}`"),
             ));
         }
-        let array_type = match variable.semantic_type {
-            SemanticType::Array(array_type) => array_type,
-            SemanticType::Scalar(_) => {
+        let array_type = match self.effective_variable_semantic_type(&variable) {
+            SemanticType::Array(array_type) => (*array_type).clone(),
+            _ => {
                 return Err(CompileError::new(
                     span,
                     format!("binding `{name}` is not an array"),
@@ -694,24 +949,17 @@ impl Compiler<'_> {
             self.compile_array_index(index)?;
         // The element crosses into storage here, so its destination contract is
         // applied before the store is planned.
-        let element = self.compile_array_element(expression, array_type)?;
-        let typed_expression = self.prepare_element_for_storage(element, array_type)?;
+        let element = self.compile_array_element(expression, array_type.clone())?;
+        let typed_expression = self.prepare_element_for_storage(element, array_type.clone())?;
         // A written element the compiler cannot type precisely makes that slot
         // dynamic, so later reads of it keep dispatching on the stored subtype.
-        let element_slot = if typed_expression.complete_type_domain().is_some() {
-            None
-        } else {
-            match typed_expression.output {
-                Some(SemanticType::Scalar(value_type)) => Some(value_type),
-                Some(SemanticType::Array(_)) | None => None,
-            }
-        };
+        let element_slot = self.array_flow_type_for_expression(&typed_expression);
         match constant_index {
             Some(index) => {
                 self.update_array_element_type(variable.binding, index, element_slot);
             }
             None => {
-                self.element_flow.remove(variable.binding);
+                self.update_array_unknown_index_type(variable.binding, &typed_expression);
             }
         }
         Ok(TypedStatement::IndexedAssignment {
@@ -756,10 +1004,10 @@ impl Compiler<'_> {
                     // The statement is unreachable. Compile it for diagnostics,
                     // then restore the state the last reachable transfer left so
                     // its facts cannot reach the block's exit state.
-                    let reachable_types = self.element_flow.snapshot();
+                    let reachable_types = self.flow_snapshot();
                     let reachable_narrowings = self.narrowed_bindings.clone();
                     statements.push(self.compile_statement(statement)?);
-                    self.element_flow.restore(reachable_types);
+                    self.restore_flow(reachable_types);
                     self.narrowed_bindings = reachable_narrowings;
                     continue;
                 }
@@ -849,7 +1097,7 @@ impl Compiler<'_> {
             comparison,
             increment,
         };
-        let loop_entry_state = self.element_flow.snapshot();
+        let loop_entry_state = self.flow_snapshot();
         self.variable_scopes.push(HashMap::new());
         self.scope_slots.push(Vec::new());
         self.import_scopes.push(ImportScope::default());
@@ -858,7 +1106,7 @@ impl Compiler<'_> {
                 variable.to_owned(),
                 SemanticType::Scalar(start_type),
                 false,
-                false,
+                BindingContract::Static(SemanticType::Scalar(start_type)),
                 None,
                 span,
             );
@@ -905,7 +1153,7 @@ impl Compiler<'_> {
         body: &Block,
         span: crate::syntax::Span,
     ) -> Result<TypedStatement, CompileError> {
-        let loop_entry_state = self.element_flow.snapshot();
+        let loop_entry_state = self.flow_snapshot();
         let narrowed_binding = self.non_null_narrowing_binding(condition);
         if let Some(binding) = narrowed_binding {
             self.push_narrowing(binding);
@@ -966,7 +1214,7 @@ impl Compiler<'_> {
     /// suffix.
     fn compile_loop_statement(
         &mut self,
-        loop_entry_state: ArrayElementFlow,
+        loop_entry_state: CompilerFlowState,
         include_entry_state_in_exit: bool,
         mut body_step: impl FnMut(&mut Self) -> Result<CompiledLoopPass, CompileError>,
     ) -> Result<CompiledLoop, CompileError> {
@@ -975,7 +1223,7 @@ impl Compiler<'_> {
         for _ in 0..MAXIMUM_LOOP_FIXED_POINT_PASSES {
             // The head is the state every iteration begins from: the loop entry
             // and every path that reached the end of a previous body.
-            self.element_flow.restore(head.clone());
+            self.restore_flow(head.clone());
             self.loop_contexts.push(LoopContext {
                 break_exits: Vec::new(),
             });
@@ -985,7 +1233,7 @@ impl Compiler<'_> {
                 .pop()
                 .expect("the loop context was pushed above");
             let pass = body_result?;
-            let backedge_state = self.element_flow.snapshot();
+            let backedge_state = self.flow_snapshot();
             // Every later iteration begins from a state this pass can reach at
             // the end of the body, either by completing it or by `break`ing out.
             // Joining those into the current head heads the next iteration, and
@@ -994,7 +1242,7 @@ impl Compiler<'_> {
             reached.extend(context.break_exits.iter().cloned());
             let mut head_snapshots = vec![head.clone()];
             head_snapshots.extend(reached);
-            let next_head = ArrayElementFlow::join(&head_snapshots);
+            let next_head = Self::join_flow(&head_snapshots);
             // The post-loop state merges only reachable exits. A `continue` is a
             // backedge and contributes through the post-body state; a `break`
             // contributes the state it recorded at the jump. The head already
@@ -1005,7 +1253,7 @@ impl Compiler<'_> {
             if include_entry_state_in_exit {
                 exit_snapshots.push(loop_entry_state.clone());
             }
-            let exit_state = ArrayElementFlow::join(&exit_snapshots);
+            let exit_state = Self::join_flow(&exit_snapshots);
             if next_head == head {
                 converged = Some(CompiledLoop { pass, exit_state });
                 break;
@@ -1017,13 +1265,14 @@ impl Compiler<'_> {
             // fact keeps the diagnostic sound instead of emitting operations
             // compiled against a head a later iteration could invalidate.
             self.element_flow.clear();
+            self.binding_flow.current_types.clear();
             CompileError::new(
                 crate::syntax::Span { start: 0, end: 0 },
                 "the loop flow analysis did not converge",
             )
         })?;
         // Statements after the loop see the merged state of its reachable exits.
-        self.element_flow.restore(compiled.exit_state.clone());
+        self.restore_flow(compiled.exit_state.clone());
         Ok(compiled)
     }
 
@@ -1034,10 +1283,11 @@ impl Compiler<'_> {
     /// post state. The innermost enclosing [`LoopContext`] always exists here,
     /// because `break` is rejected outside a loop.
     fn record_loop_break_exit(&mut self) {
+        let snapshot = self.flow_snapshot();
         let Some(context) = self.loop_contexts.last_mut() else {
             return;
         };
-        context.break_exits.push(self.element_flow.snapshot());
+        context.break_exits.push(snapshot);
     }
 
     /// Validates that a range bound is a plain integer type.

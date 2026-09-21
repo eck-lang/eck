@@ -1,7 +1,7 @@
 //! Built-in array end operations: spellings, aliases, and compilation.
 
 use crate::ir::{TypedExpression, TypedExpressionKind};
-use crate::semantic::{ArrayElementMode, ArrayEndOperation, ArrayType, SemanticType};
+use crate::semantic::{ArrayEndOperation, ArrayType, ScalarRepresentation, SemanticType};
 use crate::syntax::Expression;
 
 use crate::CompileError;
@@ -76,8 +76,8 @@ impl Compiler<'_> {
                         format!("`{method_name}` expects exactly one value to add"),
                     ));
                 };
-                let element = self.compile_array_element(value, array_type)?;
-                Some(self.prepare_element_for_storage(element, array_type)?)
+                let element = self.compile_array_element(value, array_type.clone())?;
+                Some(self.prepare_element_for_storage(element, array_type.clone())?)
             }
             ArrayEndOperation::Pop | ArrayEndOperation::Shift => {
                 if !arguments.is_empty() {
@@ -93,23 +93,64 @@ impl Compiler<'_> {
         // element keeps whatever subtype it was stored with, so the produced
         // complete type is only known at runtime in that case. An insertion
         // produces no value at all.
+        let known_dynamic_types = array_type
+            .static_semantic_type()
+            .is_none()
+            .then(|| self.element_flow.known_types(binding))
+            .flatten();
         let (output, result_domain, empty_result) = match method.removes_element() {
             // The null value an empty removal produces is resolved here, so the
             // runtime never looks the null type up or re-parses its literal.
-            true => (
-                Some(SemanticType::Scalar(array_type.element)),
-                (array_type.element_mode == ArrayElementMode::AdaptiveInt
-                    || array_type.element.subtype.is_none())
-                .then(|| self.array_element_complete_type_domain(array_type)),
-                Some(
-                    self.registry
-                        .parse_null("null", None)
-                        .map_err(|error| CompileError::core(span, error))?,
-                ),
-            ),
+            true => {
+                let null_value = self
+                    .registry
+                    .parse_null("null", None)
+                    .map_err(|error| CompileError::core(span, error))?;
+                let null_type = SemanticType::Scalar(null_value.value_type());
+                let element_type = array_type.static_semantic_type().cloned().or_else(|| {
+                    known_dynamic_types
+                        .as_ref()
+                        .filter(|known| !known.is_empty())
+                        .cloned()
+                        .map(SemanticType::union)
+                });
+                let result_domain = array_type.static_semantic_type().and_then(|element| {
+                    (array_type.static_representation()
+                        == Some(ScalarRepresentation::AdaptiveSignedInteger)
+                        || matches!(element, SemanticType::Scalar(value) if value.subtype.is_none()))
+                    .then(|| self.array_element_complete_type_domain(array_type.clone()))
+                });
+                (
+                    element_type
+                        .map(|element| SemanticType::union([element, null_type.clone()]))
+                        .or_else(|| {
+                            known_dynamic_types
+                                .as_ref()
+                                .is_some_and(Vec::is_empty)
+                                .then_some(null_type)
+                        }),
+                    result_domain,
+                    Some(null_value),
+                )
+            }
             false => (None, None, None),
         };
-        self.element_flow.remove(binding);
+        match method {
+            ArrayEndOperation::Push | ArrayEndOperation::Unshift => {
+                let element_type = stored_value
+                    .as_ref()
+                    .and_then(|element| self.array_flow_type_for_expression(element));
+                self.element_flow.insert_end(
+                    binding,
+                    method == ArrayEndOperation::Unshift,
+                    element_type,
+                );
+            }
+            ArrayEndOperation::Pop | ArrayEndOperation::Shift => {
+                self.element_flow
+                    .remove_end(binding, method == ArrayEndOperation::Shift);
+            }
+        }
         Ok(TypedExpression {
             output,
             kind: TypedExpressionKind::ArrayMethod {

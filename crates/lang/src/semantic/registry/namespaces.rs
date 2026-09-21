@@ -115,6 +115,19 @@ impl Registry {
         }
     }
 
+    /// Resolves a namespaced generic fallback for one container argument.
+    pub fn resolve_namespace_any_single_function(
+        &self,
+        namespace: &str,
+        member: &str,
+    ) -> Result<FunctionId, CoreError> {
+        match self.namespace_symbol(namespace, member)? {
+            NamespaceSymbol::Function { function_name } => {
+                self.resolve_any_single_function(function_name)
+            }
+        }
+    }
+
     /// Resolves a pipe member through the namespace associated with its receiver type.
     pub fn resolve_receiver_function(
         &self,

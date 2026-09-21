@@ -1,4 +1,4 @@
-//! Lexical variable scopes, local slot allocation, and nullability tracking.
+//! Lexical variable scopes, local slot allocation, and narrowing proofs.
 //!
 //! Every binding receives a statically allocated [`LocalVariableSlot`] and a
 //! [`BindingId`] here, and this module owns the narrowing proofs that record
@@ -7,7 +7,8 @@
 use std::sync::Arc;
 
 use crate::ir::{
-    BindingId, BindingMetadata, CompleteTypeDomain, LocalVariableSlot, TypedExpression,
+    BindingContract, BindingId, BindingMetadata, CompleteTypeDomain, LocalVariableSlot,
+    TypedExpression,
 };
 use crate::semantic::{FunctionId, FunctionSignature, SemanticType, ValueType};
 use crate::syntax::{ComparisonOperator, Expression};
@@ -23,7 +24,7 @@ impl Compiler<'_> {
         name: String,
         semantic_type: SemanticType,
         mutable: bool,
-        nullable: bool,
+        contract: BindingContract,
         complete_type_domain: Option<Arc<CompleteTypeDomain>>,
         declaration_span: crate::syntax::Span,
     ) -> LocalVariable {
@@ -32,20 +33,19 @@ impl Compiler<'_> {
         let binding = BindingId(self.bindings.len());
         let variable = LocalVariable {
             binding,
-            semantic_type,
+            semantic_type: semantic_type.clone(),
             slot,
             mutable,
-            nullable,
+            contract: contract.clone(),
             complete_type_domain,
-            adaptive_integer: false,
         };
         self.bindings.push(BindingMetadata {
             id: binding,
             slot,
             name: name.clone(),
             mutable,
-            semantic_type,
-            nullable,
+            contract,
+            semantic_type: semantic_type.clone(),
             declaration_span,
             scope_depth: self.variable_scopes.len() - 1,
         });
@@ -57,19 +57,12 @@ impl Compiler<'_> {
             .last_mut()
             .expect("compiler always has a variable scope")
             .insert(name, variable.clone());
-        variable
-    }
-
-    /// Marks a newly declared scalar binding as using adaptive `int` semantics.
-    pub(super) fn mark_variable_adaptive_integer(&mut self, name: &str) {
-        if let Some(variable) = self
-            .variable_scopes
-            .last_mut()
-            .expect("compiler always has a variable scope")
-            .get_mut(name)
-        {
-            variable.adaptive_integer = true;
+        if matches!(variable.contract, BindingContract::Dynamic) {
+            self.binding_flow
+                .current_types
+                .insert(binding, semantic_type);
         }
+        variable
     }
 
     /// Reports whether the active lexical scope already owns `name`.
@@ -88,6 +81,36 @@ impl Compiler<'_> {
             .find_map(|scope| scope.get(name).cloned())
     }
 
+    /// Returns the variable type after applying an active non-null proof.
+    pub(super) fn effective_variable_semantic_type(
+        &self,
+        variable: &LocalVariable,
+    ) -> SemanticType {
+        let semantic_type = self
+            .binding_flow
+            .current_types
+            .get(&variable.binding)
+            .unwrap_or(&variable.semantic_type);
+        if self.narrowed_bindings.contains_key(&variable.binding)
+            && let Ok(null_type) = self.registry.default_null()
+            && let Some(non_null) = semantic_type.without_scalar(ValueType::plain(null_type))
+        {
+            return non_null;
+        }
+        semantic_type.clone()
+    }
+
+    /// Replaces the current flow knowledge of one dynamic binding.
+    pub(super) fn update_dynamic_binding_type(
+        &mut self,
+        binding: BindingId,
+        semantic_type: SemanticType,
+    ) {
+        self.binding_flow
+            .current_types
+            .insert(binding, semantic_type);
+    }
+
     /// Marks the nearest binding for `name` as carrying a runtime complete type.
     ///
     /// A statement that assigns an extracted element to an existing binding must
@@ -102,7 +125,7 @@ impl Compiler<'_> {
             if let Some(variable) = scope.get_mut(name) {
                 variable.complete_type_domain = Some(match &variable.complete_type_domain {
                     Some(existing) => CompleteTypeDomain::union(
-                        &self.registry,
+                        self.registry,
                         &[existing.clone(), complete_type_domain],
                     ),
                     None => complete_type_domain,
@@ -129,7 +152,7 @@ impl Compiler<'_> {
             _ => return None,
         };
         self.resolve_variable(name)
-            .filter(|variable| variable.nullable)
+            .filter(|variable| self.semantic_type_is_nullable(&variable.semantic_type))
             .map(|variable| variable.binding)
     }
 
@@ -176,34 +199,46 @@ impl Compiler<'_> {
         }
     }
 
-    /// Reports whether an expression may evaluate to the null value.
-    ///
-    /// A nullable binding yields null until a lexical proof narrows it, and a
-    /// removal from an array yields null when there is no element to remove.
-    /// The typed expression owns this decision so every consumer, including
-    /// binding, assignment, and null-check compilation, asks one implementation.
+    /// Reports whether an expression may evaluate to the configured null scalar.
     pub(super) fn expression_is_nullable(&self, expression: &TypedExpression) -> bool {
-        expression.is_nullable()
+        expression
+            .output
+            .as_ref()
+            .is_some_and(|semantic_type| self.semantic_type_is_nullable(semantic_type))
     }
 
-    /// Rejects nullable and array operands before concrete registry dispatch.
+    /// Reports whether a structural type contains the configured null scalar.
+    pub(super) fn semantic_type_is_nullable(&self, semantic_type: &SemanticType) -> bool {
+        let Some(null_type) = self.registry.default_null().ok() else {
+            return false;
+        };
+        semantic_type.contains_scalar(crate::semantic::ValueType::plain(null_type))
+    }
+
+    /// Rejects nullable, union, and array operands before concrete registry dispatch.
     ///
     /// Scalar operations, conditions, calls, and conversions all require one
     /// complete scalar value. An array is a container whose compile-time
-    /// contract lives in its element type, so passing it where a scalar is
-    /// expected is always a type error rather than an operator lookup failure.
+    /// contract lives in its element type, and an un-narrowed union does not
+    /// have one concrete dispatch identity. Both are type errors rather than
+    /// operator lookup failures.
     pub(crate) fn require_scalar_expression(
         &self,
         expression: &TypedExpression,
     ) -> Result<(), CompileError> {
         self.require_non_nullable_expression(expression)?;
-        if expression.array_type().is_some() {
-            return Err(CompileError::new(
+        match expression.output {
+            Some(SemanticType::Scalar(_)) => Ok(()),
+            Some(SemanticType::Array(_)) => Err(CompileError::new(
                 expression.span,
                 "an array cannot be used as a scalar operand",
-            ));
+            )),
+            Some(SemanticType::Union(_)) => Err(CompileError::new(
+                expression.span,
+                "a union cannot be used as a scalar operand; narrow it first",
+            )),
+            None => Ok(()),
         }
-        Ok(())
     }
 
     /// Returns the scalar type of an expression after enforcing its scalar contract.
@@ -215,8 +250,8 @@ impl Compiler<'_> {
         self.require_scalar_expression(expression)?;
         match expression.output {
             Some(SemanticType::Scalar(value_type)) => Ok(value_type),
-            Some(SemanticType::Array(_)) => {
-                unreachable!("require_scalar_expression rejects array semantic types")
+            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
+                unreachable!("require_scalar_expression rejects non-scalar types")
             }
             None => Err(CompileError::new(expression.span, no_value_message)),
         }
@@ -230,7 +265,10 @@ impl Compiler<'_> {
     ) -> Result<crate::semantic::TypeId, CompileError> {
         match expression.output {
             Some(SemanticType::Scalar(value_type)) => Ok(value_type.base),
-            Some(SemanticType::Array(array_type)) => Ok(array_type.element.base),
+            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => Err(CompileError::new(
+                expression.span,
+                "a container or union has no scalar overload type",
+            )),
             None => Err(CompileError::new(expression.span, no_value_message)),
         }
     }
@@ -266,10 +304,12 @@ impl Compiler<'_> {
         arguments: &[TypedExpression],
         span: crate::syntax::Span,
     ) -> Result<(), CompileError> {
-        if arguments
-            .iter()
-            .all(|argument| argument.array_type().is_none())
-        {
+        if arguments.iter().all(|argument| {
+            !argument
+                .output
+                .as_ref()
+                .is_some_and(Self::type_contains_array)
+        }) {
             return Ok(());
         }
         let descriptor = self
@@ -281,7 +321,12 @@ impl Compiler<'_> {
         }
         let container = arguments
             .iter()
-            .find(|argument| argument.array_type().is_some())
+            .find(|argument| {
+                argument
+                    .output
+                    .as_ref()
+                    .is_some_and(Self::type_contains_array)
+            })
             .expect("an array argument was found above");
         Err(CompileError::new(
             container.span,

@@ -1,12 +1,12 @@
 use crate::containers::array::ArrayValue;
 use crate::ir::{
     BindingId, LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock, TypedExpression,
-    TypedExpressionKind, TypedProgram, TypedRangePlan, TypedScalePlan, TypedScaleStep,
-    TypedStatement,
+    TypedExpressionKind, TypedOpenBinaryDispatch, TypedProgram, TypedRangePlan, TypedScalePlan,
+    TypedScaleStep, TypedStatement,
 };
 use crate::semantic::{
-    ArrayElementMode, ArrayEndOperation, ArrayType, BinaryOperator, CoreError, Registry,
-    ResolvedSubtypeConversion, Scale, SemanticType, SubtypeBinaryRule, SubtypeDescriptor,
+    ArrayEndOperation, ArrayType, BinaryOperator, CoreError, Registry, ResolvedSubtypeConversion,
+    ScalarRepresentation, Scale, SemanticType, SubtypeBinaryRule, SubtypeDescriptor,
     SubtypeRelativeRule, TypeDescriptor, Value, ValueType,
 };
 use crate::syntax::Span;
@@ -14,6 +14,111 @@ use crate::syntax::Span;
 use super::*;
 
 const SPAN: Span = Span { start: 0, end: 0 };
+
+/// Verifies a genuinely open operator site resolves once and retains its plan.
+#[test]
+fn open_binary_dispatch_caches_runtime_identity_pairs() {
+    let mut registry = Registry::new();
+    crate::semantic::register_all(&mut registry).unwrap();
+    let integer = registry.default_integer().unwrap();
+    let dispatch = TypedOpenBinaryDispatch::default();
+    let expression = TypedExpression {
+        output: None,
+        kind: TypedExpressionKind::OpenBinary {
+            operator: BinaryOperator::Addition,
+            dispatch: dispatch.clone(),
+            left_operand: Box::new(TypedExpression {
+                output: Some(SemanticType::Scalar(ValueType::plain(integer))),
+                kind: TypedExpressionKind::Literal(registry.parse_numeric("20", None).unwrap()),
+                span: SPAN,
+            }),
+            right_operand: Box::new(TypedExpression {
+                output: Some(SemanticType::Scalar(ValueType::plain(integer))),
+                kind: TypedExpressionKind::Literal(registry.parse_numeric("22", None).unwrap()),
+                span: SPAN,
+            }),
+        },
+        span: SPAN,
+    };
+    let program = TypedProgram {
+        statements: vec![TypedStatement::VariableDeclaration {
+            name: "result".into(),
+            binding: BindingId(0),
+            slot: LocalVariableSlot(0),
+            mutable: true,
+            semantic_type: SemanticType::Scalar(ValueType::plain(integer)),
+            expression,
+            span: SPAN,
+        }],
+        bindings: Vec::new(),
+        local_slot_count: 1,
+    };
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    result.unwrap();
+    assert_eq!(
+        locals[0]
+            .as_ref()
+            .and_then(|value| value.downcast_ref::<i64>()),
+        Some(&42)
+    );
+    assert!(
+        dispatch
+            .get((ValueType::plain(integer), ValueType::plain(integer)))
+            .is_some()
+    );
+}
+
+/// Verifies a failed dynamic-to-typed boundary never stores a partial destination.
+#[test]
+fn array_boundary_failure_leaves_destination_uninitialized() {
+    let mut registry = Registry::new();
+    crate::semantic::register_all(&mut registry).unwrap();
+    let integer = registry.default_integer().unwrap();
+    let string = registry.default_string().unwrap();
+    let source_type = ArrayType::dynamic();
+    let destination_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(integer)),
+        ScalarRepresentation::AdaptiveSignedInteger,
+    );
+    let source = Value::new_array(
+        source_type.clone(),
+        ArrayValue::new(vec![
+            registry.parse_numeric("1", None).unwrap(),
+            Value::new(string, "two".to_string()),
+        ]),
+    );
+    let program = TypedProgram {
+        statements: vec![TypedStatement::VariableDeclaration {
+            name: "destination".into(),
+            binding: BindingId(0),
+            slot: LocalVariableSlot(0),
+            mutable: true,
+            semantic_type: SemanticType::array(destination_type.clone()),
+            expression: TypedExpression {
+                output: Some(SemanticType::array(destination_type.clone())),
+                kind: TypedExpressionKind::ArrayBoundary {
+                    array_type: destination_type,
+                    expression: Box::new(TypedExpression {
+                        output: Some(SemanticType::array(source_type)),
+                        kind: TypedExpressionKind::Literal(source),
+                        span: SPAN,
+                    }),
+                },
+                span: SPAN,
+            },
+            span: SPAN,
+        }],
+        bindings: Vec::new(),
+        local_slot_count: 1,
+    };
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    assert!(result.is_err());
+    assert!(locals[0].is_none());
+}
 
 fn parse_integer(raw_text: &str, type_id: crate::semantic::TypeId) -> Result<Value, CoreError> {
     let value = raw_text
@@ -151,7 +256,6 @@ fn missing_variable_expression(boolean_type: crate::semantic::TypeId) -> TypedEx
             name: "missing".into(),
             binding: BindingId(0),
             slot: LocalVariableSlot(0),
-            nullable: false,
             complete_type_domain: None,
         },
         span: SPAN,
@@ -461,7 +565,6 @@ fn true_if_condition_executes_its_body_and_releases_local_variables() {
                     name: "local".into(),
                     binding: BindingId(1),
                     slot: LocalVariableSlot(1),
-                    nullable: false,
                     complete_type_domain: None,
                 },
                 span: SPAN,
@@ -595,7 +698,6 @@ fn integer_variable(
             name: name.into(),
             binding: BindingId(slot.0),
             slot,
-            nullable: false,
             complete_type_domain: None,
         },
         span: SPAN,
@@ -744,23 +846,22 @@ fn optimized_for_body_clears_owned_slots_on_break_and_continue() {
 fn clearing_an_inner_array_alias_preserves_the_outer_value() {
     let (registry, integer, _) = array_method_registry();
     let element_type = ValueType::plain(integer);
-    let array_type = ArrayType {
-        element: element_type,
-        element_mode: ArrayElementMode::Exact,
-    };
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(element_type),
+        ScalarRepresentation::Exact,
+    );
     let alias = TypedStatement::VariableDeclaration {
         name: "alias".into(),
         binding: BindingId(1),
         slot: LocalVariableSlot(1),
         mutable: true,
-        semantic_type: SemanticType::Array(array_type),
+        semantic_type: SemanticType::array(array_type.clone()),
         expression: TypedExpression {
-            output: Some(SemanticType::Array(array_type)),
+            output: Some(SemanticType::array(array_type.clone())),
             kind: TypedExpressionKind::Variable {
                 name: "values0".into(),
                 binding: BindingId(0),
                 slot: LocalVariableSlot(0),
-                nullable: false,
                 complete_type_domain: None,
             },
             span: SPAN,
@@ -1113,15 +1214,15 @@ fn store_boundary_program(
                 binding: BindingId(0),
                 slot: LocalVariableSlot(0),
                 mutable: true,
-                semantic_type: SemanticType::Array(ArrayType {
-                    element: ValueType::plain(narrow),
-                    element_mode: ArrayElementMode::Exact,
-                }),
+                semantic_type: SemanticType::array(ArrayType::static_element(
+                    SemanticType::Scalar(ValueType::plain(narrow)),
+                    ScalarRepresentation::Exact,
+                )),
                 expression: TypedExpression {
-                    output: Some(SemanticType::Array(ArrayType {
-                        element: ValueType::plain(narrow),
-                        element_mode: ArrayElementMode::Exact,
-                    })),
+                    output: Some(SemanticType::array(ArrayType::static_element(
+                        SemanticType::Scalar(ValueType::plain(narrow)),
+                        ScalarRepresentation::Exact,
+                    ))),
                     kind: TypedExpressionKind::ArrayLiteral {
                         elements: vec![TypedExpression {
                             output: Some(SemanticType::Scalar(ValueType::plain(narrow))),
@@ -1196,6 +1297,43 @@ fn stored_elements(slot: &Option<Value>) -> &[Value] {
         .downcast_ref::<ArrayValue>()
         .expect("the local slot holds an array")
         .elements()
+}
+
+/// Verifies null checks inspect only concrete scalar identities, so a nullable
+/// array value is tested without asking an array to expose a scalar type ID.
+#[test]
+fn null_checks_accept_nullable_arrays_and_nested_union_elements() {
+    let mut registry = Registry::new();
+    crate::semantic::register_all(&mut registry).unwrap();
+    let syntax = crate::parser::parse(
+        "let maybe: int?[]? = [null, 2]\n\
+         let matrix: (int | string)[][] = [[1, 'one'], ['two', 2]]\n\
+         let result: int = 0\n\
+         if (maybe == null) { result = 1 } else { result = 2 }\n\
+         if (maybe != null) { print(maybe[0] == null) }\n\
+         let nested = matrix[0][1]\n",
+    )
+    .unwrap();
+    let program = crate::compile(&syntax, &registry).unwrap();
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    result.unwrap();
+    assert_eq!(
+        locals[2]
+            .as_ref()
+            .and_then(|value| value.downcast_ref::<i64>()),
+        Some(&2)
+    );
+    assert!(
+        locals[1]
+            .as_ref()
+            .and_then(|value| value.array_type())
+            .is_some_and(|array_type| matches!(
+                array_type.static_semantic_type(),
+                Some(SemanticType::Array(inner))
+                    if matches!(inner.static_semantic_type(), Some(SemanticType::Union(_)))
+            ))
+    );
 }
 
 /// Verifies a value that widened temporarily is normalized before storage.
@@ -1276,10 +1414,8 @@ fn conversion_store_program(
         }),
     };
     let target = ValueType::qualified(narrow, centimeter);
-    let array = ArrayType {
-        element: target,
-        element_mode: ArrayElementMode::Exact,
-    };
+    let array =
+        ArrayType::static_element(SemanticType::Scalar(target), ScalarRepresentation::Exact);
     let converted = TypedExpression {
         output: Some(SemanticType::Scalar(conversion.output)),
         kind: TypedExpressionKind::Convert {
@@ -1305,9 +1441,9 @@ fn conversion_store_program(
                 binding: BindingId(0),
                 slot: LocalVariableSlot(0),
                 mutable: true,
-                semantic_type: SemanticType::Array(array),
+                semantic_type: SemanticType::array(array.clone()),
                 expression: TypedExpression {
-                    output: Some(SemanticType::Array(array)),
+                    output: Some(SemanticType::array(array.clone())),
                     kind: TypedExpressionKind::ArrayLiteral {
                         elements: vec![TypedExpression {
                             output: Some(SemanticType::Scalar(target)),
@@ -1465,15 +1601,15 @@ fn array_declaration(
         binding: BindingId(slot),
         slot: LocalVariableSlot(slot),
         mutable: true,
-        semantic_type: SemanticType::Array(ArrayType {
-            element: element_type,
-            element_mode: ArrayElementMode::Exact,
-        }),
+        semantic_type: SemanticType::array(ArrayType::static_element(
+            SemanticType::Scalar(element_type),
+            ScalarRepresentation::Exact,
+        )),
         expression: TypedExpression {
-            output: Some(SemanticType::Array(ArrayType {
-                element: element_type,
-                element_mode: ArrayElementMode::Exact,
-            })),
+            output: Some(SemanticType::array(ArrayType::static_element(
+                SemanticType::Scalar(element_type),
+                ScalarRepresentation::Exact,
+            ))),
             kind: TypedExpressionKind::ArrayLiteral {
                 elements: elements
                     .into_iter()
@@ -1562,24 +1698,23 @@ fn removing_from_an_empty_array_produces_the_null_value() {
 fn empty_removals_keep_shared_array_payloads() {
     let (registry, integer, null) = array_method_registry();
     let element_type = ValueType::plain(integer);
-    let array_type = ArrayType {
-        element: element_type,
-        element_mode: ArrayElementMode::Exact,
-    };
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(element_type),
+        ScalarRepresentation::Exact,
+    );
     let alias_declaration =
         |source_slot: usize, alias_slot: usize| TypedStatement::VariableDeclaration {
             name: format!("alias{alias_slot}"),
             binding: BindingId(alias_slot),
             slot: LocalVariableSlot(alias_slot),
             mutable: true,
-            semantic_type: SemanticType::Array(array_type),
+            semantic_type: SemanticType::array(array_type.clone()),
             expression: TypedExpression {
-                output: Some(SemanticType::Array(array_type)),
+                output: Some(SemanticType::array(array_type.clone())),
                 kind: TypedExpressionKind::Variable {
                     name: format!("values{source_slot}"),
                     binding: BindingId(source_slot),
                     slot: LocalVariableSlot(source_slot),
-                    nullable: false,
                     complete_type_domain: None,
                 },
                 span: SPAN,
@@ -1639,20 +1774,19 @@ fn insertion_through_a_shared_binding_copies_the_array() {
                 binding: BindingId(1),
                 slot: LocalVariableSlot(1),
                 mutable: true,
-                semantic_type: SemanticType::Array(ArrayType {
-                    element: element_type,
-                    element_mode: ArrayElementMode::Exact,
-                }),
+                semantic_type: SemanticType::array(ArrayType::static_element(
+                    SemanticType::Scalar(element_type),
+                    ScalarRepresentation::Exact,
+                )),
                 expression: TypedExpression {
-                    output: Some(SemanticType::Array(ArrayType {
-                        element: element_type,
-                        element_mode: ArrayElementMode::Exact,
-                    })),
+                    output: Some(SemanticType::array(ArrayType::static_element(
+                        SemanticType::Scalar(element_type),
+                        ScalarRepresentation::Exact,
+                    ))),
                     kind: TypedExpressionKind::Variable {
                         name: "values0".to_string(),
                         binding: BindingId(0),
                         slot: LocalVariableSlot(0),
-                        nullable: false,
                         complete_type_domain: None,
                     },
                     span: SPAN,
@@ -1692,10 +1826,10 @@ fn insertion_through_a_shared_binding_copies_the_array() {
 fn indexed_assignment_copies_a_shared_array_without_changing_its_identity() {
     let (registry, integer, _) = array_method_registry();
     let element_type = ValueType::plain(integer);
-    let array_type = ArrayType {
-        element: element_type,
-        element_mode: ArrayElementMode::Exact,
-    };
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(element_type),
+        ScalarRepresentation::Exact,
+    );
     let program = TypedProgram {
         statements: vec![
             array_declaration(0, integer, vec![1, 2]),
@@ -1704,14 +1838,13 @@ fn indexed_assignment_copies_a_shared_array_without_changing_its_identity() {
                 binding: BindingId(1),
                 slot: LocalVariableSlot(1),
                 mutable: true,
-                semantic_type: SemanticType::Array(array_type),
+                semantic_type: SemanticType::array(array_type.clone()),
                 expression: TypedExpression {
-                    output: Some(SemanticType::Array(array_type)),
+                    output: Some(SemanticType::array(array_type.clone())),
                     kind: TypedExpressionKind::Variable {
                         name: "values0".into(),
                         binding: BindingId(0),
                         slot: LocalVariableSlot(0),
-                        nullable: false,
                         complete_type_domain: None,
                     },
                     span: SPAN,
@@ -1745,8 +1878,14 @@ fn indexed_assignment_copies_a_shared_array_without_changing_its_identity() {
     let (result, locals) = execute_collecting_locals(&program, &registry);
 
     result.unwrap();
-    assert_eq!(locals[0].as_ref().unwrap().array_type(), Some(array_type));
-    assert_eq!(locals[1].as_ref().unwrap().array_type(), Some(array_type));
+    assert_eq!(
+        locals[0].as_ref().unwrap().array_type(),
+        Some(array_type.clone())
+    );
+    assert_eq!(
+        locals[1].as_ref().unwrap().array_type(),
+        Some(array_type.clone())
+    );
     let original = stored_elements(&locals[0]);
     assert_eq!(original[0].downcast_ref::<i64>(), Some(&1));
     let alias = stored_elements(&locals[1]);
@@ -1758,17 +1897,16 @@ fn indexed_assignment_copies_a_shared_array_without_changing_its_identity() {
 fn indexed_read_returns_the_element_at_a_runtime_index() {
     let (registry, integer, _) = array_method_registry();
     let element_type = ValueType::plain(integer);
-    let array_type = ArrayType {
-        element: element_type,
-        element_mode: ArrayElementMode::Exact,
-    };
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(element_type),
+        ScalarRepresentation::Exact,
+    );
     let array_expression = TypedExpression {
-        output: Some(SemanticType::Array(array_type)),
+        output: Some(SemanticType::array(array_type.clone())),
         kind: TypedExpressionKind::Variable {
             name: "values".into(),
             binding: BindingId(0),
             slot: LocalVariableSlot(0),
-            nullable: false,
             complete_type_domain: None,
         },
         span: SPAN,
@@ -1779,7 +1917,6 @@ fn indexed_read_returns_the_element_at_a_runtime_index() {
             name: "index".into(),
             binding: BindingId(1),
             slot: LocalVariableSlot(1),
-            nullable: false,
             complete_type_domain: None,
         },
         span: SPAN,

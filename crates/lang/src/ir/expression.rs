@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use crate::semantic::{
     ArrayEndOperation, ArrayType, BinaryOperator, ComparisonOperator, FunctionId, IndexExtractor,
@@ -23,21 +24,9 @@ pub struct TypedExpression {
 impl TypedExpression {
     /// Returns this expression's array contract when it produces an array.
     pub fn array_type(&self) -> Option<ArrayType> {
-        match self.output {
-            Some(SemanticType::Array(array_type)) => Some(array_type),
+        match &self.output {
+            Some(SemanticType::Array(array_type)) => Some((**array_type).clone()),
             _ => None,
-        }
-    }
-
-    /// Reports whether this expression may produce the null value.
-    ///
-    /// A nullable binding yields null until a lexical proof narrows it, and a
-    /// removal from an array yields null when there is no element to remove.
-    pub fn is_nullable(&self) -> bool {
-        match &self.kind {
-            TypedExpressionKind::Variable { nullable, .. } => *nullable,
-            TypedExpressionKind::ArrayMethod { method, .. } => method.removes_element(),
-            _ => false,
         }
     }
 
@@ -66,8 +55,90 @@ impl TypedExpression {
             TypedExpressionKind::ElementStore { expression, .. } => {
                 expression.complete_type_domain()
             }
+            TypedExpressionKind::ArrayBoundary { .. } => None,
             _ => None,
         }
+    }
+
+    /// Reports a produced value whose concrete semantic type is intentionally open.
+    pub fn is_open_value(&self) -> bool {
+        matches!(
+            self.kind,
+            TypedExpressionKind::OpenBinary { .. }
+                | TypedExpressionKind::OpenNegation { .. }
+                | TypedExpressionKind::ElementAccess { .. } if self.output.is_none()
+        ) || matches!(
+            self.kind,
+            TypedExpressionKind::ArrayMethod { method, .. }
+                if method.removes_element() && self.output.is_none()
+        )
+    }
+}
+
+/// Number of runtime identity pairs retained at one open dispatch site.
+const OPEN_DISPATCH_CACHE_CAPACITY: usize = 4;
+
+type RuntimeTypePair = (ValueType, ValueType);
+type OpenBinaryEntries = Arc<Mutex<Vec<(RuntimeTypePair, TypedBinaryPlan)>>>;
+type OpenComparisonEntries = Arc<Mutex<Vec<(RuntimeTypePair, TypedComparisonPlan)>>>;
+
+/// One tiny per-site cache for genuinely open binary operations.
+#[derive(Clone, Default)]
+pub struct TypedOpenBinaryDispatch {
+    entries: OpenBinaryEntries,
+}
+
+impl TypedOpenBinaryDispatch {
+    /// Returns a cached plan for one runtime identity pair.
+    pub(crate) fn get(&self, key: (ValueType, ValueType)) -> Option<TypedBinaryPlan> {
+        self.entries
+            .lock()
+            .expect("open binary dispatch cache must not be poisoned")
+            .iter()
+            .find(|(candidate, _)| *candidate == key)
+            .map(|(_, plan)| plan.clone())
+    }
+
+    /// Adds one plan while keeping the cache allocation and lookup bounded.
+    pub(crate) fn insert(&self, key: (ValueType, ValueType), plan: TypedBinaryPlan) {
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("open binary dispatch cache must not be poisoned");
+        if entries.len() == OPEN_DISPATCH_CACHE_CAPACITY {
+            entries.remove(0);
+        }
+        entries.push((key, plan));
+    }
+}
+
+/// One tiny per-site cache for genuinely open comparisons.
+#[derive(Clone, Default)]
+pub struct TypedOpenComparisonDispatch {
+    entries: OpenComparisonEntries,
+}
+
+impl TypedOpenComparisonDispatch {
+    /// Returns a cached comparison plan for one runtime identity pair.
+    pub(crate) fn get(&self, key: (ValueType, ValueType)) -> Option<TypedComparisonPlan> {
+        self.entries
+            .lock()
+            .expect("open comparison dispatch cache must not be poisoned")
+            .iter()
+            .find(|(candidate, _)| *candidate == key)
+            .map(|(_, plan)| plan.clone())
+    }
+
+    /// Adds one plan while keeping the cache allocation and lookup bounded.
+    pub(crate) fn insert(&self, key: (ValueType, ValueType), plan: TypedComparisonPlan) {
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("open comparison dispatch cache must not be poisoned");
+        if entries.len() == OPEN_DISPATCH_CACHE_CAPACITY {
+            entries.remove(0);
+        }
+        entries.push((key, plan));
     }
 }
 
@@ -291,12 +362,16 @@ pub enum TypedExpressionKind {
         name: String,
         binding: BindingId,
         slot: LocalVariableSlot,
-        nullable: bool,
         /// Complete scalar identities the binding may hold at runtime.
         complete_type_domain: Option<Arc<CompleteTypeDomain>>,
     },
     /// Builds one contiguous array payload from evaluated element expressions.
     ArrayLiteral { elements: Vec<TypedExpression> },
+    /// Validates a dynamic array once and assigns the result a static contract.
+    ArrayBoundary {
+        array_type: ArrayType,
+        expression: Box<TypedExpression>,
+    },
     /// Applies one built-in end operation to the array stored in a local slot.
     ///
     /// The receiver is the array binding itself rather than a value, because the
@@ -361,15 +436,34 @@ pub enum TypedExpressionKind {
         left_operand: Box<TypedExpression>,
         right_operand: Box<TypedExpression>,
     },
+    /// Resolves and caches an operator from the operands' actual runtime identities.
+    OpenBinary {
+        operator: BinaryOperator,
+        dispatch: TypedOpenBinaryDispatch,
+        left_operand: Box<TypedExpression>,
+        right_operand: Box<TypedExpression>,
+    },
     /// Negates an operand through a complete-type dispatch table.
     DynamicNegation {
         dispatch: Box<TypedUnaryNegationDispatch>,
+        operand: Box<TypedExpression>,
+    },
+    /// Resolves and caches negation when the operand identity is genuinely open.
+    OpenNegation {
+        dispatch: TypedOpenBinaryDispatch,
         operand: Box<TypedExpression>,
     },
     /// Applies the relation selected by the operands' runtime complete types.
     DynamicComparison {
         operator: ComparisonOperator,
         dispatch: Box<TypedComparisonDispatch>,
+        left_operand: Box<TypedExpression>,
+        right_operand: Box<TypedExpression>,
+    },
+    /// Resolves and caches a comparison from the operands' runtime identities.
+    OpenComparison {
+        operator: ComparisonOperator,
+        dispatch: TypedOpenComparisonDispatch,
         left_operand: Box<TypedExpression>,
         right_operand: Box<TypedExpression>,
     },

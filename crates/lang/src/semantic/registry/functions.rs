@@ -126,6 +126,32 @@ impl Registry {
         })
     }
 
+    /// Resolves the generic one-value fallback without inventing a scalar type.
+    ///
+    /// Containers have no [`TypeId`], but a function such as `print` can still
+    /// explicitly accept one complete value through [`FunctionSignature::AnySingle`].
+    /// Keeping this path separate prevents an array from being mistaken for an
+    /// element scalar when exact overloads are registered alongside the fallback.
+    pub fn resolve_any_single_function(&self, name: &str) -> Result<FunctionId, CoreError> {
+        let candidates = self
+            .functions_by_name
+            .get(name)
+            .ok_or_else(|| CoreError::UnknownFunction(name.to_string()))?;
+        candidates
+            .iter()
+            .find(|id| {
+                matches!(
+                    self.functions[id.index].signature,
+                    FunctionSignature::AnySingle
+                )
+            })
+            .copied()
+            .ok_or_else(|| CoreError::NoMatchingFunction {
+                name: name.to_string(),
+                arguments: vec!["array".to_string()],
+            })
+    }
+
     /// Returns the descriptor identified by a previously resolved function ID.
     ///
     /// Returns [`CoreError::UnknownFunctionId`] when `id` was resolved by

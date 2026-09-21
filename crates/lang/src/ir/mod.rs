@@ -9,12 +9,13 @@ mod expression;
 mod program;
 mod statement;
 
-pub use binding::{BindingId, BindingMetadata, LocalVariableSlot};
+pub use binding::{BindingContract, BindingId, BindingMetadata, LocalVariableSlot};
 pub use expression::{
     CompleteTypeDomain, TypedBinaryDispatch, TypedBinaryExecutionPlan, TypedBinaryPlan,
     TypedComparisonDispatch, TypedComparisonPlan, TypedConversionDispatch, TypedConversionPlan,
-    TypedExpression, TypedExpressionKind, TypedIndexDispatch, TypedScalePlan, TypedScaleStep,
-    TypedUnaryNegationDispatch, TypedUnaryNegationPlan,
+    TypedExpression, TypedExpressionKind, TypedIndexDispatch, TypedOpenBinaryDispatch,
+    TypedOpenComparisonDispatch, TypedScalePlan, TypedScaleStep, TypedUnaryNegationDispatch,
+    TypedUnaryNegationPlan,
 };
 pub use program::TypedProgram;
 pub use statement::{TypedBlock, TypedRangePlan, TypedStatement};

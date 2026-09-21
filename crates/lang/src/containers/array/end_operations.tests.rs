@@ -1,5 +1,6 @@
 use crate::semantic::{
-    ArrayElementMode, ArrayEndOperation, ArrayType, CoreError, Registry, Value, ValueType,
+    ArrayEndOperation, ArrayType, CoreError, Registry, ScalarRepresentation, SemanticType, Value,
+    ValueType,
 };
 
 use super::*;
@@ -17,10 +18,10 @@ fn element(number: i64) -> Value {
 
 /// Creates the array identity used by end-operation tests.
 fn array_type() -> ArrayType {
-    ArrayType {
-        element: ValueType::plain(value_type()),
-        element_mode: ArrayElementMode::Exact,
-    }
+    ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(value_type())),
+        ScalarRepresentation::Exact,
+    )
 }
 
 /// Creates an array payload holding the given integer elements.

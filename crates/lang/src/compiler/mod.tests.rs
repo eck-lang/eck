@@ -1,13 +1,15 @@
 use crate::primitives::{BoolExtension, NullExtension, RegexExtension, StringExtension};
 use crate::primitives::{DecimalExtension, IntegerExtension};
 use crate::semantic::{
-    ComparisonOperator, CoreError, Extension, Registry, TypeDescriptor, Value, ValueType,
+    ComparisonOperator, CoreError, Extension, Registry, SemanticType, TypeDescriptor, Value,
+    ValueType,
 };
 use crate::syntax::{
     Block, ComparisonOperator as SyntaxComparisonOperator, ConfigurationEntry, ConfigurationValue,
     Expression, Program, Span, Statement,
 };
 
+use crate::ir::BindingContract;
 use crate::{CompileError, TypedExpression, TypedExpressionKind, TypedStatement, compile};
 
 const SPAN: Span = Span { start: 0, end: 1 };
@@ -495,7 +497,7 @@ fn nested_blocks_record_direct_slots_in_declaration_order() {
     );
 }
 
-/// Verifies mutable assignments retain their declaration identity and type.
+/// Verifies mutable unannotated assignments retain identity and use a dynamic contract.
 #[test]
 fn compiles_mutable_assignment_and_rejects_immutable_or_mismatched_updates() {
     let registry = conditional_registry();
@@ -528,6 +530,25 @@ fn compiles_mutable_assignment_and_rejects_immutable_or_mismatched_updates() {
     };
     assert_eq!(binding, assignment_binding);
     assert_eq!(typed.bindings.len(), 1);
+    assert!(matches!(
+        typed.bindings[0].contract,
+        BindingContract::Dynamic
+    ));
+
+    let dynamic_registry = nullable_registry();
+    let dynamic_program = crate::parser::parse(
+        "let value = 1\nvalue = 'one'\nvalue = true\nvalue = null\nvalue = [1, 'two']\n",
+    )
+    .unwrap();
+    let dynamic = compile(&dynamic_program, &dynamic_registry).unwrap();
+    assert!(matches!(
+        dynamic.bindings[0].contract,
+        BindingContract::Dynamic
+    ));
+
+    let static_program = crate::parser::parse("let value: int = 1\nvalue = true\n").unwrap();
+    let static_error = compile_error(&static_program, &dynamic_registry);
+    assert!(static_error.message.contains("type mismatch"));
 
     let immutable_program = Program {
         statements: vec![
@@ -568,6 +589,37 @@ fn compiles_mutable_assignment_and_rejects_immutable_or_mismatched_updates() {
             .message
             .contains("binding `duplicate` is already declared in this scope")
     );
+}
+
+/// Verifies dynamic binding knowledge selects exact and finite execution classes.
+#[test]
+fn specializes_dynamic_binding_reads_from_flow_knowledge() {
+    let registry = nullable_registry();
+    let exact = crate::parser::parse("let value = 1\nvalue + 1\n").unwrap();
+    let exact = compile(&exact, &registry).unwrap();
+    let TypedStatement::Expression(exact_operation) = &exact.statements[1] else {
+        panic!("expected exact expression statement");
+    };
+    assert!(matches!(
+        exact_operation.kind,
+        TypedExpressionKind::Binary { .. }
+    ));
+
+    let finite = crate::parser::parse(
+        "let condition = true\n\
+         let value = 1\n\
+         if (condition) { value = 2.5 }\n\
+         value + 1\n",
+    )
+    .unwrap();
+    let finite = compile(&finite, &registry).unwrap();
+    let TypedStatement::Expression(finite_operation) = &finite.statements[3] else {
+        panic!("expected finite expression statement");
+    };
+    assert!(matches!(
+        finite_operation.kind,
+        TypedExpressionKind::DynamicBinary { .. }
+    ));
 }
 
 /// Verifies a scalar binding reports the dedicated array-assignment diagnostic.
@@ -984,7 +1036,12 @@ fn compiles_constrained_nullable_bindings() {
     .unwrap();
     let typed = compile(&program, &registry).unwrap();
     assert_eq!(typed.bindings.len(), 3);
-    assert!(typed.bindings.iter().all(|binding| binding.nullable));
+    assert!(
+        typed
+            .bindings
+            .iter()
+            .all(|binding| matches!(binding.semantic_type, SemanticType::Union(_)))
+    );
 }
 
 /// Verifies non-nullable declarations reject the null literal.
@@ -1002,20 +1059,17 @@ fn rejects_null_for_non_nullable_bindings() {
     );
 }
 
-/// Verifies nullable annotations do not expand into arbitrary registered unions.
+/// Verifies nullable lowering applies to every registered scalar type.
 #[test]
-fn rejects_unsupported_nullable_base_types() {
+fn accepts_nullable_registered_scalar_types() {
     let mut registry = nullable_registry();
     RegexExtension.register(&mut registry).unwrap();
-    let program = crate::parser::parse("let pattern: regex? = `/value/`\n").unwrap();
-    let error = compile(&program, &registry)
-        .err()
-        .expect("regex nullability must remain unsupported");
-    assert!(
-        error
-            .message
-            .contains("nullable types are currently limited")
-    );
+    let program = crate::parser::parse("let pattern: regex? = /value/\n").unwrap();
+    let typed = compile(&program, &registry).expect("regex nullability is structural");
+    assert!(matches!(
+        typed.bindings.first().map(|binding| &binding.semantic_type),
+        Some(SemanticType::Union(_))
+    ));
 }
 
 /// Verifies direct inequality with null narrows only the true branch.

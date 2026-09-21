@@ -3,8 +3,7 @@
 //! This module is the single owner of the array payload and its storage, the
 //! element contract a value crosses into storage through, the end operations,
 //! element access, and the formatter installed by [`ArrayExtension`]. The array
-//! vocabulary itself ([`ArrayType`] and [`ArrayElementMode`]) stays in
-//! `semantic`, because a `Value` carries its own array identity.
+//! vocabulary itself ([`ArrayType`] and [`ArrayElementContract`]).
 
 pub(crate) mod compiler;
 mod contract;
@@ -12,11 +11,12 @@ mod end_operations;
 mod formatting;
 mod runtime;
 mod storage;
+mod types;
 mod value;
 
-pub use crate::semantic::{ArrayElementMode, ArrayEndOperation, ArrayType};
 pub use contract::{apply_element_contract, element_crosses_unchanged};
 pub use end_operations::{apply_end_operation, element_at, set_element};
+pub use types::{ArrayElementContract, ArrayEndOperation, ArrayType, StaticArrayElementContract};
 pub use value::ArrayValue;
 
 use crate::semantic::{ArrayValueFormatter, CoreError, Extension, Registry};
