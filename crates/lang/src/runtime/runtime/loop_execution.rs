@@ -2,22 +2,25 @@ use std::collections::{HashMap, HashSet};
 
 use super::Runtime;
 use crate::RuntimeError;
+use crate::containers::array::ArrayValue;
 use crate::ir::{
     LocalVariableSlot, TypedBinaryExecutionPlan, TypedBlock, TypedExpression, TypedExpressionKind,
     TypedStatement,
 };
 use crate::semantic::{
-    BinaryOperatorDescriptor, ComparisonExecutor, ResolvedBinaryOperator, Value,
+    BinaryOperator, BinaryOperatorDescriptor, ComparisonExecutor, ResolvedBinaryOperator, Value,
 };
 
 /// Stores a linear execution plan for the hot portion of one range-loop body.
 ///
 /// Source semantics remain in the typed AST. This plan only represents
-/// statically plain binary expressions whose resolved operators cannot promote
-/// at runtime; every other statement remains an AST step.
+/// common local updates and statically plain binary expressions; every other
+/// statement remains an AST step.
 pub(super) struct LoopBodyExecutionPlan<'program> {
     steps: Vec<LoopBodyExecutionStep<'program>>,
     owned_slots: Box<[LocalVariableSlot]>,
+    pub(super) changes_configuration: bool,
+    pub(super) range_slot_is_used: bool,
     pub(super) value_stack_capacity: usize,
 }
 
@@ -41,6 +44,17 @@ enum DirectConditionalOperand<'program> {
 
 /// Represents one stack-machine instruction for a direct loop-body expression.
 enum DirectLoopInstruction<'program> {
+    AddI64ImmediateToLocal {
+        slot: LocalVariableSlot,
+        immediate: i64,
+        fallback: &'program TypedStatement,
+    },
+    AddI64ImmediateToArrayElement {
+        slot: LocalVariableSlot,
+        index: usize,
+        immediate: i64,
+        fallback: &'program TypedStatement,
+    },
     LoadLiteral(&'program Value),
     LoadLocal {
         slot: LocalVariableSlot,
@@ -57,7 +71,7 @@ enum DirectLoopInstruction<'program> {
 }
 
 impl<'registry> Runtime<'registry> {
-    /// Compiles direct instructions for eligible contiguous declarations in a loop body.
+    /// Compiles direct instructions for eligible contiguous local stores in a loop body.
     pub(super) fn compile_loop_body_execution_plan<'program>(
         &self,
         range_slot: LocalVariableSlot,
@@ -68,6 +82,7 @@ impl<'registry> Runtime<'registry> {
         let mut value_stack_depth = 0;
         let mut value_stack_capacity = 0;
         let mut remaining_local_uses = self.count_loop_body_local_uses(body);
+        let range_slot_is_used = remaining_local_uses.contains_key(&range_slot);
         let mut reinitialized_slots = HashSet::from([range_slot]);
 
         for statement in &body.statements {
@@ -81,7 +96,7 @@ impl<'registry> Runtime<'registry> {
                 steps.push(conditional);
                 continue;
             }
-            let Some(instructions) = self.compile_direct_declaration(
+            let Some(instructions) = self.compile_direct_local_store(
                 statement,
                 &mut remaining_local_uses,
                 &reinitialized_slots,
@@ -96,12 +111,16 @@ impl<'registry> Runtime<'registry> {
                 steps.push(LoopBodyExecutionStep::Statement(statement));
                 continue;
             };
-            if let TypedStatement::VariableDeclaration { slot, .. } = statement {
+            if let TypedStatement::VariableDeclaration { slot, .. }
+            | TypedStatement::Assignment { slot, .. } = statement
+            {
                 reinitialized_slots.insert(*slot);
             }
 
             for instruction in instructions {
                 match instruction {
+                    DirectLoopInstruction::AddI64ImmediateToLocal { .. }
+                    | DirectLoopInstruction::AddI64ImmediateToArrayElement { .. } => {}
                     DirectLoopInstruction::LoadLiteral(_)
                     | DirectLoopInstruction::LoadLocal { .. } => {
                         value_stack_depth += 1;
@@ -122,22 +141,75 @@ impl<'registry> Runtime<'registry> {
         Ok(LoopBodyExecutionPlan {
             steps,
             owned_slots: body.owned_slots.clone(),
+            changes_configuration: body
+                .statements
+                .iter()
+                .any(Self::statement_changes_configuration),
+            range_slot_is_used,
             value_stack_capacity,
         })
     }
 
-    /// Lowers one statically plain variable declaration into direct stack instructions.
-    fn compile_direct_declaration<'program>(
+    /// Reports whether one statement can change runtime result configuration.
+    fn statement_changes_configuration(statement: &TypedStatement) -> bool {
+        match statement {
+            TypedStatement::Configuration { .. } => true,
+            TypedStatement::Block(body)
+            | TypedStatement::While { body, .. }
+            | TypedStatement::For { body, .. } => body
+                .statements
+                .iter()
+                .any(Self::statement_changes_configuration),
+            TypedStatement::If {
+                body, else_body, ..
+            } => {
+                body.statements
+                    .iter()
+                    .any(Self::statement_changes_configuration)
+                    || else_body.as_ref().is_some_and(|body| {
+                        body.statements
+                            .iter()
+                            .any(Self::statement_changes_configuration)
+                    })
+            }
+            TypedStatement::VariableDeclaration { .. }
+            | TypedStatement::Assignment { .. }
+            | TypedStatement::IndexedAssignment { .. }
+            | TypedStatement::Break { .. }
+            | TypedStatement::Continue { .. }
+            | TypedStatement::Expression(_) => false,
+        }
+    }
+
+    /// Lowers one eligible declaration or assignment into direct instructions.
+    fn compile_direct_local_store<'program>(
         &self,
         statement: &'program TypedStatement,
         remaining_local_uses: &mut HashMap<LocalVariableSlot, usize>,
         reinitialized_slots: &HashSet<LocalVariableSlot>,
     ) -> Result<Option<Vec<DirectLoopInstruction<'program>>>, RuntimeError> {
-        let TypedStatement::VariableDeclaration {
-            slot, expression, ..
-        } = statement
-        else {
-            return Ok(None);
+        if let Some(instruction) = self.compile_i64_immediate_array_assignment(statement)? {
+            return Ok(Some(vec![instruction]));
+        }
+        if let Some(instruction) = self.compile_i64_immediate_assignment(statement)? {
+            return Ok(Some(vec![instruction]));
+        }
+        let (slot, expression, is_assignment) = match statement {
+            TypedStatement::VariableDeclaration {
+                slot, expression, ..
+            } => (*slot, expression, false),
+            TypedStatement::Assignment {
+                slot, expression, ..
+            } => (*slot, expression, true),
+            _ => return Ok(None),
+        };
+        let mut consumable_slots;
+        let reinitialized_slots = if is_assignment {
+            consumable_slots = reinitialized_slots.clone();
+            consumable_slots.insert(slot);
+            &consumable_slots
+        } else {
+            reinitialized_slots
         };
         let mut instructions = Vec::new();
         let initial_remaining_local_uses = remaining_local_uses.clone();
@@ -150,8 +222,133 @@ impl<'registry> Runtime<'registry> {
             *remaining_local_uses = initial_remaining_local_uses;
             return Ok(None);
         }
-        instructions.push(DirectLoopInstruction::StoreLocal(*slot));
+        instructions.push(DirectLoopInstruction::StoreLocal(slot));
         Ok(Some(instructions))
+    }
+
+    /// Recognizes the stable dynamic integer increment used by hot scalar loops.
+    fn compile_i64_immediate_assignment<'program>(
+        &self,
+        statement: &'program TypedStatement,
+    ) -> Result<Option<DirectLoopInstruction<'program>>, RuntimeError> {
+        let TypedStatement::Assignment {
+            slot, expression, ..
+        } = statement
+        else {
+            return Ok(None);
+        };
+        if !self.configuration.uses_initial_values() {
+            return Ok(None);
+        }
+        let (left_operand, right_operand) = match &expression.kind {
+            TypedExpressionKind::OpenBinary {
+                operator: BinaryOperator::Addition,
+                left_operand,
+                right_operand,
+                ..
+            }
+            | TypedExpressionKind::DynamicBinary {
+                operator: BinaryOperator::Addition,
+                left_operand,
+                right_operand,
+                ..
+            } => (left_operand, right_operand),
+            _ => return Ok(None),
+        };
+        let TypedExpressionKind::Variable {
+            slot: operand_slot, ..
+        } = &left_operand.kind
+        else {
+            return Ok(None);
+        };
+        let TypedExpressionKind::Literal(immediate) = &right_operand.kind else {
+            return Ok(None);
+        };
+        let integer = self.registry.default_integer()?;
+        if *operand_slot != *slot
+            || immediate.value_type() != crate::semantic::ValueType::plain(integer)
+            || !self
+                .registry
+                .initial_result_transform_is_identity(integer)?
+        {
+            return Ok(None);
+        }
+        Ok(immediate.downcast_ref::<i64>().copied().map(|immediate| {
+            DirectLoopInstruction::AddI64ImmediateToLocal {
+                slot: *slot,
+                immediate,
+                fallback: statement,
+            }
+        }))
+    }
+
+    /// Recognizes an in-place integer increment at one constant array index.
+    fn compile_i64_immediate_array_assignment<'program>(
+        &self,
+        statement: &'program TypedStatement,
+    ) -> Result<Option<DirectLoopInstruction<'program>>, RuntimeError> {
+        let TypedStatement::IndexedAssignment {
+            slot,
+            constant_index: Some(index),
+            expression,
+            ..
+        } = statement
+        else {
+            return Ok(None);
+        };
+        if !self.configuration.uses_initial_values() {
+            return Ok(None);
+        }
+        let (left_operand, right_operand) = match &expression.kind {
+            TypedExpressionKind::OpenBinary {
+                operator: BinaryOperator::Addition,
+                left_operand,
+                right_operand,
+                ..
+            }
+            | TypedExpressionKind::DynamicBinary {
+                operator: BinaryOperator::Addition,
+                left_operand,
+                right_operand,
+                ..
+            } => (left_operand, right_operand),
+            _ => return Ok(None),
+        };
+        let TypedExpressionKind::ElementAccess {
+            array,
+            constant_index: Some(read_index),
+            ..
+        } = &left_operand.kind
+        else {
+            return Ok(None);
+        };
+        let TypedExpressionKind::Variable {
+            slot: array_slot, ..
+        } = &array.kind
+        else {
+            return Ok(None);
+        };
+        let TypedExpressionKind::Literal(immediate) = &right_operand.kind else {
+            return Ok(None);
+        };
+        let integer = self.registry.default_integer()?;
+        if *array_slot != *slot
+            || read_index != index
+            || immediate.value_type() != crate::semantic::ValueType::plain(integer)
+            || !self
+                .registry
+                .initial_result_transform_is_identity(integer)?
+        {
+            return Ok(None);
+        }
+        Ok(immediate.downcast_ref::<i64>().copied().map(|immediate| {
+            DirectLoopInstruction::AddI64ImmediateToArrayElement {
+                slot: *slot,
+                index: *index,
+                immediate,
+                fallback: statement,
+            }
+        }))
     }
 
     /// Lowers a plain comparison conditional while retaining its normal body execution.
@@ -550,6 +747,66 @@ impl<'registry> Runtime<'registry> {
         value_stack.clear();
         for instruction in instructions {
             match instruction {
+                DirectLoopInstruction::AddI64ImmediateToLocal {
+                    slot,
+                    immediate,
+                    fallback,
+                } => {
+                    if !self.configuration.uses_initial_values() {
+                        self.execute_statement(fallback)?;
+                        continue;
+                    }
+                    let integer = self.registry.default_integer()?;
+                    let value = self.local_values[slot.0]
+                        .as_mut()
+                        .expect("compiled loop local is initialized before use");
+                    let updated = if value.scalar_type()
+                        == Some(crate::semantic::ValueType::plain(integer))
+                    {
+                        value
+                            .downcast_mut::<i64>()
+                            .and_then(|value| value.checked_add(*immediate))
+                    } else {
+                        None
+                    };
+                    if let Some(updated) = updated {
+                        *value
+                            .downcast_mut::<i64>()
+                            .expect("checked integer local retains its payload type") = updated;
+                    } else {
+                        self.execute_statement(fallback)?;
+                    }
+                }
+                DirectLoopInstruction::AddI64ImmediateToArrayElement {
+                    slot,
+                    index,
+                    immediate,
+                    fallback,
+                } => {
+                    if !self.configuration.uses_initial_values() {
+                        self.execute_statement(fallback)?;
+                        continue;
+                    }
+                    let integer = self.registry.default_integer()?;
+                    let updated = self.local_values[slot.0]
+                        .as_mut()
+                        .filter(|array| array.is_uniquely_owned())
+                        .and_then(|array| ArrayValue::from_value_mut(array).ok())
+                        .and_then(|array| array.elements_mut().get_mut(*index))
+                        .filter(|element| {
+                            element.scalar_type()
+                                == Some(crate::semantic::ValueType::plain(integer))
+                        })
+                        .and_then(|element| {
+                            let updated = element.downcast_ref::<i64>()?.checked_add(*immediate)?;
+                            *element.downcast_mut::<i64>()? = updated;
+                            Some(())
+                        })
+                        .is_some();
+                    if !updated {
+                        self.execute_statement(fallback)?;
+                    }
+                }
                 DirectLoopInstruction::LoadLiteral(value) => value_stack.push((*value).clone()),
                 DirectLoopInstruction::LoadLocal { slot, consume } => {
                     let value = if *consume {
@@ -606,7 +863,9 @@ impl<'registry> Runtime<'registry> {
                         )?
                     }
                     .with_subtype(resolution.output.subtype);
-                    let value = if *skip_initial_configuration_transform {
+                    let value = if *skip_initial_configuration_transform
+                        && self.configuration.uses_initial_values()
+                    {
                         value
                     } else {
                         self.registry

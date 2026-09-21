@@ -164,9 +164,19 @@ impl<'registry> Runtime<'registry> {
                 .ok_or_else(|| RuntimeError::Message("for range end returned no value".into()))?;
             self.require_integer_bound(&start_value)?;
             self.require_integer_bound(&end_value)?;
-            let mut range_plan = self.activate_range_plan(typed_range_plan)?;
             let loop_body_plan = self.compile_loop_body_execution_plan(slot, body)?;
             let mut value_stack = Vec::with_capacity(loop_body_plan.value_stack_capacity);
+            if self.execute_native_i64_range(
+                slot,
+                &start_value,
+                &end_value,
+                typed_range_plan,
+                &loop_body_plan,
+                &mut value_stack,
+            )? {
+                return Ok(());
+            }
+            let mut range_plan = self.activate_range_plan(typed_range_plan)?;
             let mut current = start_value;
             loop {
                 if current.value_type() != range_plan.current_type {
@@ -175,7 +185,9 @@ impl<'registry> Runtime<'registry> {
                 if !self.range_continues(&current, &end_value, &range_plan)? {
                     break;
                 }
-                self.store_local_value(slot, current.clone());
+                if loop_body_plan.range_slot_is_used {
+                    self.store_local_value(slot, current.clone());
+                }
                 self.execute_loop_body(&loop_body_plan, &mut value_stack)?;
                 match self.loop_control.take() {
                     Some(LoopControl::Break) => break,
@@ -187,6 +199,49 @@ impl<'registry> Runtime<'registry> {
         })();
         self.clear_local_slots(std::slice::from_ref(&slot));
         result
+    }
+
+    /// Executes the ordinary default-integer range without generic value dispatch.
+    fn execute_native_i64_range(
+        &mut self,
+        slot: LocalVariableSlot,
+        start: &Value,
+        end: &Value,
+        typed_range_plan: &TypedRangePlan,
+        loop_body_plan: &loop_execution::LoopBodyExecutionPlan<'_>,
+        value_stack: &mut Vec<Value>,
+    ) -> Result<bool, RuntimeError> {
+        let integer = self.registry.default_integer()?;
+        let integer_type = ValueType::plain(integer);
+        if start.value_type() != integer_type
+            || end.value_type() != integer_type
+            || typed_range_plan.current_type != integer_type
+            || loop_body_plan.changes_configuration
+            || !self.configuration.uses_initial_values()
+            || !self
+                .registry
+                .initial_result_transform_is_identity(integer)?
+        {
+            return Ok(false);
+        }
+        let (Some(mut current), Some(end)) = (
+            start.downcast_ref::<i64>().copied(),
+            end.downcast_ref::<i64>().copied(),
+        ) else {
+            return Ok(false);
+        };
+        while current < end {
+            if loop_body_plan.range_slot_is_used {
+                self.store_local_value(slot, Value::new(integer, current));
+            }
+            self.execute_loop_body(loop_body_plan, value_stack)?;
+            match self.loop_control.take() {
+                Some(LoopControl::Break) => break,
+                Some(LoopControl::Continue) | None => {}
+            }
+            current += 1;
+        }
+        Ok(true)
     }
 
     /// Validates that a range bound is an unqualified value of an integral type.

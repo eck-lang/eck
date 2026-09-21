@@ -841,6 +841,162 @@ fn optimized_for_body_clears_owned_slots_on_break_and_continue() {
     }
 }
 
+/// Verifies the direct integer assignment retries the full operator on overflow.
+#[test]
+fn optimized_integer_assignment_preserves_overflow_errors_and_the_original_value() {
+    let (registry, integer) = integer_range_registry();
+    let value_slot = LocalVariableSlot(0);
+    let range_slot = LocalVariableSlot(1);
+    let program = TypedProgram {
+        statements: vec![
+            integer_declaration(value_slot.0, integer, i64::MAX),
+            TypedStatement::For {
+                variable: "index".into(),
+                binding: BindingId(range_slot.0),
+                slot: range_slot,
+                variable_type: ValueType::plain(integer),
+                start: integer_literal(integer, 0),
+                end: integer_literal(integer, 1),
+                range_plan: integer_range_plan(&registry, integer),
+                body: TypedBlock {
+                    statements: vec![TypedStatement::Assignment {
+                        name: "value".into(),
+                        binding: BindingId(value_slot.0),
+                        slot: value_slot,
+                        expression: TypedExpression {
+                            output: None,
+                            kind: TypedExpressionKind::OpenBinary {
+                                operator: BinaryOperator::Addition,
+                                dispatch: TypedOpenBinaryDispatch::default(),
+                                left_operand: Box::new(integer_variable(
+                                    integer, "value", value_slot,
+                                )),
+                                right_operand: Box::new(integer_literal(integer, 1)),
+                            },
+                            span: SPAN,
+                        },
+                        span: SPAN,
+                    }],
+                    owned_slots: Box::new([]),
+                    span: SPAN,
+                },
+                span: SPAN,
+            },
+        ],
+        local_slot_count: 2,
+        bindings: Vec::new(),
+    };
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    assert!(result.is_err());
+    assert_eq!(
+        locals[value_slot.0]
+            .as_ref()
+            .and_then(|value| value.downcast_ref::<i64>()),
+        Some(&i64::MAX)
+    );
+    assert!(locals[range_slot.0].is_none());
+}
+
+/// Verifies the direct array increment retains copy-on-write value semantics.
+#[test]
+fn optimized_array_increment_copies_a_shared_payload_before_mutation() {
+    let (registry, integer) = integer_range_registry();
+    let array_type = ArrayType::static_element(
+        SemanticType::Scalar(ValueType::plain(integer)),
+        ScalarRepresentation::Exact,
+    );
+    let source_slot = LocalVariableSlot(0);
+    let alias_slot = LocalVariableSlot(1);
+    let range_slot = LocalVariableSlot(2);
+    let source_expression = TypedExpression {
+        output: Some(SemanticType::array(array_type.clone())),
+        kind: TypedExpressionKind::Variable {
+            name: "source".into(),
+            binding: BindingId(source_slot.0),
+            slot: source_slot,
+            complete_type_domain: None,
+        },
+        span: SPAN,
+    };
+    let element_access = TypedExpression {
+        output: None,
+        kind: TypedExpressionKind::ElementAccess {
+            array: Box::new(source_expression.clone()),
+            index: Box::new(integer_literal(integer, 0)),
+            constant_index: Some(0),
+            index_extractor: extract_integer_index,
+            type_domain: None,
+            index_dispatch: None,
+        },
+        span: SPAN,
+    };
+    let program = TypedProgram {
+        statements: vec![
+            array_declaration(source_slot.0, integer, vec![1]),
+            TypedStatement::VariableDeclaration {
+                name: "alias".into(),
+                binding: BindingId(alias_slot.0),
+                slot: alias_slot,
+                mutable: true,
+                semantic_type: SemanticType::array(array_type),
+                expression: source_expression,
+                span: SPAN,
+            },
+            TypedStatement::For {
+                variable: "index".into(),
+                binding: BindingId(range_slot.0),
+                slot: range_slot,
+                variable_type: ValueType::plain(integer),
+                start: integer_literal(integer, 0),
+                end: integer_literal(integer, 1),
+                range_plan: integer_range_plan(&registry, integer),
+                body: TypedBlock {
+                    statements: vec![TypedStatement::IndexedAssignment {
+                        name: "source".into(),
+                        binding: BindingId(source_slot.0),
+                        slot: source_slot,
+                        index: integer_literal(integer, 0),
+                        constant_index: Some(0),
+                        index_extractor: extract_integer_index,
+                        index_dispatch: None,
+                        expression: TypedExpression {
+                            output: None,
+                            kind: TypedExpressionKind::OpenBinary {
+                                operator: BinaryOperator::Addition,
+                                dispatch: TypedOpenBinaryDispatch::default(),
+                                left_operand: Box::new(element_access),
+                                right_operand: Box::new(integer_literal(integer, 1)),
+                            },
+                            span: SPAN,
+                        },
+                        span: SPAN,
+                    }],
+                    owned_slots: Box::new([]),
+                    span: SPAN,
+                },
+                span: SPAN,
+            },
+        ],
+        local_slot_count: 3,
+        bindings: Vec::new(),
+    };
+
+    let (result, locals) = execute_collecting_locals(&program, &registry);
+
+    result.unwrap();
+    assert_eq!(
+        stored_elements(&locals[source_slot.0])[0].downcast_ref::<i64>(),
+        Some(&2)
+    );
+    assert_eq!(
+        stored_elements(&locals[alias_slot.0])[0].downcast_ref::<i64>(),
+        Some(&1)
+    );
+    assert!(locals[range_slot.0].is_none());
+}
+
 /// Verifies releasing an inner array alias leaves the outer value live for COW.
 #[test]
 fn clearing_an_inner_array_alias_preserves_the_outer_value() {
