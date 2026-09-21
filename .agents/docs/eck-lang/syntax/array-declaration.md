@@ -1,33 +1,39 @@
 # Array declaration syntax
 
-Declare arrays with square brackets and use `[]` after a type annotation to
-constrain their element type:
+Arrays are built-in containers. They are neither primitive scalar values nor
+standard-library values. Declare them with square brackets and use `[]` after a
+type annotation to constrain their element type:
 
 ```eck
 let numbers: int[] = [1, 2, 3]
 let fixed_numbers: int64[] = [1, 2, 3]
 let names: string[] = ["alice", "bob"]
-let inferred = [1, 2, 3]
+let dynamic = [1, 2, 3]
 ```
 
-* An array contains values with the same declared base type.
-* When the array type annotation is omitted, its element type is inferred from
-  the initializer.
-* `int[]` uses the normal adaptive `int` semantics. Integer values may widen as
-  required without changing the declared array type.
+* An array element contract may be scalar, nullable, a union, or another
+  recursive array. `int[] | string[]` is a union of homogeneous arrays, while
+  `(int | string)[]` is one array with a union element contract.
+* When the array type annotation is omitted in a mutable dynamic context, the
+  array has a dynamic element contract. Its elements keep their concrete types,
+  and later insertions or indexed writes may use unrelated types.
+* `int[]` uses adaptive signed integer semantics with the widening progression
+  `int8 -> int16 -> int32 -> int64 -> int128 -> bigint`. Integer values may
+  widen as required without changing the declared array type.
 * Explicit-width integer arrays such as `int64[]` are fixed to that integer
-  width. A value that cannot be represented by the declared width is invalid.
-* An empty array requires an explicit element type because its type cannot be
-  inferred from its contents.
+  width. A value that cannot be represented exactly by the declared width is
+  invalid.
+* An empty unannotated array is valid and starts with a dynamic element contract.
 
-The physical storage a future `int[]` may use is a design question rather than
-part of the syntax contract; the intended direction is recorded in
+The physical storage is not part of the syntax contract. Current storage and
+future adaptive-layout proposals are recorded in
 [the adaptive integer array design note](../adaptive-integer-arrays.md).
-Fixed-width arrays keep their strict representation contract either way.
 
 ```eck
 let values: int[] = []
-let inferred = [] // Invalid: element type cannot be inferred.
+let dynamic = []
+dynamic->push(10)
+dynamic->push("hello")
 ```
 
 ## Element subtypes
@@ -99,7 +105,8 @@ The resulting elements are treated as:
 100mm
 ```
 
-A value whose subtype cannot be converted to the declared subtype is invalid:
+A value whose subtype cannot be converted exactly to the declared subtype is
+invalid:
 
 ```eck
 let sizes: int<mm>[] = [
@@ -129,6 +136,10 @@ unconstrained.
 
 `int64<mm>[]` constrains both the integer representation and the subtype.
 
+For fixed-width integer arrays, a unit conversion must prove exact
+representability before division or truncation. A fractional result is not
+silently truncated to fit the destination width.
+
 Unlike `int`, an explicit-width integer type does not widen when a value exceeds
 its representable range:
 
@@ -140,42 +151,59 @@ flexible[0] = 999999999999999999999999999999
 fixed[0] = 999999999999999999999999999999 // Invalid.
 ```
 
-## Type inference
+For a non-nullable element contract, nullable expressions cannot cross into an
+array element slot; narrow them first. A nullable element contract such as
+`int?[]` explicitly stores either an integer or the concrete `null` value.
+Likewise, `int[]?` is a nullable array binding and can be indexed after the
+existing null comparison proves that the array itself is present. Mutable
+arrays are invariant: an `int[]` is not assignable to `(int | string)[]`.
 
-An array literal with elements of the same complete type may infer that type:
+The complete precedence and alias rules are documented in
+[type expressions](type-expressions.md).
 
-```eck
-let sizes = [10mm, 20mm, 30mm]
-```
+## Recursive arrays
 
-The inferred type is:
-
-```eck
-int<mm>[]
-```
-
-When the elements share a base type but have different subtypes, the common base
-type is inferred and each element keeps its subtype:
+Array postfix syntax is recursive and may be repeated:
 
 ```eck
-let sizes = [10mm, 2cm, 3dm]
+let matrix: int[][] = [[1, 2], [3, 4]]
+let cube: int[][][] = [[[1]]]
+let mixed: (int | string)[][] = [[1, "one"]]
 ```
 
-The inferred array type is:
+Nested array values keep a concrete recursive `ArrayType` at runtime. The
+runtime does not carry a generic union identity or walk static union members.
+
+## Dynamic array literals
+
+An unannotated mutable array literal does not infer a lasting element contract:
 
 ```eck
-int[]
+let values = [1, 2, 3]
+values->push("hello")
+values->push(true)
+values->push(null)
 ```
 
-Elements that do not share a compatible base type cannot form an inferred
-array:
+Each element retains its concrete runtime identity. Strings that look numeric
+are never parsed implicitly:
 
 ```eck
-let values = [
-    10mm,
-    "hello"
-] // Invalid.
+let values = [1, "2", 3]
 ```
+
+Nested arrays are ordinary values and keep their own contracts. A typed array
+moved into a dynamic binding also keeps its static element contract.
+
+An explicit destination context constrains a literal directly:
+
+```eck
+let values: int[] = [1, 2, 3]
+```
+
+When a dynamic array crosses into a typed array binding, the runtime validates
+the complete value once when static proof is unavailable. A successful crossing
+creates a typed array value, so later accesses do not repeat the boundary check.
 
 ## Element access
 
@@ -212,11 +240,24 @@ let empty: int[] = []
 print(empty) // []
 ```
 
-Every element keeps the representation it was stored with, so its subtype
-suffix and its active configuration apply exactly as they do outside the
-array.
+Every element keeps the complete identity it was stored with: its actual base
+representation and subtype. Its subtype suffix and active configuration apply
+exactly as they do outside the array.
 
 ## End operations
 
 Adding and removing a value at either end of a mutable array is documented in
 [array end operations](array-end-operations.md).
+
+## Implementation boundary
+
+The following details are implementation notes, not additional source
+semantics. `eck-lang::containers::array` owns the canonical `ArrayType`,
+`ArrayElementContract`, payload, storage, compiler rules, runtime boundary, and
+formatter. `semantic` only re-exports the vocabulary needed by shared value and
+type infrastructure. Finite element dispatch preserves complete identities and
+uses dense compiler-planned candidates rather than textual lookup on hot paths.
+The array-owned flow state also preserves a conservative finite whole-array
+domain when exact slot positions are lost. A genuinely open scalar operation
+delegates through runtime identity to the Registry and caches the prepared plan
+at that operation site.

@@ -7,11 +7,12 @@ Read the relevant files before making changes:
 * `.agents/docs/repository.md` — repository-wide conventions including language
 * `.agents/docs/code-style.md` — naming and code-style conventions
 * `.agents/docs/commits.md` — commit message and commit workflow conventions
-* `.agents/docs/eck-lang/crate-structure.md` — common crate and operation layout
-* `.agents/docs/eck-lang/adaptive-integer-arrays.md` — intended direction for adaptive `int[]` storage and vectorized execution (design note, not current semantics)
+* `.agents/docs/eck-lang/crate-structure.md` — module ownership and operation layout
+* `.agents/docs/eck-lang/adaptive-integer-arrays.md` — current adaptive `int[]` storage contract and deferred vectorized execution design
 * `.agents/docs/eck-lang/use-cases.md` — language use-case test conventions
 * `.agents/docs/eck-lang/performance.md` — raw execution speed as the primary implementation goal
 * `.agents/docs/eck-lang/syntax/array-declaration.md` — array literals, element constraints, indexing, mutation, and rendering
+* `.agents/docs/eck-lang/syntax/type-expressions.md` — structural aliases, unions, recursive arrays, precedence, and nullable lowering
 * `.agents/docs/eck-lang/syntax/array-end-operations.md` — adding and removing values at either end of a mutable array, including the aliases and the empty-array contract
 * `.agents/docs/eck-lang/syntax/conditionals.md` — current `if`, `else if`, and `else` syntax, including mandatory condition parentheses
 * `.agents/docs/eck-lang/syntax/for.md` — current integer range `for` loop syntax and behavior

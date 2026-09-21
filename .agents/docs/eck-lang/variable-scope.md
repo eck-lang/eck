@@ -70,8 +70,7 @@ binding:
 x = 10 // error if `x` was never declared
 ```
 
-A `let` binding may be reassigned, but its declared or inferred type stays
-stable:
+A typed `let` binding may be reassigned only within its explicit contract:
 
 ```eck
 let value: int = 10
@@ -79,6 +78,21 @@ let value: int = 10
 value = 20    // valid
 value = "20"  // type error
 ```
+
+An unannotated mutable binding is different: it accepts every ECK value, while
+the compiler separately tracks the concrete type known at each program point:
+
+```eck
+let value = 10
+value = "20"  // valid; the current value is now a string
+```
+
+Control-flow joins combine current knowledge without changing the dynamic
+contract. Exact knowledge uses the ordinary monomorphic operation path; finite
+scalar alternatives use pre-resolved dense dispatch. Genuinely open scalar
+knowledge uses runtime identities and Registry resolution through a bounded
+per-site inline cache; it remains compiler knowledge and never becomes a
+runtime `any` payload or an assignment restriction.
 
 A `const` binding cannot be reassigned.
 
@@ -182,7 +196,8 @@ The following behavior must be covered:
 - assignment to an undeclared name;
 - assignment to `const`;
 - reassignment of `let`;
-- type-invalid reassignment;
+- type-invalid reassignment of an explicitly typed binding;
+- cross-type reassignment of an unannotated mutable binding;
 - branch-local variables not escaping;
 - loop-local iterator not escaping.
 
