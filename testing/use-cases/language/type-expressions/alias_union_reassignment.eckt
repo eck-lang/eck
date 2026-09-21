@@ -1,0 +1,24 @@
+# Union alias reassignment
+
+Verifies a mutable binding annotated with a union alias may successively store
+each member while a constant retains one concrete member of the same union.
+
+>>> source
+type Value = int | string | bool
+
+let value: Value = 10
+print(value)
+value = "ten"
+print(value)
+value = false
+print(value)
+const fixed: Value = "constant"
+print(fixed)
+
+<<< stdout
+10
+ten
+false
+constant
+
+<<< stderr

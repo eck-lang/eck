@@ -1,0 +1,29 @@
+# Primitive aliases on mutable and immutable bindings
+
+Verifies primitive and nullable aliases annotate both mutable `let` bindings
+and immutable `const` bindings without changing their concrete values.
+
+>>> source
+type Count = int
+type Label = string
+type Switch = bool
+type OptionalLabel = Label?
+
+let count: Count = 1
+count = 2
+const label: Label = "ready"
+const enabled: Switch = true
+const missing: OptionalLabel = null
+
+print(count)
+print(label)
+print(enabled)
+print(missing == null)
+
+<<< stdout
+2
+ready
+true
+true
+
+<<< stderr

@@ -1,0 +1,16 @@
+# Constant alias rejects a non-member
+
+Verifies an immutable binding annotated with a union alias rejects a boolean
+initializer outside the alias's integer and string members.
+
+>>> source
+type Identifier = int | string
+const identifier: Identifier = true
+
+<<< stdout
+
+<<< stderr
+eck: type mismatch: binding `identifier` expects `int64 | string`, expression produces `bool` at Span { start: 62, end: 66 }
+
+<<< exit
+1

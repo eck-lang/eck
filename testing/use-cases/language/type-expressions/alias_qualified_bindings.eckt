@@ -1,0 +1,20 @@
+# Qualified aliases on mutable and immutable bindings
+
+Verifies an alias preserves a scalar subtype contract across mutable
+reassignment and immutable initialization.
+
+>>> source
+type Millimeters = int<mm>
+
+let mutable_distance: Millimeters = 20mm
+mutable_distance = 30mm
+const fixed_distance: Millimeters = 40mm
+
+print(mutable_distance)
+print(fixed_distance)
+
+<<< stdout
+30mm
+40mm
+
+<<< stderr

@@ -1,0 +1,19 @@
+# Nested array alias on a constant binding
+
+Verifies a constant accepts composed aliases for union elements, rows, and a
+nested array while retaining ordinary indexing and rendering.
+
+>>> source
+type Cell = int | string
+type Row = Cell[]
+type Matrix = Row[]
+
+const matrix: Matrix = [[1, "one"], [2, "two"]]
+print(matrix)
+print(matrix[1][0])
+
+<<< stdout
+[[1, one], [2, two]]
+2
+
+<<< stderr
