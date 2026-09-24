@@ -1,0 +1,19 @@
+# Container map keys are rejected
+
+Verifies that an array cannot be used as a map key. Map keys must be scalar
+values with a stable complete identity.
+
+>>> source
+let values = {
+    [1]: 2
+}
+
+print(values)
+
+<<< stdout
+
+<<< stderr
+eck: map key must be a hashable scalar value at Span { start: 19, end: 22 }
+
+<<< exit
+1

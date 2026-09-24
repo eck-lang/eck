@@ -1,0 +1,23 @@
+# Dynamic map values keep their concrete identities
+
+Verifies that the current unannotated map contract accepts unrelated scalar
+value types through literals and later indexed assignment.
+
+>>> source
+let values = {
+    "count": 1
+}
+
+values["label"] = "ready"
+values["enabled"] = true
+
+print(values["count"])
+print(values["label"])
+print(values["enabled"])
+
+<<< stdout
+1
+ready
+true
+
+<<< stderr

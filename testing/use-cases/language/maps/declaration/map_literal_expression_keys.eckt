@@ -1,0 +1,23 @@
+# Map literals evaluate expression keys and preserve insertion order
+
+Verifies that map keys are expressions, entries are rendered in insertion
+order, and a later duplicate replaces the earlier value without moving the
+key.
+
+>>> source
+let offset = 1
+let values = {
+    offset: "first",
+    offset + 1: "second",
+    offset: "replacement"
+}
+
+print(values)
+
+<<< stdout
+{
+    1: "replacement",
+    2: "second"
+}
+
+<<< stderr

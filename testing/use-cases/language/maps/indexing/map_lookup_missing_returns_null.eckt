@@ -1,0 +1,18 @@
+# Missing map lookup returns null
+
+Verifies that square-bracket lookup returns the stored value for a present key
+and the concrete null value for a missing key.
+
+>>> source
+let values = {
+    "present": 7
+}
+
+print(values["present"])
+print(values["missing"])
+
+<<< stdout
+7
+null
+
+<<< stderr

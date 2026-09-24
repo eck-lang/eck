@@ -1,0 +1,19 @@
+# Null map keys are rejected
+
+Verifies that null cannot be used as a map key because map keys require a
+hashable scalar identity.
+
+>>> source
+let values = {
+    null: 1
+}
+
+print(values)
+
+<<< stdout
+
+<<< stderr
+eck: map key must be a hashable scalar value at Span { start: 19, end: 23 }
+
+<<< exit
+1

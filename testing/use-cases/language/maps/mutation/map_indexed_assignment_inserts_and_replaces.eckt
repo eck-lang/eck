@@ -1,0 +1,23 @@
+# Map indexed assignment inserts and replaces values
+
+Verifies that indexed assignment inserts a new key, replaces an existing key,
+and keeps the original key position when it replaces a value.
+
+>>> source
+let values = {
+    "first": 1,
+    "second": 2
+}
+
+values["second"] = 20
+values["third"] = 3
+print(values)
+
+<<< stdout
+{
+    "first": 1,
+    "second": 20,
+    "third": 3
+}
+
+<<< stderr
