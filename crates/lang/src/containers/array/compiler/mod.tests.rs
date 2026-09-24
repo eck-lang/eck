@@ -73,7 +73,10 @@ fn first_element_access(program: &TypedProgram) -> (Option<usize>, ValueType) {
                     .expect("element access produces a value")
                 {
                     SemanticType::Scalar(value_type) => *value_type,
-                    SemanticType::Array(_) | SemanticType::Union(_) => {
+                    SemanticType::Open
+                    | SemanticType::Array(_)
+                    | SemanticType::Map(_)
+                    | SemanticType::Union(_) => {
                         panic!("element access cannot produce a container or union")
                     }
                 },
@@ -382,7 +385,10 @@ fn drops_element_record_after_dynamic_write() {
     assert_eq!(
         match read.semantic_type {
             SemanticType::Scalar(value_type) => value_type.subtype,
-            SemanticType::Array(_) | SemanticType::Union(_) => {
+            SemanticType::Open
+            | SemanticType::Array(_)
+            | SemanticType::Map(_)
+            | SemanticType::Union(_) => {
                 panic!("an element read cannot be a container or union")
             }
         },
@@ -458,7 +464,10 @@ fn widens_adaptive_int_element_beyond_declared_width() {
         .expect("the element produces a value");
     let output = match output {
         SemanticType::Scalar(value_type) => value_type,
-        SemanticType::Array(_) | SemanticType::Union(_) => {
+        SemanticType::Open
+        | SemanticType::Array(_)
+        | SemanticType::Map(_)
+        | SemanticType::Union(_) => {
             panic!("an element store cannot produce a container or union")
         }
     };
@@ -1187,7 +1196,10 @@ fn distinguishes_insertion_and_removal_results() {
             .static_semantic_type()
             .expect("typed array element")
             .clone(),
-        SemanticType::Scalar(_) | SemanticType::Union(_) => {
+        SemanticType::Open
+        | SemanticType::Scalar(_)
+        | SemanticType::Map(_)
+        | SemanticType::Union(_) => {
             panic!("an array binding must have an array semantic type")
         }
     };
@@ -1277,7 +1289,10 @@ fn converts_an_inserted_element_to_the_declared_subtype() {
             .static_semantic_type()
             .expect("typed array element")
             .clone(),
-        SemanticType::Scalar(_) | SemanticType::Union(_) => {
+        SemanticType::Open
+        | SemanticType::Scalar(_)
+        | SemanticType::Map(_)
+        | SemanticType::Union(_) => {
             panic!("an array binding must have an array semantic type")
         }
     };

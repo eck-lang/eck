@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::semantic::{ArrayType, ValueType};
+use crate::semantic::{ArrayType, MapType, ValueType};
 
 /// Selects how a scalar value is represented when it crosses an array boundary.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -31,10 +31,14 @@ impl ScalarRepresentation {
 /// Describes the complete semantic shape of an expression or binding.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SemanticType {
+    /// Compiler knowledge is open; the runtime value still has a concrete identity.
+    Open,
     /// One scalar value with a base type and optional subtype.
     Scalar(ValueType),
     /// One recursively described array value.
     Array(Arc<ArrayType>),
+    /// One recursively describable associative container.
+    Map(Arc<MapType>),
     /// One canonical finite union of structural types.
     Union(Arc<[SemanticType]>),
 }
@@ -43,6 +47,11 @@ impl SemanticType {
     /// Builds an array semantic type from either an owned or shared contract.
     pub fn array(array_type: impl Into<Arc<ArrayType>>) -> Self {
         Self::Array(array_type.into())
+    }
+
+    /// Builds a map semantic type from its container contract.
+    pub fn map(map_type: impl Into<Arc<MapType>>) -> Self {
+        Self::Map(map_type.into())
     }
 
     /// Returns the concrete scalar identity when this type is scalar.
@@ -62,6 +71,9 @@ impl SemanticType {
                 member => flattened.push(member),
             }
         }
+        if flattened.contains(&Self::Open) {
+            return Self::Open;
+        }
         flattened.sort_by_key(Self::canonical_key);
         flattened.dedup();
         match flattened.len() {
@@ -74,8 +86,9 @@ impl SemanticType {
     /// Returns whether this type contains the given scalar identity.
     pub fn contains_scalar(&self, value_type: ValueType) -> bool {
         match self {
+            Self::Open => false,
             Self::Scalar(actual) => *actual == value_type,
-            Self::Array(_) => false,
+            Self::Array(_) | Self::Map(_) => false,
             Self::Union(members) => members
                 .iter()
                 .any(|member| member.contains_scalar(value_type)),
@@ -86,7 +99,7 @@ impl SemanticType {
     pub fn without_scalar(&self, value_type: ValueType) -> Option<Self> {
         match self {
             Self::Scalar(actual) if *actual == value_type => None,
-            Self::Scalar(_) | Self::Array(_) => Some(self.clone()),
+            Self::Open | Self::Scalar(_) | Self::Array(_) | Self::Map(_) => Some(self.clone()),
             Self::Union(members) => {
                 let remaining = members
                     .iter()
@@ -100,8 +113,10 @@ impl SemanticType {
     /// Returns the deterministic key used for canonical union ordering.
     fn canonical_key(&self) -> String {
         match self {
+            Self::Open => "open".into(),
             Self::Scalar(value_type) => format!("scalar:{value_type:?}"),
             Self::Array(array_type) => format!("array:{array_type:?}"),
+            Self::Map(map_type) => format!("map:{map_type:?}"),
             Self::Union(members) => format!("union:{members:?}"),
         }
     }
@@ -114,6 +129,8 @@ impl SemanticType {
 /// destination union accepts a source that fits at least one member.
 pub fn is_assignable(source: &SemanticType, destination: &SemanticType) -> bool {
     match (source, destination) {
+        (_, SemanticType::Open) => true,
+        (SemanticType::Open, _) => false,
         (SemanticType::Union(source_members), SemanticType::Union(destination_members)) => {
             source_members.iter().all(|source_member| {
                 destination_members
@@ -132,6 +149,7 @@ pub fn is_assignable(source: &SemanticType, destination: &SemanticType) -> bool 
                 && (destination.subtype.is_none() || source.subtype == destination.subtype)
         }
         (SemanticType::Array(source), SemanticType::Array(destination)) => source == destination,
+        (SemanticType::Map(source), SemanticType::Map(destination)) => source == destination,
         _ => false,
     }
 }

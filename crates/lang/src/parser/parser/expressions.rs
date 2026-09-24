@@ -254,6 +254,7 @@ impl Parser {
             TokenKind::Ident(name) => self.parse_identifier_expression(token.span, name),
             TokenKind::Frame => self.parse_frame_literal(token.span.start),
             TokenKind::LeftBracket => self.parse_array_literal(token.span.start),
+            TokenKind::LeftBrace => self.parse_map_literal(token.span.start),
             TokenKind::LeftParenthesis => {
                 let expression = self.parse_expression(0)?;
                 self.expect_simple(TokenKind::RightParenthesis)?;
@@ -284,6 +285,36 @@ impl Parser {
         let end = self.expect_simple(TokenKind::RightBracket)?.span.end;
         Ok(Expression::ArrayLiteral {
             elements,
+            span: Span { start, end },
+        })
+    }
+
+    /// Parses a brace-delimited map literal with expression keys and values.
+    fn parse_map_literal(&mut self, start: usize) -> Result<Expression, ParseError> {
+        self.skip_newlines();
+        let mut entries = Vec::new();
+        if !matches!(&self.peek().kind, TokenKind::RightBrace) {
+            loop {
+                let key = self.parse_expression(0)?;
+                self.skip_newlines();
+                self.expect_simple(TokenKind::Colon)?;
+                self.skip_newlines();
+                let value = self.parse_expression(0)?;
+                entries.push((key, value));
+                self.skip_newlines();
+                if !matches!(&self.peek().kind, TokenKind::Comma) {
+                    break;
+                }
+                self.advance();
+                self.skip_newlines();
+                if matches!(&self.peek().kind, TokenKind::RightBrace) {
+                    break;
+                }
+            }
+        }
+        let end = self.expect_simple(TokenKind::RightBrace)?.span.end;
+        Ok(Expression::MapLiteral {
+            entries,
             span: Span { start, end },
         })
     }

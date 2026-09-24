@@ -14,6 +14,41 @@ use crate::{CompileError, TypedExpression, TypedExpressionKind, TypedStatement, 
 
 const SPAN: Span = Span { start: 0, end: 1 };
 
+/// Ensures map indexing selects map IR rather than the positional array path.
+#[test]
+fn compiles_typed_map_keys_and_mutable_indexed_assignment() {
+    let registry = crate::semantic::default_registry().unwrap();
+    let source = "let values = {10: \"integer\", \"10\": \"string\"}\nvalues[10] = \"updated\"\nprint(values[\"10\"])\n";
+    let parsed = crate::parser::parse(source).unwrap();
+    let program = compile(&parsed, &registry).unwrap();
+    assert!(matches!(
+        &program.statements[0],
+        TypedStatement::VariableDeclaration { expression: TypedExpression { kind: TypedExpressionKind::MapLiteral { entries }, .. }, .. }
+            if entries.len() == 2
+    ));
+    assert!(matches!(
+        &program.statements[1],
+        TypedStatement::MapIndexedAssignment { .. }
+    ));
+    assert!(matches!(
+        &program.statements[2],
+        TypedStatement::Expression(TypedExpression { kind: TypedExpressionKind::Call { arguments, .. }, .. })
+            if matches!(arguments[0].kind, TypedExpressionKind::MapAccess { .. })
+    ));
+}
+
+/// Rejects collection keys before the runtime attempts to hash them.
+#[test]
+fn rejects_array_map_keys_during_compilation() {
+    let registry = crate::semantic::default_registry().unwrap();
+    let parsed = crate::parser::parse("let values = {[1]: 2}\n").unwrap();
+    let error = match compile(&parsed, &registry) {
+        Ok(_) => panic!("array key must be rejected"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("hashable scalar"));
+}
+
 fn parse_integer(raw_text: &str, type_id: crate::semantic::TypeId) -> Result<Value, CoreError> {
     Ok(Value::new(
         type_id,

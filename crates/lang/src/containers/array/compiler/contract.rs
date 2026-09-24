@@ -237,7 +237,10 @@ impl Compiler<'_> {
         self.validate_element_for_storage(&typed)?;
         let actual = match typed.output {
             Some(SemanticType::Scalar(actual)) => actual,
-            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
+            Some(SemanticType::Open)
+            | Some(SemanticType::Array(_))
+            | Some(SemanticType::Map(_))
+            | Some(SemanticType::Union(_)) => {
                 unreachable!("array elements are rejected before scalar matching")
             }
             None => {

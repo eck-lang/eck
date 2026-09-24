@@ -428,7 +428,10 @@ impl Compiler<'_> {
         );
         let actual = match typed_condition.output {
             Some(SemanticType::Scalar(actual)) => actual,
-            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
+            Some(SemanticType::Open)
+            | Some(SemanticType::Array(_))
+            | Some(SemanticType::Map(_))
+            | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects array semantic types")
             }
             None => {
@@ -528,7 +531,10 @@ impl Compiler<'_> {
                     {
                         resolved.representation
                     }
-                    SemanticType::Array(_) | SemanticType::Union(_) => ScalarRepresentation::Exact,
+                    SemanticType::Open
+                    | SemanticType::Array(_)
+                    | SemanticType::Map(_)
+                    | SemanticType::Union(_) => ScalarRepresentation::Exact,
                 };
                 Ok(DeclaredType {
                     semantic_type: SemanticType::Array(Arc::new(
@@ -591,7 +597,7 @@ impl Compiler<'_> {
                 .iter()
                 .flat_map(Self::array_members_for_type)
                 .collect(),
-            SemanticType::Scalar(_) => Vec::new(),
+            SemanticType::Open | SemanticType::Scalar(_) | SemanticType::Map(_) => Vec::new(),
         }
     }
 
@@ -612,7 +618,8 @@ impl Compiler<'_> {
     fn type_contains_array(semantic_type: &SemanticType) -> bool {
         match semantic_type {
             SemanticType::Array(_) => true,
-            SemanticType::Scalar(_) => false,
+            SemanticType::Map(_) => false,
+            SemanticType::Open | SemanticType::Scalar(_) => false,
             SemanticType::Union(members) => members.iter().any(Self::type_contains_array),
         }
     }
@@ -620,6 +627,7 @@ impl Compiler<'_> {
     /// Renders a structural semantic type with ECK source-level precedence.
     fn semantic_type_name(&self, semantic_type: &SemanticType) -> String {
         match semantic_type {
+            SemanticType::Open => "dynamic".into(),
             SemanticType::Scalar(value_type) => {
                 self.registry.value_type_name(*value_type).to_owned()
             }
@@ -633,6 +641,7 @@ impl Compiler<'_> {
                     _ => format!("{element}[]"),
                 }
             }
+            SemanticType::Map(_) => "map".into(),
             SemanticType::Union(members) => members
                 .iter()
                 .map(|member| self.semantic_type_name(member))
@@ -837,7 +846,10 @@ impl Compiler<'_> {
         };
         let value_type = match &target_type {
             SemanticType::Scalar(value_type) => Some(*value_type),
-            SemanticType::Array(_) | SemanticType::Union(_)
+            SemanticType::Open
+            | SemanticType::Array(_)
+            | SemanticType::Map(_)
+            | SemanticType::Union(_)
                 if !dynamic_binding && Self::type_contains_array(&target_type) =>
             {
                 return Err(CompileError::new(
@@ -935,6 +947,27 @@ impl Compiler<'_> {
                 span,
                 format!("cannot assign through immutable binding `{name}`"),
             ));
+        }
+        if matches!(
+            self.effective_variable_semantic_type(&variable),
+            SemanticType::Map(_)
+        ) {
+            let key = self.compile_expression(index, None)?;
+            self.require_map_key(&key, index.span())?;
+            let value = self.compile_expression(expression, None)?;
+            if value.output.is_none() && !value.is_open_value() {
+                return Err(CompileError::new(
+                    expression.span(),
+                    "map value must produce a value",
+                ));
+            }
+            return Ok(TypedStatement::MapIndexedAssignment {
+                name: name.to_owned(),
+                slot: variable.slot,
+                key,
+                expression: value,
+                span,
+            });
         }
         let array_type = match self.effective_variable_semantic_type(&variable) {
             SemanticType::Array(array_type) => (*array_type).clone(),

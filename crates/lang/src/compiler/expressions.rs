@@ -19,6 +19,26 @@ use super::Compiler;
 use super::helpers::{is_negative_integer_power, is_true_boolean_literal, with_span};
 
 impl Compiler<'_> {
+    /// Rejects a known unhashable key before map construction or lookup runs.
+    pub(crate) fn require_map_key(
+        &self,
+        expression: &TypedExpression,
+        span: crate::syntax::Span,
+    ) -> Result<(), CompileError> {
+        match &expression.output {
+            Some(SemanticType::Scalar(value_type))
+                if crate::containers::map::MapKey::supports_type(self.registry, *value_type) =>
+            {
+                Ok(())
+            }
+            Some(SemanticType::Open) | None if expression.is_open_value() => Ok(()),
+            _ => Err(CompileError::new(
+                span,
+                "map key must be a hashable scalar value",
+            )),
+        }
+    }
+
     /// Lowers one source expression into a typed expression with a resolved
     /// semantic type.
     ///
@@ -697,7 +717,7 @@ impl Compiler<'_> {
                 let has_structural_argument = typed_arguments.iter().any(|argument| {
                     argument.is_open_value()
                         || argument.output.as_ref().is_some_and(|semantic_type| {
-                            matches!(semantic_type, SemanticType::Union(_))
+                            matches!(semantic_type, SemanticType::Union(_) | SemanticType::Map(_))
                                 || Self::type_contains_array(semantic_type)
                         })
                 });
@@ -743,14 +763,56 @@ impl Compiler<'_> {
                 })
             }
             Expression::ArrayLiteral { .. } => self.compile_array_expression(expression, None),
+            Expression::MapLiteral { entries, span } => {
+                let mut typed_entries = Vec::with_capacity(entries.len());
+                for (key, value) in entries {
+                    let typed_key = self.compile_expression(key, None)?;
+                    self.require_map_key(&typed_key, key.span())?;
+                    let typed_value = self.compile_expression(value, None)?;
+                    if typed_value.output.is_none() && !typed_value.is_open_value() {
+                        return Err(CompileError::new(
+                            value.span(),
+                            "map value must produce a value",
+                        ));
+                    }
+                    typed_entries.push((typed_key, typed_value));
+                }
+                Ok(TypedExpression {
+                    output: Some(SemanticType::map(crate::semantic::MapType::dynamic())),
+                    kind: TypedExpressionKind::MapLiteral {
+                        entries: typed_entries,
+                    },
+                    span: *span,
+                })
+            }
             Expression::ElementAccess {
                 expression: array,
                 index,
                 span,
             } => {
                 let typed_array = self.compile_expression(array, None)?;
+                if matches!(typed_array.output, Some(SemanticType::Map(_))) {
+                    let typed_key = self.compile_expression(index, None)?;
+                    self.require_map_key(&typed_key, index.span())?;
+                    let missing = self
+                        .registry
+                        .parse_null("null", None)
+                        .map_err(|error| CompileError::core(*span, error))?;
+                    return Ok(TypedExpression {
+                        output: Some(SemanticType::Open),
+                        kind: TypedExpressionKind::MapAccess {
+                            map: Box::new(typed_array),
+                            key: Box::new(typed_key),
+                            missing,
+                        },
+                        span: *span,
+                    });
+                }
                 let array_types = self.array_types_for_access(&typed_array).ok_or_else(|| {
-                    CompileError::new(array.span(), "only an array can be indexed with `[]`")
+                    CompileError::new(
+                        array.span(),
+                        "only an array or map can be indexed with `[]`",
+                    )
                 })?;
                 let array_type = array_types.first().cloned();
                 let (typed_index, constant_index, index_extractor, index_dispatch) =

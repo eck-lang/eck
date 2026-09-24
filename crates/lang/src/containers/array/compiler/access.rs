@@ -29,7 +29,10 @@ impl Compiler<'_> {
             {
                 members.iter().filter_map(SemanticType::as_scalar).collect()
             }
-            SemanticType::Array(_) | SemanticType::Union(_) => {
+            SemanticType::Open
+            | SemanticType::Array(_)
+            | SemanticType::Map(_)
+            | SemanticType::Union(_) => {
                 return Some((semantic_type, None));
             }
         };
@@ -59,12 +62,15 @@ impl Compiler<'_> {
                     .iter()
                     .map(|member| match member {
                         SemanticType::Array(array_type) => Some((**array_type).clone()),
-                        SemanticType::Scalar(_) | SemanticType::Union(_) => None,
+                        SemanticType::Open
+                        | SemanticType::Scalar(_)
+                        | SemanticType::Map(_)
+                        | SemanticType::Union(_) => None,
                     })
                     .collect::<Option<Vec<_>>>()?;
                 (!array_types.is_empty()).then_some(array_types)
             }
-            SemanticType::Scalar(_) => None,
+            SemanticType::Open | SemanticType::Scalar(_) | SemanticType::Map(_) => None,
         }
     }
 
@@ -91,7 +97,10 @@ impl Compiler<'_> {
         self.require_scalar_expression(&typed)?;
         let index_type = match typed.output {
             Some(SemanticType::Scalar(index_type)) => index_type,
-            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
+            Some(SemanticType::Open)
+            | Some(SemanticType::Array(_))
+            | Some(SemanticType::Map(_))
+            | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects array semantic types")
             }
             None => {

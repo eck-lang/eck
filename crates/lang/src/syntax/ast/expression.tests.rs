@@ -51,6 +51,13 @@ fn every_expression_variant_returns_its_span() {
             }],
             span: expected_span,
         },
+        Expression::MapLiteral {
+            entries: vec![(
+                number_expression(expected_span),
+                number_expression(expected_span),
+            )],
+            span: expected_span,
+        },
         Expression::Unary {
             operator: UnaryOperator::Negation,
             operand: Box::new(number_expression(expected_span)),

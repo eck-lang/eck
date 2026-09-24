@@ -13,6 +13,7 @@ mod types;
 pub use crate::containers::array::{
     ArrayElementContract, ArrayEndOperation, ArrayType, StaticArrayElementContract,
 };
+pub use crate::containers::map::MapType;
 pub use crate::values::Value;
 pub use configuration::{
     ArrayValueFormatter, ConfigurationDescriptor, ConfigurationNormalizer, ConfigurationOverride,

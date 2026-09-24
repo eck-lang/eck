@@ -49,6 +49,11 @@ pub enum Expression {
         elements: Vec<Expression>,
         span: Span,
     },
+    /// A source map literal with expression keys and values.
+    MapLiteral {
+        entries: Vec<(Expression, Expression)>,
+        span: Span,
+    },
     /// Zero-based postfix access to one array element.
     ElementAccess {
         expression: Box<Expression>,
@@ -110,6 +115,7 @@ impl Expression {
             | Expression::FieldAccess { span, .. }
             | Expression::FrameLiteral { span, .. }
             | Expression::ArrayLiteral { span, .. }
+            | Expression::MapLiteral { span, .. }
             | Expression::ElementAccess { span, .. }
             | Expression::Unary { span, .. }
             | Expression::Binary { span, .. }

@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::semantic::{ArrayType, SemanticType, SubtypeId, TypeId, ValueType};
+use crate::semantic::{ArrayType, MapType, SemanticType, SubtypeId, TypeId, ValueType};
 
 /// Number of bytes reserved for one payload stored directly inside a [`Value`].
 const INLINE_PAYLOAD_SIZE: usize = 16;
@@ -143,6 +143,8 @@ enum ValueIdentity {
     Scalar(ValueType),
     /// A complete array element contract shared by value clones.
     Array(Arc<ArrayType>),
+    /// A complete map contract shared by value clones.
+    Map(Arc<MapType>),
 }
 
 /// One opaque runtime value.
@@ -175,12 +177,22 @@ impl Value {
         }
     }
 
+    /// Creates a map value with its associative container contract.
+    #[inline]
+    pub fn new_map<T: Any + Send + Sync>(map_type: MapType, value: T) -> Self {
+        Self {
+            identity: ValueIdentity::Map(Arc::new(map_type)),
+            payload: PayloadStorage::from_owned(value),
+        }
+    }
+
     /// Returns the complete semantic shape of this value.
     #[inline]
     pub fn semantic_type(&self) -> SemanticType {
         match &self.identity {
             ValueIdentity::Scalar(value_type) => SemanticType::Scalar(*value_type),
             ValueIdentity::Array(array_type) => SemanticType::Array(array_type.clone()),
+            ValueIdentity::Map(map_type) => SemanticType::Map(map_type.clone()),
         }
     }
 
@@ -189,7 +201,7 @@ impl Value {
     pub fn scalar_type(&self) -> Option<ValueType> {
         match self.identity {
             ValueIdentity::Scalar(value_type) => Some(value_type),
-            ValueIdentity::Array(_) => None,
+            ValueIdentity::Array(_) | ValueIdentity::Map(_) => None,
         }
     }
 
@@ -199,6 +211,16 @@ impl Value {
         match &self.identity {
             ValueIdentity::Scalar(_) => None,
             ValueIdentity::Array(array_type) => Some((**array_type).clone()),
+            ValueIdentity::Map(_) => None,
+        }
+    }
+
+    /// Returns this value's map contract when it is a map.
+    #[inline]
+    pub fn map_type(&self) -> Option<MapType> {
+        match &self.identity {
+            ValueIdentity::Map(map_type) => Some((**map_type).clone()),
+            _ => None,
         }
     }
 
@@ -236,7 +258,9 @@ impl Value {
     pub fn with_subtype(mut self, subtype_id: Option<SubtypeId>) -> Self {
         match &mut self.identity {
             ValueIdentity::Scalar(value_type) => value_type.subtype = subtype_id,
-            ValueIdentity::Array(_) => panic!("cannot qualify an array value"),
+            ValueIdentity::Array(_) | ValueIdentity::Map(_) => {
+                panic!("cannot qualify a container value")
+            }
         }
         self
     }
@@ -246,7 +270,9 @@ impl Value {
     fn scalar_identity(&self) -> ValueType {
         match self.identity {
             ValueIdentity::Scalar(value_type) => value_type,
-            ValueIdentity::Array(_) => panic!("array value has no scalar identity"),
+            ValueIdentity::Array(_) | ValueIdentity::Map(_) => {
+                panic!("container value has no scalar identity")
+            }
         }
     }
 

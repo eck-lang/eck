@@ -175,6 +175,7 @@ impl<'registry> Runtime<'registry> {
             TypedStatement::VariableDeclaration { .. }
             | TypedStatement::Assignment { .. }
             | TypedStatement::IndexedAssignment { .. }
+            | TypedStatement::MapIndexedAssignment { .. }
             | TypedStatement::Break { .. }
             | TypedStatement::Continue { .. }
             | TypedStatement::Expression(_) => false,
@@ -414,6 +415,8 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
             | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::MapLiteral { .. }
+            | TypedExpressionKind::MapAccess { .. }
             | TypedExpressionKind::ArrayBoundary { .. }
             | TypedExpressionKind::ArrayMethod { .. }
             | TypedExpressionKind::ElementStore { .. }
@@ -518,6 +521,8 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::Convert { .. }
             | TypedExpressionKind::Call { .. }
             | TypedExpressionKind::ArrayLiteral { .. }
+            | TypedExpressionKind::MapLiteral { .. }
+            | TypedExpressionKind::MapAccess { .. }
             | TypedExpressionKind::ArrayBoundary { .. }
             | TypedExpressionKind::ArrayMethod { .. }
             | TypedExpressionKind::ElementStore { .. }
@@ -596,6 +601,12 @@ impl<'registry> Runtime<'registry> {
                 index, expression, ..
             } => {
                 Self::count_expression_local_uses(index, local_uses);
+                Self::count_expression_local_uses(expression, local_uses);
+            }
+            TypedStatement::MapIndexedAssignment {
+                key, expression, ..
+            } => {
+                Self::count_expression_local_uses(key, local_uses);
                 Self::count_expression_local_uses(expression, local_uses);
             }
             TypedStatement::Break { .. } | TypedStatement::Continue { .. } => {}
@@ -681,6 +692,16 @@ impl<'registry> Runtime<'registry> {
                 for element in elements {
                     Self::count_expression_local_uses(element, local_uses);
                 }
+            }
+            TypedExpressionKind::MapLiteral { entries } => {
+                for (key, value) in entries {
+                    Self::count_expression_local_uses(key, local_uses);
+                    Self::count_expression_local_uses(value, local_uses);
+                }
+            }
+            TypedExpressionKind::MapAccess { map, key, .. } => {
+                Self::count_expression_local_uses(map, local_uses);
+                Self::count_expression_local_uses(key, local_uses);
             }
             TypedExpressionKind::ArrayMethod { arguments, .. } => {
                 for argument in arguments {

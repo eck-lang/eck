@@ -307,12 +307,19 @@ impl Registry {
                     actual: "array".into(),
                 });
             }
+            SemanticType::Map(_) => {
+                return Err(CoreError::UnexpectedBooleanValueType {
+                    expected: self.value_type_name(expected),
+                    actual: "map".into(),
+                });
+            }
             SemanticType::Union(_) => {
                 return Err(CoreError::UnexpectedBooleanValueType {
                     expected: self.value_type_name(expected),
                     actual: "union".into(),
                 });
             }
+            SemanticType::Open => unreachable!("runtime values have concrete identities"),
         };
         if actual != expected {
             return Err(CoreError::UnexpectedBooleanValueType {
@@ -459,6 +466,7 @@ impl Registry {
     /// or conversion failure.
     pub fn validate_value(&self, value: &Value) -> Result<(), CoreError> {
         match value.semantic_type() {
+            SemanticType::Open => unreachable!("runtime values have concrete identities"),
             SemanticType::Scalar(value_type) => {
                 self.type_descriptor(value_type.base)?;
                 if let Some(subtype_id) = value_type.subtype {
@@ -469,6 +477,7 @@ impl Registry {
             SemanticType::Array(array_type) => array_type
                 .static_semantic_type()
                 .map_or(Ok(()), |element| self.validate_semantic_type(element)),
+            SemanticType::Map(_) => Ok(()),
             SemanticType::Union(members) => members
                 .iter()
                 .try_for_each(|member| self.validate_semantic_type(member)),
@@ -478,6 +487,7 @@ impl Registry {
     /// Verifies that every scalar leaf in a recursive semantic type is registered.
     fn validate_semantic_type(&self, semantic_type: &SemanticType) -> Result<(), CoreError> {
         match semantic_type {
+            SemanticType::Open => Ok(()),
             SemanticType::Scalar(value_type) => {
                 self.type_descriptor(value_type.base)?;
                 if let Some(subtype_id) = value_type.subtype {
@@ -488,6 +498,7 @@ impl Registry {
             SemanticType::Array(array_type) => array_type
                 .static_semantic_type()
                 .map_or(Ok(()), |element| self.validate_semantic_type(element)),
+            SemanticType::Map(_) => Ok(()),
             SemanticType::Union(members) => members
                 .iter()
                 .try_for_each(|member| self.validate_semantic_type(member)),

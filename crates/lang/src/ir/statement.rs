@@ -68,6 +68,14 @@ pub enum TypedStatement {
         expression: TypedExpression,
         span: Span,
     },
+    /// Inserts or replaces one complete typed key in a mutable map binding.
+    MapIndexedAssignment {
+        name: String,
+        slot: LocalVariableSlot,
+        key: TypedExpression,
+        expression: TypedExpression,
+        span: Span,
+    },
     /// Executes a nested lexically scoped block.
     Block(TypedBlock),
     /// Executes one of two blocks based on a boolean condition.

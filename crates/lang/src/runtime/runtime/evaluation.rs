@@ -360,6 +360,10 @@ impl<'registry> Runtime<'registry> {
             TypedExpressionKind::ArrayLiteral { elements } => {
                 self.build_array_value(expression, elements)
             }
+            TypedExpressionKind::MapLiteral { entries } => self.build_map_value(entries),
+            TypedExpressionKind::MapAccess { map, key, missing } => {
+                self.read_map_value(map, key, missing)
+            }
             TypedExpressionKind::ElementStore {
                 element,
                 expression,

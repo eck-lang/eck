@@ -62,11 +62,15 @@ impl TypedExpression {
 
     /// Reports a produced value whose concrete semantic type is intentionally open.
     pub fn is_open_value(&self) -> bool {
+        if matches!(self.output, Some(SemanticType::Open)) {
+            return true;
+        }
         matches!(
             self.kind,
             TypedExpressionKind::OpenBinary { .. }
                 | TypedExpressionKind::OpenNegation { .. }
-                | TypedExpressionKind::ElementAccess { .. } if self.output.is_none()
+                | TypedExpressionKind::ElementAccess { .. }
+                | TypedExpressionKind::MapAccess { .. } if self.output.is_none()
         ) || matches!(
             self.kind,
             TypedExpressionKind::ArrayMethod { method, .. }
@@ -367,6 +371,16 @@ pub enum TypedExpressionKind {
     },
     /// Builds one contiguous array payload from evaluated element expressions.
     ArrayLiteral { elements: Vec<TypedExpression> },
+    /// Builds a map by evaluating each key before its value in source order.
+    MapLiteral {
+        entries: Vec<(TypedExpression, TypedExpression)>,
+    },
+    /// Looks up one complete typed key, yielding the prepared null when absent.
+    MapAccess {
+        map: Box<TypedExpression>,
+        key: Box<TypedExpression>,
+        missing: Value,
+    },
     /// Validates a dynamic array once and assigns the result a static contract.
     ArrayBoundary {
         array_type: ArrayType,

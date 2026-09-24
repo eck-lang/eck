@@ -229,9 +229,17 @@ impl Compiler<'_> {
         self.require_non_nullable_expression(expression)?;
         match expression.output {
             Some(SemanticType::Scalar(_)) => Ok(()),
+            Some(SemanticType::Open) => Err(CompileError::new(
+                expression.span,
+                "an open value cannot be used as a fixed scalar operand",
+            )),
             Some(SemanticType::Array(_)) => Err(CompileError::new(
                 expression.span,
                 "an array cannot be used as a scalar operand",
+            )),
+            Some(SemanticType::Map(_)) => Err(CompileError::new(
+                expression.span,
+                "a map cannot be used as a scalar operand",
             )),
             Some(SemanticType::Union(_)) => Err(CompileError::new(
                 expression.span,
@@ -250,7 +258,10 @@ impl Compiler<'_> {
         self.require_scalar_expression(expression)?;
         match expression.output {
             Some(SemanticType::Scalar(value_type)) => Ok(value_type),
-            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => {
+            Some(SemanticType::Open)
+            | Some(SemanticType::Array(_))
+            | Some(SemanticType::Map(_))
+            | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects non-scalar types")
             }
             None => Err(CompileError::new(expression.span, no_value_message)),
@@ -265,7 +276,10 @@ impl Compiler<'_> {
     ) -> Result<crate::semantic::TypeId, CompileError> {
         match expression.output {
             Some(SemanticType::Scalar(value_type)) => Ok(value_type.base),
-            Some(SemanticType::Array(_)) | Some(SemanticType::Union(_)) => Err(CompileError::new(
+            Some(SemanticType::Open)
+            | Some(SemanticType::Array(_))
+            | Some(SemanticType::Map(_))
+            | Some(SemanticType::Union(_)) => Err(CompileError::new(
                 expression.span,
                 "a container or union has no scalar overload type",
             )),

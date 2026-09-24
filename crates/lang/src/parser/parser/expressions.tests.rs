@@ -1,10 +1,72 @@
 use super::*;
 use crate::parser::lexer::lex;
-use crate::syntax::{BinaryOperator, ComparisonOperator, Expression, LogicalOperator};
+use crate::syntax::{BinaryOperator, ComparisonOperator, Expression, LogicalOperator, Statement};
 
 fn parse_expression(source: &str) -> Expression {
     let mut parser = Parser::new(lex(source).unwrap());
     parser.parse_expression(0).unwrap()
+}
+
+/// Verifies expression keys, multiline entries, and a trailing comma.
+#[test]
+fn parses_map_literals_with_expression_keys_and_trailing_commas() {
+    let expression = parse_expression("{\n  \"name\": 1 + offset,\n  index + 1: values[0],\n}");
+
+    let Expression::MapLiteral { entries, span } = expression else {
+        panic!("expected a map literal");
+    };
+    assert_eq!(entries.len(), 2);
+    assert!(matches!(
+        &entries[0].0,
+        Expression::String { value, .. } if value == "name"
+    ));
+    assert!(matches!(
+        &entries[0].1,
+        Expression::Binary {
+            operator: BinaryOperator::Addition,
+            ..
+        }
+    ));
+    assert!(matches!(
+        &entries[1].0,
+        Expression::Binary {
+            operator: BinaryOperator::Addition,
+            ..
+        }
+    ));
+    assert!(matches!(&entries[1].1, Expression::ElementAccess { .. }));
+    assert_eq!(span.start, 0);
+    assert_eq!(span.end, 49);
+}
+
+/// Verifies that a map literal may contain no entries.
+#[test]
+fn parses_empty_map_literals() {
+    assert!(matches!(
+        parse_expression("{}"),
+        Expression::MapLiteral { entries, .. } if entries.is_empty()
+    ));
+}
+
+/// Verifies that map literals require an explicit colon after each key.
+#[test]
+fn rejects_identifier_shorthand_in_map_literals() {
+    let mut parser = Parser::new(lex("{name}").unwrap());
+    let error = parser.parse_expression(0).unwrap_err();
+
+    assert!(error.message.contains("expected Colon"));
+}
+
+/// Verifies that a statement beginning with a brace remains a block.
+#[test]
+fn keeps_a_leading_brace_statement_as_a_block() {
+    let mut parser = Parser::new(lex("{ print(1) }").unwrap());
+    let program = parser.parse_program().unwrap();
+
+    assert!(matches!(
+        program.statements.as_slice(),
+        [Statement::Block(_)]
+    ));
 }
 
 #[test]

@@ -92,6 +92,14 @@ impl<'registry> Runtime<'registry> {
                 index_dispatch.as_ref(),
                 expression,
             )?,
+            TypedStatement::MapIndexedAssignment {
+                slot,
+                key,
+                expression,
+                ..
+            } => {
+                self.write_map_value(*slot, key, expression)?;
+            }
             TypedStatement::Block(block) => self.execute_block(block)?,
             TypedStatement::If {
                 condition,

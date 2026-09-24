@@ -148,7 +148,10 @@ impl Registry {
         value: &Value,
         configuration: &RuntimeConfiguration,
     ) -> Result<Value, CoreError> {
-        if matches!(value.semantic_type(), SemanticType::Array(_)) {
+        if matches!(
+            value.semantic_type(),
+            SemanticType::Array(_) | SemanticType::Map(_)
+        ) {
             return Ok(value.clone());
         }
         match self.type_configuration(value.type_id()) {
@@ -173,7 +176,10 @@ impl Registry {
         value: Value,
         configuration: &RuntimeConfiguration,
     ) -> Result<Value, CoreError> {
-        if matches!(value.semantic_type(), SemanticType::Array(_)) {
+        if matches!(
+            value.semantic_type(),
+            SemanticType::Array(_) | SemanticType::Map(_)
+        ) {
             return Ok(value);
         }
         match self.type_configuration(value.type_id()) {
@@ -209,6 +215,9 @@ impl Registry {
                 .array_formatter
                 .ok_or(CoreError::MissingArrayFormatter)?;
             return formatter(self, value, (*array_type).clone(), configuration);
+        }
+        if matches!(value.semantic_type(), SemanticType::Map(_)) {
+            return crate::containers::map::format_value(self, value, configuration);
         }
         let formatted = match self.type_configuration(value.type_id()) {
             Some(registered) => match registered.descriptor.format {
