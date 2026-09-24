@@ -1,17 +1,17 @@
 # Integer16 literal below the minimum
 
-Verifies a negated int16 literal whose unsigned part exceeds the 16-bit
-range is rejected with a compile-time diagnostic through the complete CLI
-pipeline, consistent with int8 and int64.
+Verifies a negated int16 literal whose signed magnitude is below the 16-bit
+minimum is rejected with a compile-time diagnostic through the complete CLI
+pipeline.
 
 >>> source
-const too_small: int16 = -32768
+const too_small: int16 = -32769
 print(too_small)
 
 <<< stdout
 
 <<< stderr
-eck: invalid literal `32768` for type `int16`: number too large to fit in target type at Span { start: 26, end: 31 }
+eck: invalid literal `-32769` for type `int16`: number too small to fit in target type at Span { start: 25, end: 31 }
 
 <<< exit
 1

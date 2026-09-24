@@ -1,17 +1,17 @@
 # Integer8 literal below the minimum
 
-Verifies a negated int8 literal whose unsigned part exceeds the 8-bit
-range is rejected with a compile-time diagnostic through the complete CLI
-pipeline, consistent with int16 and int64.
+Verifies a negated int8 literal whose signed magnitude is below the 8-bit
+minimum is rejected with a compile-time diagnostic through the complete CLI
+pipeline.
 
 >>> source
-const too_small: int8 = -128
+const too_small: int8 = -129
 print(too_small)
 
 <<< stdout
 
 <<< stderr
-eck: invalid literal `128` for type `int8`: number too large to fit in target type at Span { start: 25, end: 28 }
+eck: invalid literal `-129` for type `int8`: number too small to fit in target type at Span { start: 24, end: 28 }
 
 <<< exit
 1
