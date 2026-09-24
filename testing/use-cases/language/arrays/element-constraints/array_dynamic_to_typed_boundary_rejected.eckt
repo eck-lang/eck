@@ -1,0 +1,16 @@
+# Dynamic array rejects an incompatible typed boundary
+
+Verifies statically known heterogeneous contents are rejected before a dynamic
+array can enter an integer-array contract.
+
+>>> source
+let source = [1, "two", 3]
+let values: int[] = source
+
+<<< stdout
+
+<<< stderr
+eck: dynamic array does not satisfy `int64[]` at Span { start: 47, end: 53 }
+
+<<< exit
+1

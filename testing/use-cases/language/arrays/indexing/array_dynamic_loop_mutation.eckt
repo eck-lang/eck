@@ -1,0 +1,16 @@
+# Dynamic array flow survives loop mutation
+
+Verifies a dynamic array element repeatedly written from arithmetic remains a
+finite runtime domain instead of becoming an unusable open element.
+
+>>> source
+let values = [0, 1, "outlier"]
+for (iteration in 0..100) {
+    values[0] = values[0] + 1
+}
+print(values[0])
+
+<<< stdout
+100
+
+<<< stderr

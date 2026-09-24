@@ -1,15 +1,13 @@
-# Array elements must share a base type
+# Dynamic array elements keep unrelated concrete types
 
-Verifies an array literal mixing a measure element with a string element is
-rejected because the two elements share no base type.
+Verifies an unannotated array literal accepts unrelated element types without
+coercing or erasing their concrete identities.
 
 >>> source
 let values = [10mm, "hello"]
+print(values)
 
 <<< stdout
+[10mm, hello]
 
 <<< stderr
-eck: array elements must share a base type; found `int64[mm]` and `string` at Span { start: 13, end: 28 }
-
-<<< exit
-1

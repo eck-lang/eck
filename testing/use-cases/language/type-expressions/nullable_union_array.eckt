@@ -1,0 +1,20 @@
+# Nullable union-element arrays
+
+Verifies `int?[]?` keeps array nullability separate from nullable elements and
+that the concrete array can be indexed after a null guard.
+
+>>> source
+let values: int?[]? = [null, 2]
+if (values != null) {
+    print(values[0] == null)
+    let element: int? = values[1]
+    if (element != null) {
+        print(element)
+    }
+}
+
+<<< stdout
+true
+2
+
+<<< stderr

@@ -1,7 +1,7 @@
-# Plain integer array inference
+# Plain integers in a dynamic array
 
-Verifies an unannotated literal of plain integers infers an adaptive integer
-array and preserves source order during element access.
+Verifies an unannotated integer literal creates a dynamic array while preserving
+source order and exact values during element access.
 
 >>> source
 let values = [1, 2, 3]

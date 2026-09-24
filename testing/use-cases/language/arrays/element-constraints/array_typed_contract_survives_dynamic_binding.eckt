@@ -1,0 +1,17 @@
+# Typed array contract survives a dynamic binding
+
+Verifies moving a typed array into an unannotated mutable binding does not erase
+the element contract owned by the array value.
+
+>>> source
+let typed: int[] = [1, 2, 3]
+let value = typed
+value->push("hello")
+
+<<< stdout
+
+<<< stderr
+eck: string literals are not supported by type `int64` at Span { start: 59, end: 66 }
+
+<<< exit
+1

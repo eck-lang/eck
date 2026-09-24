@@ -1,0 +1,13 @@
+# Nullable array binding
+
+Verifies `T[]?` lowers to an array-or-null value and that a concrete array
+passes the existing null check without scalar identity lookup.
+
+>>> source
+let values: int[]? = []
+print(values == null)
+
+<<< stdout
+false
+
+<<< stderr

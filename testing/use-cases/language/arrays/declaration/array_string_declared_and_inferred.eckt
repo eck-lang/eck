@@ -1,7 +1,7 @@
-# Declared and inferred string arrays
+# Declared and dynamic string arrays
 
-Verifies string elements work with an explicit `string[]` contract and with
-element-type inference, while both forms preserve source order during reads.
+Verifies string elements work with an explicit `string[]` contract and a
+dynamic unannotated array, while both preserve source order during reads.
 
 >>> source
 let typed: string[] = ["alice", "bob"]

@@ -1,0 +1,16 @@
+# Mutable array invariance
+
+Verifies an integer array cannot initialize an array whose mutable element
+contract also admits strings.
+
+>>> source
+let integers: int[] = [1, 2]
+let values: (int | string)[] = integers
+
+<<< stdout
+
+<<< stderr
+eck: type mismatch: binding `values` expects `(int64 | string)[]`, expression produces `int64[]` at Span { start: 60, end: 68 }
+
+<<< exit
+1

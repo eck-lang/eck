@@ -1,7 +1,7 @@
-# Inferred complete subtype constrains mutation
+# Dynamic arrays preserve inserted subtype identity
 
-Verifies elements with one complete type infer a constrained array, so a later
-compatible centimeter write is normalized to millimeters.
+Verifies an unannotated array does not create a subtype contract and therefore
+stores a later centimeter value with its own concrete identity.
 
 >>> source
 let sizes = [10mm, 20mm]
@@ -11,6 +11,6 @@ print(sizes[1])
 
 <<< stdout
 10mm
-20mm
+2cm
 
 <<< stderr

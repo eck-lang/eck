@@ -1,0 +1,27 @@
+# Structural aliases, unions, and recursive arrays
+
+Verifies aliases expand structurally through a union-element array and a
+recursive matrix while concrete runtime values retain ordinary rendering.
+
+>>> source
+type Value = string | int
+type Row = Value[]
+type Matrix = Row[]
+
+let number: Value = 10
+let text: Value = "hello"
+let row: Row = [1, "one"]
+let matrix: Matrix = [[1, "one"], [2, "two"]]
+
+print(number)
+print(text)
+print(row)
+print(matrix)
+
+<<< stdout
+10
+hello
+[1, one]
+[[1, one], [2, two]]
+
+<<< stderr

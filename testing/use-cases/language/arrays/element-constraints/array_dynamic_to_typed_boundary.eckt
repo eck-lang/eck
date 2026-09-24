@@ -1,0 +1,15 @@
+# Dynamic array validates once at a typed boundary
+
+Verifies a compatible dynamic array becomes a typed array value whose later
+mutations use the destination's static element contract.
+
+>>> source
+let source = [1, 2, 3]
+let values: int[] = source
+values->push(4)
+print(values)
+
+<<< stdout
+[1, 2, 3, 4]
+
+<<< stderr

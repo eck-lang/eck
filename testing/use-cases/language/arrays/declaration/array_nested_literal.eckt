@@ -1,0 +1,13 @@
+# Nested array literal
+
+Verifies nested arrays remain concrete values inside an outer dynamic array and
+render without flattening.
+
+>>> source
+let values = [[1, 2], [3, 4]]
+print(values)
+
+<<< stdout
+[[1, 2], [3, 4]]
+
+<<< stderr

@@ -1,0 +1,20 @@
+# Dynamic array keeps heterogeneous element identities
+
+Verifies insertion and indexed replacement accept unrelated values, including
+nested arrays and null, while a numeric-looking string remains a string.
+
+>>> source
+let values = [1, "2", 3]
+values->push("hello")
+values->unshift(true)
+values->push(null)
+values->push([4, 5])
+values[1] = "changed"
+print(values[2] + "x")
+print(values)
+
+<<< stdout
+2x
+[true, changed, 2, 3, hello, null, [4, 5]]
+
+<<< stderr

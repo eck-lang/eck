@@ -1,0 +1,15 @@
+# Dynamic binding may replace a typed array
+
+Verifies the binding remains dynamic even though its current array value owns a
+static element contract.
+
+>>> source
+let typed: int[] = [1, 2, 3]
+let value = typed
+value = "hello"
+print(value)
+
+<<< stdout
+hello
+
+<<< stderr

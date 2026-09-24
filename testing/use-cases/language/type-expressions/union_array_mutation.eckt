@@ -1,0 +1,15 @@
+# Union-element array mutation
+
+Verifies a mutable array whose element type is a union accepts both concrete
+members at different storage boundaries.
+
+>>> source
+let values: (int | string)[] = [1]
+values[0] = "one"
+values->push(2)
+print(values)
+
+<<< stdout
+[one, 2]
+
+<<< stderr

@@ -1,19 +1,15 @@
-# Inferred fixed-width array rejects an overflowed element expression
+# Dynamic array stores a promoted element expression
 
-Verifies element inference does not lose the representation contract: the
-`int8` element type inferred from `x + y` still refuses the promoted `int16`
-result `128`, exactly like a declared `int8[]` initializer.
+Verifies an unannotated array adds no `int8` element contract, so the promoted
+`int16` result keeps its concrete value instead of being narrowed or rejected.
 
 >>> source
 let x: int8 = 127
 let y: int8 = 1
 let a = [x + y]
-print(a[0])
+print(a)
 
 <<< stdout
+[128]
 
 <<< stderr
-eck: array element `128` cannot be represented as `int8`
-
-<<< exit
-1
