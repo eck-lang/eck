@@ -1,0 +1,24 @@
+# Dynamic map copy-on-write performance
+
+Measures repeated assignment of a map value followed by mutation of the copy.
+Each mutation must detach the shared map payload while leaving the source map
+unchanged.
+
+>>> checkpoint map-implementation-baseline d74f693 map implementation baseline
+The baseline is the first committed native map implementation.
+
+>>> source
+let source = {
+    "value": 0,
+    "stable": 1,
+    "other": 2
+}
+let copy = source
+
+for (iteration in 0..50000) {
+    copy = source
+    copy["value"] = iteration
+}
+
+print(source["value"])
+print(copy["value"])

@@ -1,0 +1,21 @@
+# Hot map lookup and assignment
+
+Measures repeated lookup and indexed replacement in one dynamic map. The
+workload keeps the key set small, updates one existing key, and prints only
+the final value so process output does not dominate the timed run.
+
+>>> checkpoint map-implementation-baseline d74f693 map implementation baseline
+The baseline is the first committed native map implementation.
+
+>>> source
+let values = {
+    "total": 0,
+    "step": 1,
+    "unused": 0
+}
+
+for (iteration in 0..1000000) {
+    values["total"] = values["total"] + values["step"]
+}
+
+print(values["total"])

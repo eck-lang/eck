@@ -1,0 +1,23 @@
+# Dynamic map literal construction
+
+Measures repeated construction of a small dynamic map literal followed by one
+indexed read. The final read is the only output, so map formatting does not
+dominate the timed workload.
+
+>>> checkpoint map-implementation-baseline d74f693 map implementation baseline
+The baseline is the first committed native map implementation.
+
+>>> source
+let values = {}
+let last = 0
+
+for (iteration in 0..50000) {
+    values = {
+        "first": iteration,
+        "second": iteration + 1,
+        "third": iteration + 2
+    }
+    last = values["second"]
+}
+
+print(last)

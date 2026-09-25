@@ -1,0 +1,20 @@
+# Dynamic map missing-key read performance
+
+Measures repeated reads of an absent key and the resulting null value. The
+lookup result is assigned to a dynamic binding so the timed loop performs no
+output or extra scalar work.
+
+>>> checkpoint map-implementation-baseline d74f693 map implementation baseline
+The baseline is the first committed native map implementation.
+
+>>> source
+let values = {
+    "present": 1
+}
+let last = 0
+
+for (iteration in 0..100000) {
+    last = values["missing"]
+}
+
+print(last)

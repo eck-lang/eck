@@ -1,0 +1,16 @@
+# Dynamic map insertion performance
+
+Measures insertion of new integer keys into one dynamic map. The workload
+grows the hash index and insertion-order storage, then reads the final entry.
+
+>>> checkpoint map-implementation-baseline d74f693 map implementation baseline
+The baseline is the first committed native map implementation.
+
+>>> source
+let values = {}
+
+for (iteration in 0..25000) {
+    values[iteration] = iteration + 1
+}
+
+print(values[24999])

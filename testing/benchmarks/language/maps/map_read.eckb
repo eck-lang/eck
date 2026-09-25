@@ -1,0 +1,24 @@
+# Dynamic map read performance
+
+Measures repeated reads of three existing keys from one small dynamic map.
+The last lookup is retained as the observable result while process output stays
+outside the hot loop.
+
+>>> checkpoint map-implementation-baseline d74f693 map implementation baseline
+The baseline is the first committed native map implementation.
+
+>>> source
+let values = {
+    "first": 1,
+    "second": 2,
+    "third": 3
+}
+let last = 0
+
+for (iteration in 0..100000) {
+    last = values["first"]
+    last = values["second"]
+    last = values["third"]
+}
+
+print(last)
