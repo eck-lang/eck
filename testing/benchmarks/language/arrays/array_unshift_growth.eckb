@@ -7,6 +7,10 @@ the front: an implementation that moved every remaining element on each
 insertion would be quadratic here, while this representation stays linear. The
 first and last elements are printed to prove the stored order.
 
+>>> checkpoint array-benchmark-introduction 73b9eaca434ae8064ec528bf039df87bf5d57dfd
+Starting point: this commit introduced the benchmark runner and the first
+array workloads, giving later array changes a historical comparison.
+
 >>> source
 let values: int[] = []
 for (iteration in 0..1000000) {

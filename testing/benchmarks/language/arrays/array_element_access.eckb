@@ -1,0 +1,21 @@
+# Array element access and mutation performance
+
+Measures repeated zero-based array element reads and writes over 100,000
+iterations. The program builds one small array, then reads and mutates a
+constant element each iteration while accumulating a running total. Only the
+final total is printed so benchmark output does not dominate execution.
+
+>>> checkpoint array-benchmark-introduction 73b9eaca434ae8064ec528bf039df87bf5d57dfd
+Starting point: this commit introduced the benchmark runner and the first
+array workloads, giving later array changes a historical comparison.
+
+>>> source
+let values: int[] = [0, 1, 2, 3, 4, 5, 6, 7]
+
+let total: int = 0
+for (iteration in 0..100000) {
+    values[0] = values[0] + 1
+    total = total + values[0]
+}
+
+print(total)

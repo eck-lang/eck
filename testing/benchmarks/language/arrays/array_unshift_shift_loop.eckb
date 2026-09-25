@@ -7,6 +7,10 @@ removal that advances the start of the live window. A per-operation regression
 such as an extra clone or a type lookup shows up directly. Only the final total
 is printed so benchmark output does not dominate execution.
 
+>>> checkpoint array-benchmark-introduction 73b9eaca434ae8064ec528bf039df87bf5d57dfd
+Starting point: this commit introduced the benchmark runner and the first
+array workloads, giving later array changes a historical comparison.
+
 >>> source
 let values: int[] = []
 let total: int = 0

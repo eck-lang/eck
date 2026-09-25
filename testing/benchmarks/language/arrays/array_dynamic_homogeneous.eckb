@@ -1,0 +1,15 @@
+# Dynamic homogeneous array mutation
+
+Measures constant-index arithmetic and replacement in an unannotated dynamic
+array whose elements remain integers for 5,000,000 iterations.
+
+>>> checkpoint array-benchmark-introduction 73b9eaca434ae8064ec528bf039df87bf5d57dfd
+Starting point: this commit introduced the benchmark runner and the first
+array workloads, giving later array changes a historical comparison.
+
+>>> source
+let values = [0, 1, 2, 3, 4, 5, 6, 7]
+for (iteration in 0..5000000) {
+    values[0] = values[0] + 1
+}
+print(values[0])

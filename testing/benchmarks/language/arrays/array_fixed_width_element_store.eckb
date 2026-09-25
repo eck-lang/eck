@@ -6,6 +6,10 @@ iteration while accumulating a running total, which exercises the element
 representation boundary a fixed-width destination applies to every stored value.
 Only the final total is printed so benchmark output does not dominate execution.
 
+>>> checkpoint array-benchmark-introduction 73b9eaca434ae8064ec528bf039df87bf5d57dfd
+Starting point: this commit introduced the benchmark runner and the first
+array workloads, giving later array changes a historical comparison.
+
 >>> source
 let values: int64[] = [0, 1, 2, 3, 4, 5, 6, 7]
 

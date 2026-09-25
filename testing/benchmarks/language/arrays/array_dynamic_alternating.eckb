@@ -1,0 +1,16 @@
+# Alternating heterogeneous dynamic array access
+
+Measures repeated reads of known integer slots in an alternating integer and
+string dynamic array.
+
+>>> checkpoint array-benchmark-introduction 73b9eaca434ae8064ec528bf039df87bf5d57dfd
+Starting point: this commit introduced the benchmark runner and the first
+array workloads, giving later array changes a historical comparison.
+
+>>> source
+let values = [0, "a", 1, "b", 2, "c", 3, "d"]
+let total: int = 0
+for (iteration in 0..100000) {
+    total = total + values[0] + values[2] + values[4] + values[6]
+}
+print(total)
