@@ -176,10 +176,10 @@ impl Parser {
             let field_start = self.peek().span.start;
             let field_name = self.expect_identifier("expected field name")?;
             self.expect_simple(TokenKind::Colon)?;
-            let type_name = self.expect_type_name("expected field type")?;
+            let type_expression = self.parse_type_expression()?;
             fields.push(TypeField {
                 name: field_name,
-                type_name,
+                type_expression,
                 span: Span {
                     start: field_start,
                     end: self.previous().span.end,
@@ -508,8 +508,12 @@ impl Parser {
         let variable = self.expect_identifier("expected loop variable after `(`")?;
         self.expect_simple(TokenKind::In)?;
         let range_start = self.parse_expression(0)?;
-        self.expect_simple(TokenKind::DotDot)?;
-        let range_end = self.parse_expression(0)?;
+        let range_end = if matches!(&self.peek().kind, TokenKind::DotDot) {
+            self.advance();
+            Some(self.parse_expression(0)?)
+        } else {
+            None
+        };
         self.expect_simple(TokenKind::RightParenthesis)?;
         self.skip_newlines();
         let body = self.parse_block()?;
@@ -517,12 +521,20 @@ impl Parser {
             start,
             end: body.span.end,
         };
-        Ok(Statement::For {
-            variable,
-            start: range_start,
-            end: range_end,
-            body,
-            span,
+        Ok(match range_end {
+            Some(end) => Statement::For {
+                variable,
+                start: range_start,
+                end,
+                body,
+                span,
+            },
+            None => Statement::ForEach {
+                variable,
+                source: range_start,
+                body,
+                span,
+            },
         })
     }
 
@@ -660,7 +672,7 @@ impl Parser {
     }
 
     /// Parses a complete type expression with union and postfix precedence.
-    fn parse_type_expression(&mut self) -> Result<TypeExpression, ParseError> {
+    pub(super) fn parse_type_expression(&mut self) -> Result<TypeExpression, ParseError> {
         let first = self.parse_type_postfix_expression()?;
         let mut members = vec![first];
         while matches!(&self.peek().kind, TokenKind::Pipe) {

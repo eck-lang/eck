@@ -1,4 +1,4 @@
-use super::SourceIdentifier;
+use super::{SourceIdentifier, TypeExpression};
 use crate::syntax::{BinaryOperator, ComparisonOperator, LogicalOperator, Span, UnaryOperator};
 
 /// Stores one named typed column inside a hand-written frame literal.
@@ -7,6 +7,13 @@ pub struct FrameLiteralColumn {
     pub name: String,
     pub values: Vec<Expression>,
     pub span: Span,
+}
+
+/// Stores one explicitly named call argument and its source location.
+#[derive(Clone, Debug)]
+pub struct NamedArgument {
+    pub name: SourceIdentifier,
+    pub expression: Expression,
 }
 
 #[derive(Clone, Debug)]
@@ -88,16 +95,24 @@ pub enum Expression {
         target: String,
         span: Span,
     },
+    /// Applies a parsed type boundary to a source expression.
+    As {
+        expression: Box<Expression>,
+        target_type: TypeExpression,
+        span: Span,
+    },
     Pipe {
         expression: Box<Expression>,
         function: String,
         arguments: Vec<Expression>,
+        named_arguments: Vec<NamedArgument>,
         span: Span,
     },
     Call {
         namespace: Option<SourceIdentifier>,
         function: SourceIdentifier,
         arguments: Vec<Expression>,
+        named_arguments: Vec<NamedArgument>,
         span: Span,
     },
 }
@@ -122,6 +137,7 @@ impl Expression {
             | Expression::Comparison { span, .. }
             | Expression::Logical { span, .. }
             | Expression::Convert { span, .. }
+            | Expression::As { span, .. }
             | Expression::Pipe { span, .. }
             | Expression::Call { span, .. } => *span,
         }

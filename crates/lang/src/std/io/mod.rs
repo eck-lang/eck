@@ -10,12 +10,13 @@ impl Extension for IoExtension {
     }
 
     fn register(&self, registry: &mut Registry) -> Result<(), CoreError> {
-        registry.register_global_function(
+        let print = registry.register_global_function(
             "print",
             FunctionSignature::AnySingle,
             None,
             functions::print,
         )?;
+        registry.set_function_parameter_names(print, &["value"])?;
         Ok(())
     }
 }

@@ -115,6 +115,21 @@ impl Registry {
         }
     }
 
+    /// Resolves a namespace member with source argument names and returns callback order.
+    pub fn resolve_namespace_named_function(
+        &self,
+        namespace: &str,
+        member: &str,
+        positional_types: &[Option<TypeId>],
+        named_types: &[(&str, Option<TypeId>)],
+    ) -> Result<(FunctionId, Vec<Option<usize>>), CoreError> {
+        match self.namespace_symbol(namespace, member)? {
+            NamespaceSymbol::Function { function_name } => {
+                self.resolve_named_function(function_name, positional_types, named_types)
+            }
+        }
+    }
+
     /// Resolves a namespaced generic fallback for one container argument.
     pub fn resolve_namespace_any_single_function(
         &self,
@@ -140,6 +155,21 @@ impl Registry {
             .get(&receiver_type)
             .ok_or_else(|| CoreError::UnknownFunction(member.to_string()))?;
         self.resolve_namespace_function(namespace, member, argument_types)
+    }
+
+    /// Resolves a named pipe call through the receiver's native namespace.
+    pub fn resolve_receiver_named_function(
+        &self,
+        receiver_type: TypeId,
+        member: &str,
+        positional_types: &[Option<TypeId>],
+        named_types: &[(&str, Option<TypeId>)],
+    ) -> Result<(FunctionId, Vec<Option<usize>>), CoreError> {
+        let namespace = self
+            .namespaces_by_receiver_type
+            .get(&receiver_type)
+            .ok_or_else(|| CoreError::UnknownFunction(member.to_string()))?;
+        self.resolve_namespace_named_function(namespace, member, positional_types, named_types)
     }
 }
 

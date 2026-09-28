@@ -24,6 +24,7 @@ pub(super) fn statement_span(statement: &Statement) -> crate::syntax::Span {
         | Statement::If { span, .. }
         | Statement::While { span, .. }
         | Statement::For { span, .. }
+        | Statement::ForEach { span, .. }
         | Statement::Break { span }
         | Statement::Continue { span } => *span,
         Statement::Block(block) => block.span,

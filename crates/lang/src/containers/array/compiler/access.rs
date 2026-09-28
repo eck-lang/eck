@@ -32,6 +32,8 @@ impl Compiler<'_> {
             SemanticType::Open
             | SemanticType::Array(_)
             | SemanticType::Map(_)
+            | SemanticType::Source(_)
+            | SemanticType::Row(_)
             | SemanticType::Union(_) => {
                 return Some((semantic_type, None));
             }
@@ -65,12 +67,18 @@ impl Compiler<'_> {
                         SemanticType::Open
                         | SemanticType::Scalar(_)
                         | SemanticType::Map(_)
+                        | SemanticType::Source(_)
+                        | SemanticType::Row(_)
                         | SemanticType::Union(_) => None,
                     })
                     .collect::<Option<Vec<_>>>()?;
                 (!array_types.is_empty()).then_some(array_types)
             }
-            SemanticType::Open | SemanticType::Scalar(_) | SemanticType::Map(_) => None,
+            SemanticType::Open
+            | SemanticType::Scalar(_)
+            | SemanticType::Map(_)
+            | SemanticType::Source(_)
+            | SemanticType::Row(_) => None,
         }
     }
 
@@ -100,6 +108,8 @@ impl Compiler<'_> {
             Some(SemanticType::Open)
             | Some(SemanticType::Array(_))
             | Some(SemanticType::Map(_))
+            | Some(SemanticType::Source(_))
+            | Some(SemanticType::Row(_))
             | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects array semantic types")
             }

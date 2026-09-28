@@ -156,7 +156,8 @@ impl<'registry> Runtime<'registry> {
             TypedStatement::Configuration { .. } => true,
             TypedStatement::Block(body)
             | TypedStatement::While { body, .. }
-            | TypedStatement::For { body, .. } => body
+            | TypedStatement::For { body, .. }
+            | TypedStatement::ForEach { body, .. } => body
                 .statements
                 .iter()
                 .any(Self::statement_changes_configuration),
@@ -428,6 +429,9 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::OpenNegation { .. }
             | TypedExpressionKind::OpenComparison { .. }
             | TypedExpressionKind::DynamicConvert { .. }
+            | TypedExpressionKind::SourceAs { .. }
+            | TypedExpressionKind::RowField { .. }
+            | TypedExpressionKind::DynamicRowField { .. }
             | TypedExpressionKind::Pipe { .. } => None,
         }
     }
@@ -534,6 +538,9 @@ impl<'registry> Runtime<'registry> {
             | TypedExpressionKind::OpenNegation { .. }
             | TypedExpressionKind::OpenComparison { .. }
             | TypedExpressionKind::DynamicConvert { .. }
+            | TypedExpressionKind::SourceAs { .. }
+            | TypedExpressionKind::RowField { .. }
+            | TypedExpressionKind::DynamicRowField { .. }
             | TypedExpressionKind::Pipe { .. } => Ok(false),
         }
     }
@@ -579,6 +586,12 @@ impl<'registry> Runtime<'registry> {
             } => {
                 Self::count_expression_local_uses(start, local_uses);
                 Self::count_expression_local_uses(end, local_uses);
+                for nested_statement in &body.statements {
+                    Self::count_statement_local_uses(nested_statement, local_uses);
+                }
+            }
+            TypedStatement::ForEach { source, body, .. } => {
+                Self::count_expression_local_uses(source, local_uses);
                 for nested_statement in &body.statements {
                     Self::count_statement_local_uses(nested_statement, local_uses);
                 }
@@ -666,8 +679,17 @@ impl<'registry> Runtime<'registry> {
                 Self::count_expression_local_uses(operand, local_uses);
             }
             TypedExpressionKind::Convert { expression, .. }
-            | TypedExpressionKind::DynamicConvert { expression, .. } => {
+            | TypedExpressionKind::DynamicConvert { expression, .. }
+            | TypedExpressionKind::SourceAs {
+                source: expression, ..
+            }
+            | TypedExpressionKind::RowField {
+                row: expression, ..
+            } => {
                 Self::count_expression_local_uses(expression, local_uses);
+            }
+            TypedExpressionKind::DynamicRowField { row, .. } => {
+                Self::count_expression_local_uses(row, local_uses);
             }
             TypedExpressionKind::LogicalNot { operand } => {
                 Self::count_expression_local_uses(operand, local_uses);

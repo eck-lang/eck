@@ -136,7 +136,15 @@ fn register_function(
     let member = function_name
         .strip_prefix("String.")
         .expect("String function names must use their canonical namespace prefix");
-    registry.register_function(function_name, signature, output, execute)?;
+    let parameter_names: &[&str] = match member {
+        "replace" => &["value", "search", "replacement"],
+        "remove" => &["value", "search"],
+        "pad_start" | "pad_end" => &["value", "length", "padding"],
+        "repeat" => &["value", "count"],
+        _ => &["value"],
+    };
+    let function = registry.register_function(function_name, signature, output, execute)?;
+    registry.set_function_parameter_names(function, parameter_names)?;
     match registry.namespace_symbol("String", member) {
         Ok(_) => {}
         Err(CoreError::UnknownNamespaceMember { .. }) => {

@@ -8,6 +8,6 @@ pub use declaration::{
     RelationDefinition, RelationRole, RelationRoleBinding, SourceIdentifier, TypeAliasDefinition,
     TypeDefinition, TypeField, UseClause, UseDeclaration, UseMember,
 };
-pub use expression::{Expression, FrameLiteralColumn};
+pub use expression::{Expression, FrameLiteralColumn, NamedArgument};
 pub use statement::{BindingKind, Block, Program, Statement};
 pub use type_expression::TypeExpression;

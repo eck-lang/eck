@@ -97,6 +97,13 @@ pub enum Statement {
         body: Block,
         span: Span,
     },
+    /// Iterates values produced on demand by a lazy source.
+    ForEach {
+        variable: String,
+        source: Expression,
+        body: Block,
+        span: Span,
+    },
     Break {
         span: Span,
     },

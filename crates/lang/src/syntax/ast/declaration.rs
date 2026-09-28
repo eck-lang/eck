@@ -61,7 +61,7 @@ pub struct TypeAliasDefinition {
 #[derive(Clone, Debug)]
 pub struct TypeField {
     pub name: String,
-    pub type_name: String,
+    pub type_expression: TypeExpression,
     pub span: Span,
 }
 

@@ -151,6 +151,16 @@ pub enum CoreError {
     UnknownFunction(String),
     #[error("function `{name}` already has overload `{signature}`")]
     DuplicateFunctionSignature { name: String, signature: String },
+    #[error("invalid parameter names for function `{name}`: {message}")]
+    InvalidFunctionParameterNames { name: String, message: String },
+    #[error("function `{0}` does not declare named parameters")]
+    UnnamedFunctionParameters(String),
+    #[error("unknown named argument `{0}`")]
+    UnknownNamedArgument(String),
+    #[error("argument `{0}` is supplied more than once")]
+    DuplicateArgument(String),
+    #[error("missing required argument `{0}`")]
+    MissingArgument(String),
     #[error("namespace `{0}` is already registered")]
     DuplicateNamespace(String),
     #[error("unknown namespace `{0}`")]

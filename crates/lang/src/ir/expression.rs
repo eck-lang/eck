@@ -521,10 +521,27 @@ pub enum TypedExpressionKind {
         dispatch: Box<TypedConversionDispatch>,
         expression: Box<TypedExpression>,
     },
-    /// Calls a resolved function with positional arguments.
+    /// Applies a lazy row contract to a source without consuming it.
+    SourceAs {
+        source: Box<TypedExpression>,
+        row_type: Arc<crate::semantic::RowType>,
+    },
+    /// Reads one row field through a slot resolved by the compiler.
+    RowField {
+        row: Box<TypedExpression>,
+        field_index: usize,
+    },
+    /// Reads a textual field from an untyped row whose header is known only at consumption.
+    DynamicRowField {
+        row: Box<TypedExpression>,
+        field: String,
+    },
+    /// Calls a resolved function with arguments in callback parameter order.
     Call {
         function: FunctionId,
         arguments: Vec<TypedExpression>,
+        /// Parameter slots in source evaluation order for calls with named arguments.
+        source_order: Option<Vec<usize>>,
     },
     /// Pipes a base value into a resolved function as its first argument.
     Pipe {

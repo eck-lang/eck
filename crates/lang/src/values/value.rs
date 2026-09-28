@@ -1,6 +1,8 @@
 use std::{any::Any, sync::Arc};
 
-use crate::semantic::{ArrayType, MapType, SemanticType, SubtypeId, TypeId, ValueType};
+use crate::semantic::{
+    ArrayType, MapType, RowType, SemanticType, SourceType, SubtypeId, TypeId, ValueType,
+};
 
 /// Number of bytes reserved for one payload stored directly inside a [`Value`].
 const INLINE_PAYLOAD_SIZE: usize = 16;
@@ -145,6 +147,8 @@ enum ValueIdentity {
     Array(Arc<ArrayType>),
     /// A complete map contract shared by value clones.
     Map(Arc<MapType>),
+    Source(Arc<SourceType>),
+    Row(Arc<RowType>),
 }
 
 /// One opaque runtime value.
@@ -186,6 +190,22 @@ impl Value {
         }
     }
 
+    /// Creates a lazy source with a logical row contract.
+    pub fn new_source<T: Any + Send + Sync>(source_type: SourceType, value: T) -> Self {
+        Self {
+            identity: ValueIdentity::Source(Arc::new(source_type)),
+            payload: PayloadStorage::from_owned(value),
+        }
+    }
+
+    /// Creates a row whose field values own any data retained from the source.
+    pub fn new_row<T: Any + Send + Sync>(row_type: Arc<RowType>, value: T) -> Self {
+        Self {
+            identity: ValueIdentity::Row(row_type),
+            payload: PayloadStorage::from_owned(value),
+        }
+    }
+
     /// Returns the complete semantic shape of this value.
     #[inline]
     pub fn semantic_type(&self) -> SemanticType {
@@ -193,6 +213,8 @@ impl Value {
             ValueIdentity::Scalar(value_type) => SemanticType::Scalar(*value_type),
             ValueIdentity::Array(array_type) => SemanticType::Array(array_type.clone()),
             ValueIdentity::Map(map_type) => SemanticType::Map(map_type.clone()),
+            ValueIdentity::Source(source_type) => SemanticType::Source(source_type.clone()),
+            ValueIdentity::Row(row_type) => SemanticType::Row(row_type.clone()),
         }
     }
 
@@ -201,7 +223,10 @@ impl Value {
     pub fn scalar_type(&self) -> Option<ValueType> {
         match self.identity {
             ValueIdentity::Scalar(value_type) => Some(value_type),
-            ValueIdentity::Array(_) | ValueIdentity::Map(_) => None,
+            ValueIdentity::Array(_)
+            | ValueIdentity::Map(_)
+            | ValueIdentity::Source(_)
+            | ValueIdentity::Row(_) => None,
         }
     }
 
@@ -211,7 +236,7 @@ impl Value {
         match &self.identity {
             ValueIdentity::Scalar(_) => None,
             ValueIdentity::Array(array_type) => Some((**array_type).clone()),
-            ValueIdentity::Map(_) => None,
+            ValueIdentity::Map(_) | ValueIdentity::Source(_) | ValueIdentity::Row(_) => None,
         }
     }
 
@@ -220,6 +245,22 @@ impl Value {
     pub fn map_type(&self) -> Option<MapType> {
         match &self.identity {
             ValueIdentity::Map(map_type) => Some((**map_type).clone()),
+            _ => None,
+        }
+    }
+
+    /// Returns the logical source contract, if any.
+    pub fn source_type(&self) -> Option<Arc<SourceType>> {
+        match &self.identity {
+            ValueIdentity::Source(source_type) => Some(source_type.clone()),
+            _ => None,
+        }
+    }
+
+    /// Returns the row contract, if any.
+    pub fn row_type(&self) -> Option<Arc<RowType>> {
+        match &self.identity {
+            ValueIdentity::Row(row_type) => Some(row_type.clone()),
             _ => None,
         }
     }
@@ -258,7 +299,10 @@ impl Value {
     pub fn with_subtype(mut self, subtype_id: Option<SubtypeId>) -> Self {
         match &mut self.identity {
             ValueIdentity::Scalar(value_type) => value_type.subtype = subtype_id,
-            ValueIdentity::Array(_) | ValueIdentity::Map(_) => {
+            ValueIdentity::Array(_)
+            | ValueIdentity::Map(_)
+            | ValueIdentity::Source(_)
+            | ValueIdentity::Row(_) => {
                 panic!("cannot qualify a container value")
             }
         }
@@ -270,7 +314,10 @@ impl Value {
     fn scalar_identity(&self) -> ValueType {
         match self.identity {
             ValueIdentity::Scalar(value_type) => value_type,
-            ValueIdentity::Array(_) | ValueIdentity::Map(_) => {
+            ValueIdentity::Array(_)
+            | ValueIdentity::Map(_)
+            | ValueIdentity::Source(_)
+            | ValueIdentity::Row(_) => {
                 panic!("container value has no scalar identity")
             }
         }

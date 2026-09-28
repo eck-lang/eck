@@ -4,7 +4,7 @@ mod span;
 
 pub use ast::{
     BindingKind, Block, ConfigurationEntry, ConfigurationValue, Expression, FrameLiteralColumn,
-    Program, RelationBinding, RelationCardinality, RelationDefinition, RelationRole,
+    NamedArgument, Program, RelationBinding, RelationCardinality, RelationDefinition, RelationRole,
     RelationRoleBinding, SourceIdentifier, Statement, TypeAliasDefinition, TypeDefinition,
     TypeExpression, TypeField, UseClause, UseDeclaration, UseMember,
 };

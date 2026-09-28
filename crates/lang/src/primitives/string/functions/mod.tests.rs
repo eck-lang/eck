@@ -1,4 +1,4 @@
-use crate::semantic::{ExecutionContext, Extension, Registry};
+use crate::semantic::{ExecutionContext, Extension, Registry, SemanticType, ValueType};
 
 /// Verifies that all string pipe functions are registered with the expected signatures.
 #[test]
@@ -25,7 +25,10 @@ fn registers_string_pipe_functions() {
             .resolve_namespace_function("String", name, &[string_type])
             .unwrap_or_else(|_| panic!("{name} should be registered"));
         let descriptor = registry.function(function).unwrap();
-        assert_eq!(descriptor.output, Some(string_type));
+        assert_eq!(
+            descriptor.output,
+            Some(SemanticType::Scalar(ValueType::plain(string_type)))
+        );
     }
 
     let replace_function = registry
@@ -36,13 +39,19 @@ fn registers_string_pipe_functions() {
         )
         .unwrap();
     let descriptor = registry.function(replace_function).unwrap();
-    assert_eq!(descriptor.output, Some(string_type));
+    assert_eq!(
+        descriptor.output,
+        Some(SemanticType::Scalar(ValueType::plain(string_type)))
+    );
 
     let remove_function = registry
         .resolve_namespace_function("String", "remove", &[string_type, string_type])
         .unwrap();
     let descriptor = registry.function(remove_function).unwrap();
-    assert_eq!(descriptor.output, Some(string_type));
+    assert_eq!(
+        descriptor.output,
+        Some(SemanticType::Scalar(ValueType::plain(string_type)))
+    );
 
     let pad_start_function = registry
         .resolve_namespace_function(
@@ -52,7 +61,10 @@ fn registers_string_pipe_functions() {
         )
         .unwrap();
     let descriptor = registry.function(pad_start_function).unwrap();
-    assert_eq!(descriptor.output, Some(string_type));
+    assert_eq!(
+        descriptor.output,
+        Some(SemanticType::Scalar(ValueType::plain(string_type)))
+    );
 
     let pad_end_function = registry
         .resolve_namespace_function(
@@ -62,19 +74,28 @@ fn registers_string_pipe_functions() {
         )
         .unwrap();
     let descriptor = registry.function(pad_end_function).unwrap();
-    assert_eq!(descriptor.output, Some(string_type));
+    assert_eq!(
+        descriptor.output,
+        Some(SemanticType::Scalar(ValueType::plain(string_type)))
+    );
 
     let repeat_function = registry
         .resolve_namespace_function("String", "repeat", &[string_type, integer_type])
         .unwrap();
     let descriptor = registry.function(repeat_function).unwrap();
-    assert_eq!(descriptor.output, Some(string_type));
+    assert_eq!(
+        descriptor.output,
+        Some(SemanticType::Scalar(ValueType::plain(string_type)))
+    );
 
     let replace_regex_function = registry
         .resolve_namespace_function("String", "replace", &[string_type, regex_type, string_type])
         .unwrap();
     let descriptor = registry.function(replace_regex_function).unwrap();
-    assert_eq!(descriptor.output, Some(string_type));
+    assert_eq!(
+        descriptor.output,
+        Some(SemanticType::Scalar(ValueType::plain(string_type)))
+    );
 
     let exported_members = registry.namespace_member_names("String").unwrap();
     for name in [

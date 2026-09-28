@@ -76,6 +76,8 @@ fn first_element_access(program: &TypedProgram) -> (Option<usize>, ValueType) {
                     SemanticType::Open
                     | SemanticType::Array(_)
                     | SemanticType::Map(_)
+                    | SemanticType::Source(_)
+                    | SemanticType::Row(_)
                     | SemanticType::Union(_) => {
                         panic!("element access cannot produce a container or union")
                     }
@@ -388,6 +390,8 @@ fn drops_element_record_after_dynamic_write() {
             SemanticType::Open
             | SemanticType::Array(_)
             | SemanticType::Map(_)
+            | SemanticType::Source(_)
+            | SemanticType::Row(_)
             | SemanticType::Union(_) => {
                 panic!("an element read cannot be a container or union")
             }
@@ -467,6 +471,8 @@ fn widens_adaptive_int_element_beyond_declared_width() {
         SemanticType::Open
         | SemanticType::Array(_)
         | SemanticType::Map(_)
+        | SemanticType::Source(_)
+        | SemanticType::Row(_)
         | SemanticType::Union(_) => {
             panic!("an element store cannot produce a container or union")
         }
@@ -1199,6 +1205,8 @@ fn distinguishes_insertion_and_removal_results() {
         SemanticType::Open
         | SemanticType::Scalar(_)
         | SemanticType::Map(_)
+        | SemanticType::Source(_)
+        | SemanticType::Row(_)
         | SemanticType::Union(_) => {
             panic!("an array binding must have an array semantic type")
         }
@@ -1292,6 +1300,8 @@ fn converts_an_inserted_element_to_the_declared_subtype() {
         SemanticType::Open
         | SemanticType::Scalar(_)
         | SemanticType::Map(_)
+        | SemanticType::Source(_)
+        | SemanticType::Row(_)
         | SemanticType::Union(_) => {
             panic!("an array binding must have an array semantic type")
         }

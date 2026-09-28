@@ -10,6 +10,7 @@ use crate::RuntimeError;
 
 mod evaluation;
 mod loop_execution;
+mod source_evaluation;
 
 pub fn execute(program: &TypedProgram, registry: &Registry) -> Result<(), RuntimeError> {
     let mut runtime = Runtime {
@@ -142,10 +143,46 @@ impl<'registry> Runtime<'registry> {
                 body,
                 ..
             } => self.execute_for(*slot, start, end, range_plan, body)?,
+            TypedStatement::ForEach {
+                slot, source, body, ..
+            } => {
+                self.execute_for_each(*slot, source, body)?;
+            }
             TypedStatement::Break { .. } => self.loop_control = Some(LoopControl::Break),
             TypedStatement::Continue { .. } => self.loop_control = Some(LoopControl::Continue),
         }
         Ok(())
+    }
+
+    /// Consumes one lazy iterable until completion, break, or the first error.
+    fn execute_for_each(
+        &mut self,
+        slot: LocalVariableSlot,
+        source: &TypedExpression,
+        body: &TypedBlock,
+    ) -> Result<(), RuntimeError> {
+        let result = (|| {
+            let source_value = self
+                .eval(source)?
+                .ok_or_else(|| RuntimeError::Message("for source returned no value".into()))?;
+            let source = source_value
+                .downcast_ref::<crate::connectors::source::CsvSource>()
+                .ok_or_else(|| {
+                    RuntimeError::Message("for source has invalid representation".into())
+                })?;
+            let mut cursor = source.cursor();
+            while let Some(row) = cursor.next_value(self.registry)? {
+                self.store_local_value(slot, row);
+                self.execute_block(body)?;
+                match self.loop_control.take() {
+                    Some(LoopControl::Break) => break,
+                    Some(LoopControl::Continue) | None => {}
+                }
+            }
+            Ok(())
+        })();
+        self.clear_local_slots(std::slice::from_ref(&slot));
+        result
     }
 
     /// Executes a `for (variable in start..end)` integer range loop.

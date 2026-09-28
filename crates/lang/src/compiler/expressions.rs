@@ -625,7 +625,7 @@ impl Compiler<'_> {
                     .function(function)
                     .map_err(|error| CompileError::core(*span, error))?
                     .output
-                    .map(|type_id| SemanticType::Scalar(ValueType::plain(type_id)));
+                    .clone();
                 Ok(TypedExpression {
                     output,
                     kind: TypedExpressionKind::Pipe {
@@ -640,13 +640,26 @@ impl Compiler<'_> {
                 expression,
                 function,
                 arguments,
+                named_arguments,
                 span,
             } => {
                 if function == "to" {
+                    if !named_arguments.is_empty() {
+                        return Err(CompileError::new(
+                            *span,
+                            "`->to` does not accept named arguments",
+                        ));
+                    }
                     return self.compile_measure_to(expression, arguments, *span);
                 }
                 let typed_base = self.compile_expression(expression, None)?;
                 if let Some(array_type) = typed_base.array_type() {
+                    if !named_arguments.is_empty() {
+                        return Err(CompileError::new(
+                            *span,
+                            "array methods do not accept named arguments",
+                        ));
+                    }
                     return self.compile_array_method(
                         expression,
                         &typed_base,
@@ -658,6 +671,98 @@ impl Compiler<'_> {
                 }
                 let base_type =
                     self.scalar_expression_type(&typed_base, "pipe receiver has no value")?;
+                if !named_arguments.is_empty() {
+                    let mut source_arguments =
+                        Vec::with_capacity(1 + arguments.len() + named_arguments.len());
+                    source_arguments.push(typed_base);
+                    let mut source_types = vec![Some(base_type.base)];
+                    for argument in arguments
+                        .iter()
+                        .chain(named_arguments.iter().map(|named| &named.expression))
+                    {
+                        let typed = self.compile_expression(argument, None)?;
+                        self.require_non_nullable_expression(&typed)?;
+                        let argument_type = self.expression_base_type(
+                            &typed,
+                            "void expression cannot be passed as an argument",
+                        )?;
+                        source_types.push(Some(argument_type));
+                        source_arguments.push(typed);
+                    }
+                    let positional_count = 1 + arguments.len();
+                    let named_types = named_arguments
+                        .iter()
+                        .enumerate()
+                        .map(|(index, named)| {
+                            (
+                                named.name.name.as_str(),
+                                source_types[positional_count + index],
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let (function_id, parameter_order) = self
+                        .registry
+                        .resolve_receiver_named_function(
+                            base_type.base,
+                            function,
+                            &source_types[..positional_count],
+                            &named_types,
+                        )
+                        .or_else(|error| match error {
+                            crate::semantic::CoreError::UnknownFunction(_) => {
+                                self.registry.resolve_named_function(
+                                    function,
+                                    &source_types[..positional_count],
+                                    &named_types,
+                                )
+                            }
+                            other => Err(other),
+                        })
+                        .map_err(|error| CompileError::core(*span, error))?;
+                    let descriptor = self
+                        .registry
+                        .function(function_id)
+                        .map_err(|error| CompileError::core(*span, error))?;
+                    let mut source_order = vec![0; source_arguments.len()];
+                    for (parameter_index, source_index) in parameter_order.iter().enumerate() {
+                        if let Some(source_index) = source_index {
+                            source_order[*source_index] = parameter_index;
+                        }
+                    }
+                    let mut source_arguments =
+                        source_arguments.into_iter().map(Some).collect::<Vec<_>>();
+                    let typed_arguments = parameter_order
+                        .into_iter()
+                        .enumerate()
+                        .map(|(parameter_index, source_index)| match source_index {
+                            Some(index) => source_arguments[index]
+                                .take()
+                                .expect("one source argument per parameter"),
+                            None => {
+                                let value = descriptor.parameter_defaults[parameter_index]
+                                    .as_ref()
+                                    .expect("resolver checked the default")
+                                    .clone();
+                                TypedExpression {
+                                    output: Some(value.semantic_type()),
+                                    kind: TypedExpressionKind::Literal(value),
+                                    span: *span,
+                                }
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    self.require_scalar_arguments(function_id, &typed_arguments, *span)?;
+                    let output = descriptor.output.clone();
+                    return Ok(TypedExpression {
+                        output,
+                        kind: TypedExpressionKind::Call {
+                            function: function_id,
+                            arguments: typed_arguments,
+                            source_order: Some(source_order),
+                        },
+                        span: *span,
+                    });
+                }
                 let mut typed_arguments = Vec::with_capacity(arguments.len());
                 let mut argument_types = Vec::with_capacity(1 + arguments.len());
                 argument_types.push(base_type.base);
@@ -684,12 +789,17 @@ impl Compiler<'_> {
                     })
                     .map_err(|e| CompileError::core(*span, e))?;
                 self.require_scalar_arguments(function_id, &typed_arguments, *span)?;
+                typed_arguments.extend(self.function_default_arguments(
+                    function_id,
+                    argument_types.len(),
+                    *span,
+                )?);
                 let output = self
                     .registry
                     .function(function_id)
                     .map_err(|e| CompileError::core(*span, e))?
                     .output
-                    .map(|type_id| SemanticType::Scalar(ValueType::plain(type_id)));
+                    .clone();
                 Ok(TypedExpression {
                     output,
                     kind: TypedExpressionKind::Pipe {
@@ -704,21 +814,123 @@ impl Compiler<'_> {
                 namespace,
                 function,
                 arguments,
+                named_arguments,
                 span,
             } => {
-                let mut typed_arguments = Vec::with_capacity(arguments.len());
-                for argument in arguments {
+                let mut typed_arguments =
+                    Vec::with_capacity(arguments.len() + named_arguments.len());
+                for argument in arguments
+                    .iter()
+                    .chain(named_arguments.iter().map(|named| &named.expression))
+                {
                     let typed = self.compile_expression(argument, None)?;
                     // Nullability is rejected here; whether a container may be
                     // passed is decided once the called function is known.
                     self.require_non_nullable_expression(&typed)?;
                     typed_arguments.push(typed);
                 }
+                if !named_arguments.is_empty() {
+                    let argument_types = typed_arguments
+                        .iter()
+                        .map(|typed| match &typed.output {
+                            Some(SemanticType::Scalar(value_type)) => Ok(Some(value_type.base)),
+                            Some(_)
+                                if typed.is_open_value()
+                                    || typed.output.as_ref().is_some_and(|semantic_type| {
+                                        matches!(
+                                            semantic_type,
+                                            SemanticType::Union(_)
+                                                | SemanticType::Map(_)
+                                                | SemanticType::Source(_)
+                                                | SemanticType::Row(_)
+                                        ) || Self::type_contains_array(semantic_type)
+                                    }) =>
+                            {
+                                Ok(None)
+                            }
+                            None if typed.is_open_value() => Ok(None),
+                            _ => Err(CompileError::new(
+                                typed.span,
+                                "void expression cannot be passed as an argument",
+                            )),
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let named_types: Vec<_> = named_arguments
+                        .iter()
+                        .enumerate()
+                        .map(|(index, named)| {
+                            (
+                                named.name.name.as_str(),
+                                argument_types[arguments.len() + index],
+                            )
+                        })
+                        .collect();
+                    let (function_id, parameter_order) = self.resolve_source_named_function(
+                        namespace.as_ref(),
+                        function,
+                        &argument_types[..arguments.len()],
+                        &named_types,
+                        *span,
+                    )?;
+                    let mut source_arguments: Vec<Option<TypedExpression>> =
+                        typed_arguments.into_iter().map(Some).collect();
+                    let descriptor = self
+                        .registry
+                        .function(function_id)
+                        .map_err(|error| CompileError::core(*span, error))?;
+                    let mut source_order = vec![0; source_arguments.len()];
+                    for (parameter_index, source_index) in parameter_order.iter().enumerate() {
+                        if let Some(source_index) = source_index {
+                            source_order[*source_index] = parameter_index;
+                        }
+                    }
+                    let typed_arguments: Vec<_> = parameter_order
+                        .into_iter()
+                        .enumerate()
+                        .map(|(parameter_index, source_index)| match source_index {
+                            Some(index) => source_arguments[index]
+                                .take()
+                                .expect("one source argument per parameter"),
+                            None => {
+                                let value = descriptor.parameter_defaults[parameter_index]
+                                    .as_ref()
+                                    .expect("resolver checked the default")
+                                    .clone();
+                                TypedExpression {
+                                    output: Some(value.semantic_type()),
+                                    kind: TypedExpressionKind::Literal(value),
+                                    span: *span,
+                                }
+                            }
+                        })
+                        .collect();
+                    self.require_scalar_arguments(function_id, &typed_arguments, *span)?;
+                    let output = self
+                        .registry
+                        .function(function_id)
+                        .map_err(|error| CompileError::core(*span, error))?
+                        .output
+                        .clone();
+                    return Ok(TypedExpression {
+                        output,
+                        kind: TypedExpressionKind::Call {
+                            function: function_id,
+                            arguments: typed_arguments,
+                            source_order: Some(source_order),
+                        },
+                        span: *span,
+                    });
+                }
                 let has_structural_argument = typed_arguments.iter().any(|argument| {
                     argument.is_open_value()
                         || argument.output.as_ref().is_some_and(|semantic_type| {
-                            matches!(semantic_type, SemanticType::Union(_) | SemanticType::Map(_))
-                                || Self::type_contains_array(semantic_type)
+                            matches!(
+                                semantic_type,
+                                SemanticType::Union(_)
+                                    | SemanticType::Map(_)
+                                    | SemanticType::Source(_)
+                                    | SemanticType::Row(_)
+                            ) || Self::type_contains_array(semantic_type)
                         })
                 });
                 if has_structural_argument && typed_arguments.len() != 1 {
@@ -747,17 +959,23 @@ impl Compiler<'_> {
                     )?
                 };
                 self.require_scalar_arguments(function, &typed_arguments, *span)?;
+                typed_arguments.extend(self.function_default_arguments(
+                    function,
+                    arguments.len(),
+                    *span,
+                )?);
                 let output = self
                     .registry
                     .function(function)
                     .map_err(|e| CompileError::core(*span, e))?
                     .output
-                    .map(|type_id| SemanticType::Scalar(ValueType::plain(type_id)));
+                    .clone();
                 Ok(TypedExpression {
                     output,
                     kind: TypedExpressionKind::Call {
                         function,
                         arguments: typed_arguments,
+                        source_order: None,
                     },
                     span: *span,
                 })
@@ -906,6 +1124,16 @@ impl Compiler<'_> {
                     span: *span,
                 })
             }
+            Expression::As {
+                expression,
+                target_type,
+                span,
+            } => self.compile_source_as(expression, target_type, *span),
+            Expression::FieldAccess {
+                expression,
+                field,
+                span,
+            } => self.compile_row_field(expression, field, *span),
             _ => Err(CompileError::new(
                 expression.span(),
                 "expression requires an optional language patch",
@@ -1268,8 +1496,9 @@ impl Compiler<'_> {
             .registry
             .function(function)
             .map_err(|error| CompileError::core(expression.span, error))?
-            .output;
-        if function_output != Some(string_type) {
+            .output
+            .clone();
+        if function_output.as_ref() != Some(&SemanticType::Scalar(ValueType::plain(string_type))) {
             return Err(CompileError::new(
                 expression.span,
                 "the registered `string` conversion must return the default string type",
@@ -1280,10 +1509,40 @@ impl Compiler<'_> {
             kind: TypedExpressionKind::Call {
                 function,
                 arguments: vec![expression],
+                source_order: None,
             },
             output: Some(SemanticType::Scalar(ValueType::plain(string_type))),
             span,
         })
+    }
+
+    /// Materializes omitted trailing native defaults as literal IR arguments.
+    fn function_default_arguments(
+        &self,
+        function: crate::semantic::FunctionId,
+        supplied_count: usize,
+        span: crate::syntax::Span,
+    ) -> Result<Vec<TypedExpression>, CompileError> {
+        let descriptor = self
+            .registry
+            .function(function)
+            .map_err(|error| CompileError::core(span, error))?;
+        Ok(descriptor
+            .parameter_defaults
+            .iter()
+            .skip(supplied_count)
+            .map(|default| {
+                let value = default
+                    .as_ref()
+                    .expect("resolver checked trailing defaults")
+                    .clone();
+                TypedExpression {
+                    output: Some(value.semantic_type()),
+                    kind: TypedExpressionKind::Literal(value),
+                    span,
+                }
+            })
+            .collect())
     }
 }
 

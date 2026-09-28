@@ -2,6 +2,65 @@ use super::*;
 
 use super::super::test_support::{execute_function, foreign_type_id, register_type};
 
+/// Binds six parameters in callback order and fills omitted optional slots.
+#[test]
+fn resolves_named_arguments_and_six_parameter_defaults() {
+    let mut registry = Registry::new();
+    let integer = register_type(&mut registry, "int");
+    let function = registry
+        .register_function(
+            "read",
+            FunctionSignature::Exact(vec![integer; 6]),
+            None,
+            execute_function,
+        )
+        .unwrap();
+    registry
+        .set_function_parameter_names(
+            function,
+            &["path", "delimiter", "header", "quote", "escape", "encoding"],
+        )
+        .unwrap();
+    registry
+        .set_function_parameter_defaults(
+            function,
+            &[
+                None,
+                Some(crate::semantic::Value::new(integer, 1i64)),
+                Some(crate::semantic::Value::new(integer, 2i64)),
+                Some(crate::semantic::Value::new(integer, 3i64)),
+                Some(crate::semantic::Value::new(integer, 4i64)),
+                Some(crate::semantic::Value::new(integer, 5i64)),
+            ],
+        )
+        .unwrap();
+
+    let (resolved, order) = registry
+        .resolve_named_function(
+            "read",
+            &[Some(integer)],
+            &[("encoding", Some(integer)), ("delimiter", Some(integer))],
+        )
+        .unwrap();
+    assert_eq!(resolved, function);
+    assert_eq!(order, vec![Some(0), Some(2), None, None, None, Some(1)]);
+    assert_eq!(
+        registry.resolve_function("read", &[integer]).unwrap(),
+        function
+    );
+
+    assert!(matches!(registry.resolve_named_function("read", &[],
+        &[("encoding", Some(integer))]), Err(CoreError::MissingArgument(name)) if name == "path"));
+    assert!(
+        matches!(registry.resolve_named_function("read", &[Some(integer)],
+        &[("path", Some(integer))]), Err(CoreError::DuplicateArgument(name)) if name == "path")
+    );
+    assert!(
+        matches!(registry.resolve_named_function("read", &[Some(integer)],
+        &[("unknown", Some(integer))]), Err(CoreError::UnknownNamedArgument(name)) if name == "unknown")
+    );
+}
+
 #[test]
 fn function_types_must_be_registered_before_use() {
     let mut registry = Registry::new();

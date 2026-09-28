@@ -32,6 +32,15 @@ impl<'registry> Runtime<'registry> {
                 })?;
                 self.retype_array_value(value, array_type.clone()).map(Some)
             }
+            TypedExpressionKind::SourceAs { source, row_type } => {
+                self.eval_source_as(source, row_type.clone())
+            }
+            TypedExpressionKind::RowField { row, field_index } => {
+                self.eval_row_field(row, *field_index)
+            }
+            TypedExpressionKind::DynamicRowField { row, field } => {
+                self.eval_dynamic_row_field(row, field)
+            }
             TypedExpressionKind::Binary {
                 resolution,
                 execution_plan,
@@ -311,13 +320,32 @@ impl<'registry> Runtime<'registry> {
             TypedExpressionKind::Call {
                 function,
                 arguments,
+                source_order,
             } => {
-                let mut values = Vec::with_capacity(arguments.len());
-                for argument in arguments {
-                    values.push(self.eval(argument)?.ok_or_else(|| {
-                        RuntimeError::Message("argument returned no value".into())
-                    })?);
-                }
+                let values = if let Some(source_order) = source_order {
+                    let mut values = vec![None; arguments.len()];
+                    for &slot in source_order {
+                        values[slot] = Some(self.eval(&arguments[slot])?.ok_or_else(|| {
+                            RuntimeError::Message("argument returned no value".into())
+                        })?);
+                    }
+                    for (slot, argument) in arguments.iter().enumerate() {
+                        if values[slot].is_none() {
+                            values[slot] = Some(self.eval(argument)?.ok_or_else(|| {
+                                RuntimeError::Message("argument returned no value".into())
+                            })?);
+                        }
+                    }
+                    values.into_iter().map(Option::unwrap).collect()
+                } else {
+                    let mut values = Vec::with_capacity(arguments.len());
+                    for argument in arguments {
+                        values.push(self.eval(argument)?.ok_or_else(|| {
+                            RuntimeError::Message("argument returned no value".into())
+                        })?);
+                    }
+                    values
+                };
                 let function = self.registry.function(*function)?;
                 let context = ExecutionContext::new(self.registry, &self.configuration);
                 let result = (function.execute)(&context, &values)?;

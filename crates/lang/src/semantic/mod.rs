@@ -7,6 +7,7 @@ mod extension;
 mod ids;
 mod operator;
 pub mod registry;
+mod rows;
 mod subtype;
 mod types;
 
@@ -31,6 +32,7 @@ pub use extension::Extension;
 pub use ids::{ComparisonId, FunctionId, OperatorId, SubtypeId, TypeId};
 pub use operator::{BinaryOperator, ComparisonOperator};
 pub use registry::Registry;
+pub use rows::{RowField, RowType, SourceType};
 pub use subtype::{
     ResolvedBinaryOperator, ResolvedComparison, ResolvedSubtypeConversion, Scale,
     SubtypeBinaryRule, SubtypeComparisonRule, SubtypeDescriptor, SubtypeRelativeRule, ValueType,

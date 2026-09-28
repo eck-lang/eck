@@ -70,6 +70,8 @@ impl MapKey {
             SemanticType::Scalar(value_type) => value_type,
             SemanticType::Array(_) => return Err(unsupported_container_key("array")),
             SemanticType::Map(_) => return Err(unsupported_container_key("map")),
+            SemanticType::Source(_) => return Err(unsupported_container_key("source")),
+            SemanticType::Row(_) => return Err(unsupported_container_key("row")),
             SemanticType::Union(_) => return Err(unsupported_container_key("union")),
             SemanticType::Open => return Err(unsupported_container_key("open")),
         };

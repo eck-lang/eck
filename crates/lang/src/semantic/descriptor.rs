@@ -1,6 +1,6 @@
 use crate::semantic::{
     BinaryOperator, ComparisonId, ComparisonOperator, ExecutionContext, FunctionId, OperatorId,
-    TypeId, Value,
+    SemanticType, TypeId, Value,
 };
 
 pub type LiteralParser = fn(&str, TypeId) -> Result<Value, crate::semantic::CoreError>;
@@ -99,7 +99,11 @@ pub struct FunctionDescriptor {
     pub id: FunctionId,
     pub name: &'static str,
     pub signature: FunctionSignature,
-    pub output: Option<TypeId>,
+    /// Parameter names in callback order; absent for legacy positional-only registrations.
+    pub parameter_names: Option<Vec<&'static str>>,
+    /// Compile-time literals substituted for omitted optional parameters.
+    pub parameter_defaults: Vec<Option<Value>>,
+    pub output: Option<SemanticType>,
     pub execute: NativeFunction,
 }
 

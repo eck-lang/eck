@@ -265,6 +265,78 @@ impl Compiler<'_> {
         ))
     }
 
+    /// Resolves a named call through the same namespace and import rules as positional calls.
+    pub(super) fn resolve_source_named_function(
+        &self,
+        namespace: Option<&SourceIdentifier>,
+        function: &SourceIdentifier,
+        positional_types: &[Option<TypeId>],
+        named_types: &[(&str, Option<TypeId>)],
+        call_span: crate::syntax::Span,
+    ) -> Result<(crate::semantic::FunctionId, Vec<Option<usize>>), CompileError> {
+        if let Some(namespace) = namespace {
+            let namespace_import =
+                self.resolve_namespace_import(&namespace.name)
+                    .ok_or_else(|| {
+                        CompileError::new(
+                            namespace.span,
+                            format!("namespace `{}` is not imported", namespace.name),
+                        )
+                    })?;
+            return self
+                .registry
+                .resolve_namespace_named_function(
+                    &namespace_import.namespace,
+                    &function.name,
+                    positional_types,
+                    named_types,
+                )
+                .map_err(|error| CompileError::core(call_span, error));
+        }
+        if let Some(import) = self.resolve_function_import(&function.name) {
+            return match import {
+                FunctionImport::Unique(source) => self
+                    .registry
+                    .resolve_namespace_named_function(
+                        &source.namespace,
+                        &source.member,
+                        positional_types,
+                        named_types,
+                    )
+                    .map_err(|error| CompileError::core(call_span, error)),
+                FunctionImport::Ambiguous(sources) => {
+                    let mut candidates: Vec<_> = sources
+                        .iter()
+                        .map(|source| format!("{}.{}", source.namespace, source.member))
+                        .collect();
+                    candidates.sort();
+                    candidates.dedup();
+                    Err(CompileError::new(
+                        function.span,
+                        format!(
+                            "imported function `{}` is ambiguous; possible sources: {}",
+                            function.name,
+                            candidates.join(", ")
+                        ),
+                    ))
+                }
+            };
+        }
+        if self.registry.is_global_function(&function.name) {
+            return self
+                .registry
+                .resolve_named_function(&function.name, positional_types, named_types)
+                .map_err(|error| CompileError::core(call_span, error));
+        }
+        Err(CompileError::new(
+            function.span,
+            format!(
+                "function `{}` is not in scope; import it with `use` or call it through an imported namespace",
+                function.name
+            ),
+        ))
+    }
+
     /// Resolves a generic one-value function for a container argument.
     pub(super) fn resolve_source_any_single_function(
         &self,

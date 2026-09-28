@@ -240,6 +240,8 @@ impl Compiler<'_> {
             Some(SemanticType::Open)
             | Some(SemanticType::Array(_))
             | Some(SemanticType::Map(_))
+            | Some(SemanticType::Source(_))
+            | Some(SemanticType::Row(_))
             | Some(SemanticType::Union(_)) => {
                 unreachable!("array elements are rejected before scalar matching")
             }

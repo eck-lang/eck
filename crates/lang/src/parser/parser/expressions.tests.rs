@@ -1,6 +1,86 @@
 use super::*;
 use crate::parser::lexer::lex;
-use crate::syntax::{BinaryOperator, ComparisonOperator, Expression, LogicalOperator, Statement};
+use crate::syntax::{
+    BinaryOperator, ComparisonOperator, Expression, LogicalOperator, Statement, TypeExpression,
+};
+
+/// Keeps positional arguments ahead of named arguments in the parsed call.
+#[test]
+fn parses_positional_then_named_call_arguments() {
+    let Expression::Call {
+        arguments,
+        named_arguments,
+        ..
+    } = parse_expression("replace(\"value\", replacement: \"new\", search: \"old\")")
+    else {
+        panic!("expected a call")
+    };
+    assert_eq!(arguments.len(), 1);
+    assert_eq!(
+        named_arguments
+            .iter()
+            .map(|argument| argument.name.name.as_str())
+            .collect::<Vec<_>>(),
+        ["replacement", "search"]
+    );
+}
+
+/// Rejects a positional value after the first named call argument.
+#[test]
+fn rejects_positional_call_argument_after_named() {
+    let mut parser = Parser::new(lex("replace(search: \"old\", \"value\")").unwrap());
+    let error = parser.parse_expression(0).unwrap_err();
+    assert!(error.message.contains("positional argument cannot follow"));
+}
+
+/// Native pipe calls follow the same positional and named argument grammar.
+#[test]
+fn parses_named_pipe_arguments() {
+    let Expression::Pipe {
+        arguments,
+        named_arguments,
+        ..
+    } = parse_expression("'aba'->replace(replacement: 'X', search: 'a')")
+    else {
+        panic!("expected a pipe")
+    };
+    assert!(arguments.is_empty());
+    assert_eq!(
+        named_arguments
+            .iter()
+            .map(|argument| argument.name.name.as_str())
+            .collect::<Vec<_>>(),
+        ["replacement", "search"]
+    );
+
+    let mut parser = Parser::new(lex("'aba'->replace(search: 'a', 'X')").unwrap());
+    assert!(parser.parse_expression(0).is_err());
+}
+
+/// Parses a type boundary as a type expression rather than a value argument.
+#[test]
+fn parses_as_boundary_with_structural_type() {
+    let Expression::As { target_type, .. } = parse_expression("source->as((int | string)[])")
+    else {
+        panic!("expected a type boundary")
+    };
+    assert!(matches!(target_type, TypeExpression::Array { element, .. }
+        if matches!(element.as_ref(), TypeExpression::Union { .. })));
+}
+
+/// Requires one and only one type expression in an `as` boundary.
+#[test]
+fn rejects_invalid_as_boundary_arguments() {
+    for source in [
+        "source->as",
+        "source->as()",
+        "source->as(int, string)",
+        "source->as(1)",
+    ] {
+        let mut parser = Parser::new(lex(source).unwrap());
+        assert!(parser.parse_expression(0).is_err(), "{source}");
+    }
+}
 
 fn parse_expression(source: &str) -> Expression {
     let mut parser = Parser::new(lex(source).unwrap());

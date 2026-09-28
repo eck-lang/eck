@@ -313,6 +313,12 @@ impl Registry {
                     actual: "map".into(),
                 });
             }
+            SemanticType::Source(_) | SemanticType::Row(_) => {
+                return Err(CoreError::UnexpectedBooleanValueType {
+                    expected: self.value_type_name(expected),
+                    actual: "source or row".into(),
+                });
+            }
             SemanticType::Union(_) => {
                 return Err(CoreError::UnexpectedBooleanValueType {
                     expected: self.value_type_name(expected),
@@ -477,7 +483,11 @@ impl Registry {
             SemanticType::Array(array_type) => array_type
                 .static_semantic_type()
                 .map_or(Ok(()), |element| self.validate_semantic_type(element)),
-            SemanticType::Map(_) => Ok(()),
+            SemanticType::Map(_) | SemanticType::Source(_) => Ok(()),
+            SemanticType::Row(row) => row
+                .fields
+                .iter()
+                .try_for_each(|field| self.validate_semantic_type(&field.semantic_type)),
             SemanticType::Union(members) => members
                 .iter()
                 .try_for_each(|member| self.validate_semantic_type(member)),
@@ -498,7 +508,11 @@ impl Registry {
             SemanticType::Array(array_type) => array_type
                 .static_semantic_type()
                 .map_or(Ok(()), |element| self.validate_semantic_type(element)),
-            SemanticType::Map(_) => Ok(()),
+            SemanticType::Map(_) | SemanticType::Source(_) => Ok(()),
+            SemanticType::Row(row) => row
+                .fields
+                .iter()
+                .try_for_each(|field| self.validate_semantic_type(&field.semantic_type)),
             SemanticType::Union(members) => members
                 .iter()
                 .try_for_each(|member| self.validate_semantic_type(member)),

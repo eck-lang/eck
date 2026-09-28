@@ -1,5 +1,6 @@
 //! Composition of the built-in ECK language domains.
 
+use crate::connectors::csv::CsvExtension;
 use crate::containers::array::ArrayExtension;
 use crate::measures::MeasuresExtension;
 use crate::semantic::{CoreError, Extension, Registry};
@@ -18,5 +19,6 @@ pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     MeasuresExtension.register(registry)?;
     ArrayExtension.register(registry)?;
     IoExtension.register(registry)?;
+    CsvExtension.register(registry)?;
     Ok(())
 }

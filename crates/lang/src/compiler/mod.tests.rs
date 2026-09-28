@@ -848,6 +848,190 @@ fn compile_string_namespace_source(source: &str) -> Result<crate::ir::TypedProgr
     compile(&program, &registry)
 }
 
+/// Resolves arbitrary named order to the callback's fixed parameter order.
+#[test]
+fn compiles_named_string_arguments_in_parameter_order() {
+    let typed = compile_string_namespace_source(
+        "use String\nString.replace(\"aba\", replacement: \"X\", search: \"a\")",
+    )
+    .unwrap();
+    let TypedStatement::Expression(TypedExpression {
+        kind:
+            TypedExpressionKind::Call {
+                arguments,
+                source_order,
+                ..
+            },
+        ..
+    }) = &typed.statements[0]
+    else {
+        panic!("expected a compiled call")
+    };
+    let values: Vec<_> = arguments
+        .iter()
+        .map(|argument| {
+            let TypedExpressionKind::Literal(value) = &argument.kind else {
+                panic!("expected literal")
+            };
+            value.downcast_ref::<String>().unwrap().as_str()
+        })
+        .collect();
+    assert_eq!(values, ["aba", "a", "X"]);
+    assert_eq!(source_order.as_deref(), Some(&[0, 2, 1][..]));
+
+    let piped = compile_string_namespace_source(
+        "use String\n'aba'->replace(replacement: 'X', search: 'a')",
+    )
+    .unwrap();
+    let TypedStatement::Expression(TypedExpression {
+        kind: TypedExpressionKind::Call { source_order, .. },
+        ..
+    }) = &piped.statements[0]
+    else {
+        panic!("expected a resolved named pipe call")
+    };
+    assert_eq!(source_order.as_deref(), Some(&[0, 2, 1][..]));
+
+    let imported = compile_string_namespace_source(
+        "use { replace as swap } from String\nswap(search: \"a\", replacement: \"X\", value: \"aba\")",
+    )
+    .unwrap();
+    let TypedStatement::Expression(TypedExpression {
+        kind: TypedExpressionKind::Call { arguments, .. },
+        ..
+    }) = &imported.statements[0]
+    else {
+        panic!("expected an imported compiled call")
+    };
+    let imported_values: Vec<_> = arguments
+        .iter()
+        .map(|argument| {
+            let TypedExpressionKind::Literal(value) = &argument.kind else {
+                panic!("expected literal")
+            };
+            value.downcast_ref::<String>().unwrap().as_str()
+        })
+        .collect();
+    assert_eq!(imported_values, ["aba", "a", "X"]);
+}
+
+/// Reports duplicate, unknown, and missing arguments before emitting call IR.
+#[test]
+fn rejects_invalid_named_string_arguments() {
+    let cases = [
+        (
+            "String.replace(\"aba\", search: \"a\", search: \"b\", replacement: \"X\")",
+            "supplied more than once",
+        ),
+        (
+            "String.replace(\"aba\", unknown: \"a\", replacement: \"X\")",
+            "unknown named argument",
+        ),
+        (
+            "String.replace(\"aba\", replacement: \"X\")",
+            "missing required argument",
+        ),
+        (
+            "String.replace(\"aba\", \"a\", search: \"b\", replacement: \"X\")",
+            "supplied more than once",
+        ),
+    ];
+    for (call, expected) in cases {
+        let source = format!("use String\n{call}");
+        let error = compile_string_namespace_source(&source)
+            .err()
+            .expect("call must fail");
+        assert!(
+            error.message.contains(expected),
+            "{call}: {}",
+            error.message
+        );
+    }
+}
+
+/// Fills trailing defaults for positional calls and interior defaults for named calls.
+#[test]
+fn compiles_six_parameter_defaults_for_both_call_forms() {
+    let mut registry = string_namespace_registry();
+    let string_type = registry.type_by_name("string").unwrap();
+    let function = registry
+        .register_global_function(
+            "read",
+            crate::semantic::FunctionSignature::Exact(vec![string_type; 6]),
+            None,
+            |_, _| Ok(None),
+        )
+        .unwrap();
+    registry
+        .set_function_parameter_names(
+            function,
+            &["path", "delimiter", "header", "quote", "escape", "encoding"],
+        )
+        .unwrap();
+    let defaults: Vec<_> = std::iter::once(None)
+        .chain((1..6).map(|index| Some(Value::new(string_type, format!("default{index}")))))
+        .collect();
+    registry
+        .set_function_parameter_defaults(function, &defaults)
+        .unwrap();
+
+    for (source, last_value) in [
+        ("read(\"file.csv\")", "default5"),
+        ("read(\"file.csv\", encoding: \"utf8\")", "utf8"),
+    ] {
+        let parsed = crate::parser::parse(source).unwrap();
+        let program = compile(&parsed, &registry).unwrap();
+        let TypedStatement::Expression(TypedExpression {
+            kind: TypedExpressionKind::Call { arguments, .. },
+            ..
+        }) = &program.statements[0]
+        else {
+            panic!("expected a compiled call")
+        };
+        assert_eq!(arguments.len(), 6);
+        let TypedExpressionKind::Literal(value) = &arguments[5].kind else {
+            panic!("expected literal")
+        };
+        assert_eq!(value.downcast_ref::<String>().unwrap(), last_value);
+    }
+}
+
+/// Preserves a structural native output and passes it to a generic print call.
+#[test]
+fn compiles_registered_source_output_as_a_structural_argument() {
+    let mut registry = string_namespace_registry();
+    crate::std::io::IoExtension.register(&mut registry).unwrap();
+    let string_type = registry.type_by_name("string").unwrap();
+    registry.register_namespace("SourceTest", None).unwrap();
+    registry
+        .register_function_with_output(
+            "SourceTest.read",
+            crate::semantic::FunctionSignature::Exact(vec![string_type]),
+            Some(SemanticType::Source(std::sync::Arc::new(
+                crate::semantic::SourceType { row: None },
+            ))),
+            |_, _| Ok(None),
+        )
+        .unwrap();
+    registry
+        .export_namespace_function("SourceTest", "read", "SourceTest.read")
+        .unwrap();
+    let parsed =
+        crate::parser::parse("use SourceTest\nprint(SourceTest.read(\"file.csv\"))").unwrap();
+    let program = compile(&parsed, &registry).unwrap();
+    let TypedStatement::Expression(TypedExpression {
+        kind: TypedExpressionKind::Call { arguments, .. },
+        ..
+    }) = &program.statements[0]
+    else {
+        panic!("expected print call")
+    };
+    assert!(matches!(
+        arguments[0].output.as_ref(),
+        Some(SemanticType::Source(_))
+    ));
+}
+
 /// Returns the function identity used by the first compiled call or pipe expression.
 fn first_function_identity(program: &crate::ir::TypedProgram) -> crate::semantic::FunctionId {
     let expression = program

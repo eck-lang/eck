@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::semantic::{ArrayType, MapType, ValueType};
+use crate::semantic::{ArrayType, MapType, RowType, SourceType, ValueType};
 
 /// Selects how a scalar value is represented when it crosses an array boundary.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -39,6 +39,10 @@ pub enum SemanticType {
     Array(Arc<ArrayType>),
     /// One recursively describable associative container.
     Map(Arc<MapType>),
+    /// One lazy iterable source with an optional logical row contract.
+    Source(Arc<SourceType>),
+    /// One row produced by a source iteration.
+    Row(Arc<RowType>),
     /// One canonical finite union of structural types.
     Union(Arc<[SemanticType]>),
 }
@@ -88,7 +92,7 @@ impl SemanticType {
         match self {
             Self::Open => false,
             Self::Scalar(actual) => *actual == value_type,
-            Self::Array(_) | Self::Map(_) => false,
+            Self::Array(_) | Self::Map(_) | Self::Source(_) | Self::Row(_) => false,
             Self::Union(members) => members
                 .iter()
                 .any(|member| member.contains_scalar(value_type)),
@@ -99,7 +103,12 @@ impl SemanticType {
     pub fn without_scalar(&self, value_type: ValueType) -> Option<Self> {
         match self {
             Self::Scalar(actual) if *actual == value_type => None,
-            Self::Open | Self::Scalar(_) | Self::Array(_) | Self::Map(_) => Some(self.clone()),
+            Self::Open
+            | Self::Scalar(_)
+            | Self::Array(_)
+            | Self::Map(_)
+            | Self::Source(_)
+            | Self::Row(_) => Some(self.clone()),
             Self::Union(members) => {
                 let remaining = members
                     .iter()
@@ -117,6 +126,8 @@ impl SemanticType {
             Self::Scalar(value_type) => format!("scalar:{value_type:?}"),
             Self::Array(array_type) => format!("array:{array_type:?}"),
             Self::Map(map_type) => format!("map:{map_type:?}"),
+            Self::Source(source_type) => format!("source:{source_type:?}"),
+            Self::Row(row_type) => format!("row:{row_type:?}"),
             Self::Union(members) => format!("union:{members:?}"),
         }
     }
@@ -150,6 +161,8 @@ pub fn is_assignable(source: &SemanticType, destination: &SemanticType) -> bool 
         }
         (SemanticType::Array(source), SemanticType::Array(destination)) => source == destination,
         (SemanticType::Map(source), SemanticType::Map(destination)) => source == destination,
+        (SemanticType::Source(source), SemanticType::Source(destination)) => source == destination,
+        (SemanticType::Row(source), SemanticType::Row(destination)) => source == destination,
         _ => false,
     }
 }

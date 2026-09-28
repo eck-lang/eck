@@ -99,6 +99,7 @@ fn every_expression_variant_returns_its_span() {
                 span: expected_span,
             },
             arguments: vec![number_expression(expected_span)],
+            named_arguments: Vec::new(),
             span: expected_span,
         },
     ];

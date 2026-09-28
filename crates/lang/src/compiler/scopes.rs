@@ -241,6 +241,10 @@ impl Compiler<'_> {
                 expression.span,
                 "a map cannot be used as a scalar operand",
             )),
+            Some(SemanticType::Source(_) | SemanticType::Row(_)) => Err(CompileError::new(
+                expression.span,
+                "a source or row cannot be used as a scalar operand",
+            )),
             Some(SemanticType::Union(_)) => Err(CompileError::new(
                 expression.span,
                 "a union cannot be used as a scalar operand; narrow it first",
@@ -261,6 +265,8 @@ impl Compiler<'_> {
             Some(SemanticType::Open)
             | Some(SemanticType::Array(_))
             | Some(SemanticType::Map(_))
+            | Some(SemanticType::Source(_))
+            | Some(SemanticType::Row(_))
             | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects non-scalar types")
             }
@@ -279,6 +285,8 @@ impl Compiler<'_> {
             Some(SemanticType::Open)
             | Some(SemanticType::Array(_))
             | Some(SemanticType::Map(_))
+            | Some(SemanticType::Source(_))
+            | Some(SemanticType::Row(_))
             | Some(SemanticType::Union(_)) => Err(CompileError::new(
                 expression.span,
                 "a container or union has no scalar overload type",

@@ -34,12 +34,13 @@ impl Extension for StringExtension {
         registry.set_default_string(string_type)?;
         operations::register(registry, string_type)?;
         comparisons::register(registry)?;
-        registry.register_global_function(
+        let conversion = registry.register_global_function(
             "string",
             FunctionSignature::AnySingle,
             Some(string_type),
             conversion::format_as_string,
         )?;
+        registry.set_function_parameter_names(conversion, &["value"])?;
         registry.register_namespace("String", Some(string_type))?;
         functions::register(registry, string_type)?;
         Ok(())

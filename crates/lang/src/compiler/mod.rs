@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 use crate::semantic::{
     BinaryOperator as CoreBinaryOperator, ComparisonOperator as CoreComparisonOperator,
-    DeclaredType, Registry, ScalarRepresentation, SemanticType, ValueType,
+    DeclaredType, Registry, RowField, RowType, ScalarRepresentation, SemanticType, ValueType,
 };
-use crate::syntax::{Block, Expression, Program, Statement, TypeExpression};
+use crate::syntax::{Block, Expression, Program, Statement, TypeDefinition, TypeExpression};
 
 use crate::containers::array::compiler::ArrayElementFlow;
 use crate::ir::{
@@ -26,6 +26,7 @@ mod finite_dispatch;
 mod helpers;
 mod imports;
 mod scopes;
+mod sources;
 
 use self::helpers::statement_span;
 
@@ -47,6 +48,9 @@ pub fn compile(program: &Program, registry: &Registry) -> Result<TypedProgram, C
         type_aliases: HashMap::new(),
         alias_cache: HashMap::new(),
         alias_resolution_stack: Vec::new(),
+        type_definitions: HashMap::new(),
+        row_cache: HashMap::new(),
+        row_resolution_stack: Vec::new(),
     }
     .compile_program(program)
 }
@@ -91,6 +95,9 @@ pub(crate) struct Compiler<'a> {
     type_aliases: HashMap<String, TypeExpression>,
     alias_cache: HashMap<String, DeclaredType>,
     alias_resolution_stack: Vec<String>,
+    type_definitions: HashMap<String, TypeDefinition>,
+    row_cache: HashMap<String, Arc<RowType>>,
+    row_resolution_stack: Vec<String>,
 }
 
 /// Captures the control-flow facts one enclosing loop needs while its body is
@@ -238,6 +245,17 @@ impl Compiler<'_> {
     /// The result records the final local slot count and binding metadata.
     fn compile_program(&mut self, program: &Program) -> Result<TypedProgram, CompileError> {
         for statement in &program.statements {
+            if let Statement::TypeDeclaration { definition, .. } = statement
+                && self
+                    .type_definitions
+                    .insert(definition.name.clone(), definition.clone())
+                    .is_some()
+            {
+                return Err(CompileError::new(
+                    definition.span,
+                    format!("row type `{}` is already declared", definition.name),
+                ));
+            }
             if let Statement::TypeAlias { definition, .. } = statement
                 && self
                     .type_aliases
@@ -266,7 +284,10 @@ impl Compiler<'_> {
                 self.compile_use_declaration(declaration)?;
                 continue;
             }
-            if matches!(statement, Statement::TypeAlias { .. }) {
+            if matches!(
+                statement,
+                Statement::TypeAlias { .. } | Statement::TypeDeclaration { .. }
+            ) {
                 continue;
             }
             statements.push(self.compile_statement(statement)?);
@@ -383,6 +404,12 @@ impl Compiler<'_> {
                 body,
                 span,
             } => self.compile_for_statement(variable, start, end, body, *span),
+            Statement::ForEach {
+                variable,
+                source,
+                body,
+                span,
+            } => self.compile_for_each_statement(variable, source, body, *span),
             Statement::Break { span } => {
                 if self.loop_depth == 0 {
                     return Err(CompileError::new(
@@ -431,6 +458,8 @@ impl Compiler<'_> {
             Some(SemanticType::Open)
             | Some(SemanticType::Array(_))
             | Some(SemanticType::Map(_))
+            | Some(SemanticType::Source(_))
+            | Some(SemanticType::Row(_))
             | Some(SemanticType::Union(_)) => {
                 unreachable!("require_scalar_expression rejects array semantic types")
             }
@@ -456,6 +485,60 @@ impl Compiler<'_> {
         }
         Ok(typed_condition)
     }
+    /// Resolves one structural row declaration into stable field slots.
+    fn resolve_row_type(
+        &mut self,
+        name: &str,
+        span: crate::syntax::Span,
+    ) -> Result<Arc<RowType>, CompileError> {
+        if let Some(row) = self.row_cache.get(name) {
+            return Ok(row.clone());
+        }
+        if self
+            .row_resolution_stack
+            .iter()
+            .any(|active| active == name)
+        {
+            return Err(CompileError::new(
+                span,
+                format!("recursive row type `{name}` is not supported"),
+            ));
+        }
+        let definition = self
+            .type_definitions
+            .get(name)
+            .cloned()
+            .ok_or_else(|| CompileError::new(span, format!("unknown row type `{name}`")))?;
+        self.row_resolution_stack.push(name.to_string());
+        let result = (|| {
+            let mut fields = Vec::with_capacity(definition.fields.len());
+            for field in &definition.fields {
+                if fields
+                    .iter()
+                    .any(|existing: &RowField| existing.name == field.name)
+                {
+                    return Err(CompileError::new(
+                        field.span,
+                        format!("duplicate row field `{}`", field.name),
+                    ));
+                }
+                let resolved = self.resolve_declared_type(&field.type_expression, field.span)?;
+                fields.push(RowField {
+                    name: field.name.clone(),
+                    semantic_type: resolved.semantic_type,
+                    source_type_name: field.type_expression.to_string(),
+                });
+            }
+            Ok(Arc::new(RowType {
+                fields: fields.into(),
+            }))
+        })();
+        self.row_resolution_stack.pop();
+        let row = result?;
+        self.row_cache.insert(name.to_string(), row.clone());
+        Ok(row)
+    }
+
     /// Resolves one parsed type expression, including aliases and recursive structure.
     fn resolve_declared_type(
         &mut self,
@@ -464,6 +547,12 @@ impl Compiler<'_> {
     ) -> Result<DeclaredType, CompileError> {
         match type_expression {
             TypeExpression::Named { name, .. } => {
+                if self.type_definitions.contains_key(name) {
+                    return Ok(DeclaredType {
+                        semantic_type: SemanticType::Row(self.resolve_row_type(name, span)?),
+                        representation: ScalarRepresentation::Exact,
+                    });
+                }
                 if let Some(alias_expression) = self.type_aliases.get(name).cloned() {
                     if let Some(resolved) = self.alias_cache.get(name) {
                         return Ok(resolved.clone());
@@ -534,6 +623,8 @@ impl Compiler<'_> {
                     SemanticType::Open
                     | SemanticType::Array(_)
                     | SemanticType::Map(_)
+                    | SemanticType::Source(_)
+                    | SemanticType::Row(_)
                     | SemanticType::Union(_) => ScalarRepresentation::Exact,
                 };
                 Ok(DeclaredType {
@@ -597,7 +688,11 @@ impl Compiler<'_> {
                 .iter()
                 .flat_map(Self::array_members_for_type)
                 .collect(),
-            SemanticType::Open | SemanticType::Scalar(_) | SemanticType::Map(_) => Vec::new(),
+            SemanticType::Open
+            | SemanticType::Scalar(_)
+            | SemanticType::Map(_)
+            | SemanticType::Source(_)
+            | SemanticType::Row(_) => Vec::new(),
         }
     }
 
@@ -619,7 +714,10 @@ impl Compiler<'_> {
         match semantic_type {
             SemanticType::Array(_) => true,
             SemanticType::Map(_) => false,
-            SemanticType::Open | SemanticType::Scalar(_) => false,
+            SemanticType::Open
+            | SemanticType::Scalar(_)
+            | SemanticType::Source(_)
+            | SemanticType::Row(_) => false,
             SemanticType::Union(members) => members.iter().any(Self::type_contains_array),
         }
     }
@@ -642,6 +740,8 @@ impl Compiler<'_> {
                 }
             }
             SemanticType::Map(_) => "map".into(),
+            SemanticType::Source(_) => "source".into(),
+            SemanticType::Row(_) => "row".into(),
             SemanticType::Union(members) => members
                 .iter()
                 .map(|member| self.semantic_type_name(member))
@@ -1079,6 +1179,65 @@ impl Compiler<'_> {
     /// The loop variable takes the start bound's type and lives in a dedicated
     /// child scope, where it may shadow an outer binding and is released with
     /// the loop.
+    /// Compiles a lazy iterable loop while preserving its source row contract.
+    fn compile_for_each_statement(
+        &mut self,
+        variable: &str,
+        source: &Expression,
+        body: &Block,
+        span: crate::syntax::Span,
+    ) -> Result<TypedStatement, CompileError> {
+        let typed_source = self.compile_expression(source, None)?;
+        let row_type = match typed_source.output.as_ref() {
+            Some(SemanticType::Source(source_type)) => source_type
+                .row
+                .as_ref()
+                .map(|row| SemanticType::Row(row.clone()))
+                .unwrap_or(SemanticType::Open),
+            _ => {
+                return Err(CompileError::new(
+                    source.span(),
+                    "for source must be a lazy iterable",
+                ));
+            }
+        };
+        let loop_entry_state = self.flow_snapshot();
+        self.variable_scopes.push(HashMap::new());
+        self.scope_slots.push(Vec::new());
+        self.import_scopes.push(ImportScope::default());
+        let compiled = (|| {
+            let local_variable = self.bind_local_variable(
+                variable.to_owned(),
+                row_type.clone(),
+                false,
+                BindingContract::Static(row_type),
+                None,
+                span,
+            );
+            let compiled = self.compile_loop_statement(loop_entry_state, true, |compiler| {
+                compiler.loop_depth += 1;
+                let compiled_body = compiler.compile_block(body);
+                compiler.loop_depth -= 1;
+                Ok(CompiledLoopPass {
+                    condition: None,
+                    body: compiled_body?,
+                })
+            })?;
+            Ok(TypedStatement::ForEach {
+                variable: variable.to_owned(),
+                binding: local_variable.binding,
+                slot: local_variable.slot,
+                source: typed_source,
+                body: compiled.pass.body,
+                span,
+            })
+        })();
+        self.import_scopes.pop();
+        self.scope_slots.pop();
+        self.variable_scopes.pop();
+        compiled
+    }
+
     fn compile_for_statement(
         &mut self,
         variable: &str,

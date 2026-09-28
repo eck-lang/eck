@@ -233,6 +233,23 @@ fn parses_type_and_frame_declarations() {
     assert!(expression.is_none());
 }
 
+/// Verifies nullable row fields and lazy iterable loops retain their syntax shapes.
+#[test]
+fn parses_nullable_row_fields_and_source_iteration() {
+    let program =
+        parse("type User {\n age: int?\n}\nfor (user in rows) { print(user) }\n").unwrap();
+    let Statement::TypeDeclaration { definition, .. } = &program.statements[0] else {
+        panic!("expected a row type");
+    };
+    assert!(matches!(
+        definition.fields[0].type_expression,
+        TypeExpression::Nullable { .. }
+    ));
+    assert!(
+        matches!(&program.statements[1], Statement::ForEach { variable, .. } if variable == "user")
+    );
+}
+
 /// Verifies a frame declaration retains hand-written column-oriented literal data.
 #[test]
 fn parses_hand_written_frame_literals() {
@@ -468,7 +485,6 @@ fn parses_for_range_loop_with_expression_bounds() {
 fn rejects_invalid_for_range_syntax() {
     for (source, expected) in [
         ("for (i in 0..10 {}\n", "expected RightParenthesis"),
-        ("for (i in 0.10) {}\n", "expected DotDot"),
         ("for i in 0..10) {}\n", "expected LeftParenthesis"),
         ("for (i 0..10) {}\n", "expected In"),
         ("for (i in 0..10)\nprint(1)\n", "expected LeftBrace"),

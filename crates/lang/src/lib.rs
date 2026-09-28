@@ -1,6 +1,7 @@
 //! The ECK language implementation.
 
 pub mod compiler;
+pub mod connectors;
 pub mod containers;
 pub mod ir;
 pub mod measures;

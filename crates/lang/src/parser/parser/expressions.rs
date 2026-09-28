@@ -2,7 +2,7 @@
 
 use crate::syntax::{
     BinaryOperator, ComparisonOperator, Expression, FrameLiteralColumn, LogicalOperator,
-    SourceIdentifier, Span, UnaryOperator,
+    NamedArgument, SourceIdentifier, Span, UnaryOperator,
 };
 
 use crate::parser::{ParseError, lexer::TokenKind};
@@ -167,24 +167,35 @@ impl Parser {
     fn parse_postfix_arrow(&mut self, expression: Expression) -> Result<Expression, ParseError> {
         self.advance();
         let target_start = self.peek().span.start;
-        let target = self
-            .expect_identifier("expected target after `->`")
-            .map_err(|mut error| {
-                error.span.start = target_start;
-                error
-            })?;
+        let target = if matches!(self.peek().kind, TokenKind::As) {
+            self.advance();
+            "as".to_string()
+        } else {
+            self.expect_identifier("expected target after `->`")
+                .map_err(|mut error| {
+                    error.span.start = target_start;
+                    error
+                })?
+        };
+        if target == "as" && !matches!(self.peek().kind, TokenKind::LeftParenthesis) {
+            return Err(self.error_here("expected `(` after `->as`"));
+        }
         if matches!(self.peek().kind, TokenKind::LeftParenthesis) {
-            self.expect_simple(TokenKind::LeftParenthesis)?;
-            let mut arguments = Vec::new();
-            if !matches!(self.peek().kind, TokenKind::RightParenthesis) {
-                loop {
-                    arguments.push(self.parse_expression(0)?);
-                    if !matches!(self.peek().kind, TokenKind::Comma) {
-                        break;
-                    }
-                    self.advance();
-                }
+            if target == "as" {
+                self.advance();
+                let target_type = self.parse_type_expression()?;
+                let end = self.expect_simple(TokenKind::RightParenthesis)?.span.end;
+                return Ok(Expression::As {
+                    span: Span {
+                        start: expression.span().start,
+                        end,
+                    },
+                    expression: Box::new(expression),
+                    target_type,
+                });
             }
+            self.expect_simple(TokenKind::LeftParenthesis)?;
+            let (arguments, named_arguments) = self.parse_arguments()?;
             let end = self.expect_simple(TokenKind::RightParenthesis)?.span.end;
             let span = Span {
                 start: expression.span().start,
@@ -194,6 +205,7 @@ impl Parser {
                 expression: Box::new(expression),
                 function: target,
                 arguments,
+                named_arguments,
                 span,
             })
         } else {
@@ -483,23 +495,50 @@ impl Parser {
             .as_ref()
             .map_or(function.span.start, |namespace| namespace.span.start);
         self.expect_simple(TokenKind::LeftParenthesis)?;
+        let (arguments, named_arguments) = self.parse_arguments()?;
+        let end = self.expect_simple(TokenKind::RightParenthesis)?.span.end;
+        Ok(Expression::Call {
+            namespace,
+            function,
+            arguments,
+            named_arguments,
+            span: Span { start, end },
+        })
+    }
+
+    /// Parses positional arguments followed by optional named arguments.
+    fn parse_arguments(&mut self) -> Result<(Vec<Expression>, Vec<NamedArgument>), ParseError> {
         let mut arguments = Vec::new();
+        let mut named_arguments = Vec::new();
         if !matches!(&self.peek().kind, TokenKind::RightParenthesis) {
             loop {
-                arguments.push(self.parse_expression(0)?);
+                if let (TokenKind::Ident(name), Some(TokenKind::Colon)) =
+                    (&self.peek().kind, self.peek_n(1).map(|token| &token.kind))
+                {
+                    let name = SourceIdentifier {
+                        name: name.clone(),
+                        span: self.advance().span,
+                    };
+                    self.advance();
+                    named_arguments.push(NamedArgument {
+                        name,
+                        expression: self.parse_expression(0)?,
+                    });
+                } else {
+                    if !named_arguments.is_empty() {
+                        return Err(
+                            self.error_here("positional argument cannot follow a named argument")
+                        );
+                    }
+                    arguments.push(self.parse_expression(0)?);
+                }
                 if !matches!(&self.peek().kind, TokenKind::Comma) {
                     break;
                 }
                 self.advance();
             }
         }
-        let end = self.expect_simple(TokenKind::RightParenthesis)?.span.end;
-        Ok(Expression::Call {
-            namespace,
-            function,
-            arguments,
-            span: Span { start, end },
-        })
+        Ok((arguments, named_arguments))
     }
 
     /// Returns the non-associative comparison operator at the cursor.

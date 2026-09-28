@@ -103,6 +103,15 @@ pub enum TypedStatement {
         body: TypedBlock,
         span: Span,
     },
+    /// Iterates a lazy source and releases its cursor on loop exit.
+    ForEach {
+        variable: String,
+        binding: BindingId,
+        slot: LocalVariableSlot,
+        source: TypedExpression,
+        body: TypedBlock,
+        span: Span,
+    },
     /// Exits the innermost enclosing loop.
     Break { span: Span },
     /// Skips to the next iteration of the innermost enclosing loop.

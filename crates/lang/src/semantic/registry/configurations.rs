@@ -150,7 +150,10 @@ impl Registry {
     ) -> Result<Value, CoreError> {
         if matches!(
             value.semantic_type(),
-            SemanticType::Array(_) | SemanticType::Map(_)
+            SemanticType::Array(_)
+                | SemanticType::Map(_)
+                | SemanticType::Source(_)
+                | SemanticType::Row(_)
         ) {
             return Ok(value.clone());
         }
@@ -178,7 +181,10 @@ impl Registry {
     ) -> Result<Value, CoreError> {
         if matches!(
             value.semantic_type(),
-            SemanticType::Array(_) | SemanticType::Map(_)
+            SemanticType::Array(_)
+                | SemanticType::Map(_)
+                | SemanticType::Source(_)
+                | SemanticType::Row(_)
         ) {
             return Ok(value);
         }
@@ -218,6 +224,26 @@ impl Registry {
         }
         if matches!(value.semantic_type(), SemanticType::Map(_)) {
             return crate::containers::map::format_value(self, value, configuration);
+        }
+        if matches!(value.semantic_type(), SemanticType::Source(_)) {
+            return Ok("<CSV source>".to_string());
+        }
+        if let SemanticType::Row(row_type) = value.semantic_type() {
+            let fields = value.downcast_ref::<Vec<Value>>().ok_or_else(|| {
+                crate::semantic::CoreError::InvalidValueRepresentation("row".into())
+            })?;
+            let mut rendered = String::from("{");
+            for (index, (field, field_value)) in row_type.fields.iter().zip(fields).enumerate() {
+                if index > 0 {
+                    rendered.push_str(", ");
+                }
+                rendered.push_str(&field.name);
+                rendered.push_str(": ");
+                rendered
+                    .push_str(&self.format_value_with_configuration(field_value, configuration)?);
+            }
+            rendered.push('}');
+            return Ok(rendered);
         }
         let formatted = match self.type_configuration(value.type_id()) {
             Some(registered) => match registered.descriptor.format {
