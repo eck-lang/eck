@@ -188,6 +188,37 @@ impl Compiler<'_> {
         Ok((typed, constant_index, index_extractor, index_dispatch))
     }
 
+    /// Preserves adaptive width dispatch while honoring proven plain element subtypes.
+    ///
+    /// Typed adaptive arrays can normally contain arbitrary registered subtypes.
+    /// A finite flow domain containing only plain signed integers proves that
+    /// qualified alternatives cannot occur at this program point. Every signed
+    /// width remains available so overflow promotion keeps its ordinary plans.
+    pub(crate) fn array_element_access_complete_type_domain(
+        &self,
+        array: &TypedExpression,
+        array_type: ArrayType,
+    ) -> Arc<CompleteTypeDomain> {
+        let plain_signed = array_type.static_representation() == Some(ScalarRepresentation::AdaptiveSignedInteger)
+            && self.array_known_element_types(array).is_some_and(|known| {
+                !known.is_empty() && known.iter().all(|semantic_type| matches!(semantic_type,
+                    SemanticType::Scalar(value_type) if value_type.subtype.is_none() && self.is_signed_integer_base(value_type.base)))
+            });
+        let domain = self.array_element_complete_type_domain(array_type);
+        if plain_signed {
+            CompleteTypeDomain::from_candidates(
+                self.registry,
+                domain
+                    .candidates
+                    .iter()
+                    .copied()
+                    .filter(|candidate| candidate.subtype.is_none()),
+            )
+        } else {
+            domain
+        }
+    }
+
     /// Builds the complete identities an array element may carry at runtime.
     ///
     /// Adaptive `int[]` values may use every signed widening representation,
@@ -225,3 +256,7 @@ impl Compiler<'_> {
         )
     }
 }
+
+#[cfg(test)]
+#[path = "access.tests.rs"]
+mod tests;

@@ -239,7 +239,7 @@ impl<'registry> Runtime<'registry> {
         else {
             return Ok(None);
         };
-        if !self.configuration.uses_initial_values() {
+        if !self.configuration.uses_initial_value_settings() {
             return Ok(None);
         }
         let (left_operand, right_operand) = match &expression.kind {
@@ -271,7 +271,7 @@ impl<'registry> Runtime<'registry> {
             || immediate.value_type() != crate::semantic::ValueType::plain(integer)
             || !self
                 .registry
-                .initial_result_transform_is_identity(integer)?
+                .result_transform_is_identity(integer, &self.configuration)?
         {
             return Ok(None);
         }
@@ -298,7 +298,7 @@ impl<'registry> Runtime<'registry> {
         else {
             return Ok(None);
         };
-        if !self.configuration.uses_initial_values() {
+        if !self.configuration.uses_initial_value_settings() {
             return Ok(None);
         }
         let (left_operand, right_operand) = match &expression.kind {
@@ -339,7 +339,7 @@ impl<'registry> Runtime<'registry> {
             || immediate.value_type() != crate::semantic::ValueType::plain(integer)
             || !self
                 .registry
-                .initial_result_transform_is_identity(integer)?
+                .result_transform_is_identity(integer, &self.configuration)?
         {
             return Ok(None);
         }
@@ -502,10 +502,9 @@ impl<'registry> Runtime<'registry> {
                     instructions.truncate(instruction_start);
                     return Ok(false);
                 }
-                let skip_initial_configuration_transform = self.configuration.uses_initial_values()
-                    && self
-                        .registry
-                        .initial_result_transform_is_identity(descriptor.result_type)?;
+                let skip_initial_configuration_transform = self
+                    .registry
+                    .result_transform_is_identity(descriptor.result_type, &self.configuration)?;
                 instructions.push(DirectLoopInstruction::ExecuteBinary {
                     descriptor: descriptor.clone(),
                     adjustment_descriptor: execution_plan
@@ -795,7 +794,7 @@ impl<'registry> Runtime<'registry> {
                     immediate,
                     fallback,
                 } => {
-                    if !self.configuration.uses_initial_values() {
+                    if !self.configuration.uses_initial_value_settings() {
                         self.execute_statement(fallback)?;
                         continue;
                     }
@@ -826,7 +825,7 @@ impl<'registry> Runtime<'registry> {
                     immediate,
                     fallback,
                 } => {
-                    if !self.configuration.uses_initial_values() {
+                    if !self.configuration.uses_initial_value_settings() {
                         self.execute_statement(fallback)?;
                         continue;
                     }
@@ -907,7 +906,8 @@ impl<'registry> Runtime<'registry> {
                     }
                     .with_subtype(resolution.output.subtype);
                     let value = if *skip_initial_configuration_transform
-                        && self.configuration.uses_initial_values()
+                        && value.type_id() == descriptor.result_type
+                        && self.configuration.uses_initial_value_settings()
                     {
                         value
                     } else {

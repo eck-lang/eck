@@ -23,7 +23,8 @@ pub use configuration::{
 };
 pub use descriptor::{
     BinaryOperatorDescriptor, BinaryOperatorExecutor, BooleanEvaluator, ComparisonDescriptor,
-    ComparisonExecutor, ContextBinaryOperatorExecutor, FunctionDescriptor, FunctionSignature,
+    ComparisonExecutor, ContextBinaryOperatorExecutor, FunctionDescriptor, FunctionDeterminism,
+    FunctionEffectSummary, FunctionExternalEffect, FunctionPurity, FunctionSignature,
     InPlaceBinaryOperatorExecutor, IndexExtractor, LiteralParser, NamespaceSymbol, NativeFunction,
     TypeDescriptor, ValueFormatter,
 };

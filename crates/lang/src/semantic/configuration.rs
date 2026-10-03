@@ -66,12 +66,29 @@ pub struct TypeConfigurationDescriptor {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ConfigurationOverride {
     entries: Vec<(String, ConfigurationValue)>,
+    execution_workers: Option<usize>,
+    changes_value_settings: bool,
 }
 
 impl ConfigurationOverride {
     /// Creates an override from normalized path/value entries.
     pub fn new(entries: Vec<(String, ConfigurationValue)>) -> Self {
-        Self { entries }
+        let execution_workers =
+            entries
+                .iter()
+                .rev()
+                .find_map(|(path, value)| match (path.as_str(), value) {
+                    ("cores", ConfigurationValue::Integer(workers)) => {
+                        Some(usize::try_from(*workers).unwrap_or(1).max(1))
+                    }
+                    _ => None,
+                });
+        let changes_value_settings = entries.iter().any(|(path, _)| path != "cores");
+        Self {
+            entries,
+            execution_workers,
+            changes_value_settings,
+        }
     }
 
     /// Iterates over the normalized entries in source order.
@@ -87,6 +104,8 @@ impl ConfigurationOverride {
 pub struct RuntimeConfiguration {
     values: HashMap<String, ConfigurationValue>,
     uses_initial_values: bool,
+    uses_initial_value_settings: bool,
+    execution_workers: Option<usize>,
 }
 
 impl RuntimeConfiguration {
@@ -95,6 +114,8 @@ impl RuntimeConfiguration {
         Self {
             values,
             uses_initial_values: true,
+            uses_initial_value_settings: true,
+            execution_workers: None,
         }
     }
 
@@ -113,8 +134,22 @@ impl RuntimeConfiguration {
         self.uses_initial_values
     }
 
+    /// Reports whether overrides have changed any setting other than worker scheduling.
+    pub(crate) fn uses_initial_value_settings(&self) -> bool {
+        self.uses_initial_value_settings
+    }
+
+    /// Returns an explicit source worker budget, or the executor default when omitted.
+    pub(crate) fn execution_workers(&self) -> Option<usize> {
+        self.execution_workers
+    }
+
     /// Merges a validated override into the current execution state.
     pub fn apply(&mut self, configuration_override: &ConfigurationOverride) {
+        if let Some(workers) = configuration_override.execution_workers {
+            self.execution_workers = Some(workers);
+        }
+        self.uses_initial_value_settings &= !configuration_override.changes_value_settings;
         for (path, value) in configuration_override.entries() {
             self.values.insert(path.to_string(), value.clone());
             self.uses_initial_values = false;
@@ -160,3 +195,7 @@ pub(crate) struct RegisteredTypeConfiguration {
     pub(crate) type_id: TypeId,
     pub(crate) descriptor: TypeConfigurationDescriptor,
 }
+
+#[cfg(test)]
+#[path = "configuration.tests.rs"]
+mod tests;

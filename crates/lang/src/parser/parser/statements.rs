@@ -400,7 +400,11 @@ impl Parser {
     /// Parses one `name: value` entry from a configuration object.
     fn parse_configuration_entry(&mut self) -> Result<ConfigurationEntry, ParseError> {
         let start = self.peek().span.start;
-        let name = self.expect_identifier("expected configuration name")?;
+        let token = self.advance().clone();
+        let name = match token.kind {
+            TokenKind::Ident(name) | TokenKind::String(name) => name,
+            _ => return Err(self.error_at(token.span, "expected configuration name")),
+        };
         self.expect_simple(TokenKind::Colon)?;
         let value = self.parse_configuration_value()?;
         Ok(ConfigurationEntry {

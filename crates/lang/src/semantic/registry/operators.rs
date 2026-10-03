@@ -51,6 +51,7 @@ impl Registry {
             context_execute: None,
         });
         self.operator_index.insert(key, id);
+        self.execution_revision += 1;
         Ok(id)
     }
 
@@ -101,6 +102,7 @@ impl Registry {
             context_execute: Some(context_execute),
         });
         self.operator_index.insert(key, id);
+        self.execution_revision += 1;
         Ok(id)
     }
 
@@ -132,6 +134,7 @@ impl Registry {
             .get_mut(id.index)
             .ok_or(CoreError::UnknownOperatorId(id))?;
         descriptor.in_place_execute = Some(execute);
+        self.execution_revision += 1;
         Ok(())
     }
 

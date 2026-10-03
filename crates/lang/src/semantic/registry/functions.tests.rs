@@ -2,6 +2,145 @@ use super::*;
 
 use super::super::test_support::{execute_function, foreign_type_id, register_type};
 
+/// Keeps undeclared native functions conservative and preserves explicit summaries by ID.
+#[test]
+fn function_effect_summaries_default_to_unknown_and_accept_declarations() {
+    let mut registry = Registry::new();
+    let type_id = register_type(&mut registry, "int");
+    let unknown = registry
+        .register_function(
+            "unknown",
+            FunctionSignature::Exact(vec![type_id]),
+            Some(type_id),
+            execute_function,
+        )
+        .unwrap();
+    assert_eq!(
+        registry.function(unknown).unwrap().effect_summary,
+        FunctionEffectSummary::UNKNOWN
+    );
+
+    let pure = registry
+        .register_function_with_effect_summary(
+            "pure",
+            FunctionSignature::Exact(vec![type_id]),
+            Some(type_id),
+            execute_function,
+            FunctionEffectSummary::PURE,
+        )
+        .unwrap();
+    assert_eq!(
+        registry.function(pure).unwrap().effect_summary,
+        FunctionEffectSummary::PURE
+    );
+
+    let impure_summary = FunctionEffectSummary {
+        purity: crate::semantic::FunctionPurity::Impure,
+        determinism: crate::semantic::FunctionDeterminism::Deterministic,
+        may_fail: true,
+        external_effect: crate::semantic::FunctionExternalEffect::WritesExternalState,
+    };
+    let impure = registry
+        .register_function_with_effect_summary(
+            "impure",
+            FunctionSignature::Exact(vec![type_id]),
+            None,
+            execute_function,
+            impure_summary,
+        )
+        .unwrap();
+    assert_eq!(
+        registry.function(impure).unwrap().effect_summary,
+        impure_summary
+    );
+}
+
+/// Audits the effect declarations on built-in native functions.
+#[test]
+fn builtin_function_effect_summaries_match_their_observable_behavior() {
+    use crate::semantic::{
+        FunctionDeterminism, FunctionExternalEffect, FunctionPurity, default_registry,
+    };
+
+    let registry = default_registry().unwrap();
+    let string_type = registry.type_by_name("string").unwrap();
+    let uppercase = registry
+        .resolve_function("String.uppercase", &[string_type])
+        .unwrap();
+    assert_eq!(
+        registry.function(uppercase).unwrap().effect_summary,
+        FunctionEffectSummary {
+            purity: FunctionPurity::Pure,
+            determinism: FunctionDeterminism::Deterministic,
+            may_fail: true,
+            external_effect: FunctionExternalEffect::None,
+        }
+    );
+    let repeat = registry
+        .resolve_function(
+            "String.repeat",
+            &[string_type, registry.type_by_name("int").unwrap()],
+        )
+        .unwrap();
+    assert_eq!(
+        registry.function(repeat).unwrap().effect_summary,
+        FunctionEffectSummary {
+            purity: FunctionPurity::Pure,
+            determinism: FunctionDeterminism::Deterministic,
+            may_fail: true,
+            external_effect: FunctionExternalEffect::None,
+        }
+    );
+
+    let formatting = registry.resolve_any_single_function("string").unwrap();
+    assert_eq!(
+        registry.function(formatting).unwrap().effect_summary,
+        FunctionEffectSummary::UNKNOWN
+    );
+
+    let print = registry.resolve_any_single_function("print").unwrap();
+    assert_eq!(
+        registry.function(print).unwrap().effect_summary.purity,
+        FunctionPurity::Impure
+    );
+    assert_eq!(
+        registry
+            .function(print)
+            .unwrap()
+            .effect_summary
+            .external_effect,
+        FunctionExternalEffect::WritesExternalState
+    );
+    assert!(registry.function(print).unwrap().effect_summary.may_fail);
+
+    let boolean_type = registry.type_by_name("bool").unwrap();
+    let csv = registry
+        .resolve_function(
+            "CSV.read",
+            &[
+                string_type,
+                string_type,
+                boolean_type,
+                string_type,
+                string_type,
+                boolean_type,
+            ],
+        )
+        .unwrap();
+    assert_eq!(
+        registry.function(csv).unwrap().effect_summary.purity,
+        FunctionPurity::Impure
+    );
+    assert_eq!(
+        registry
+            .function(csv)
+            .unwrap()
+            .effect_summary
+            .external_effect,
+        FunctionExternalEffect::ReadsExternalState
+    );
+}
+
 /// Binds six parameters in callback order and fills omitted optional slots.
 #[test]
 fn resolves_named_arguments_and_six_parameter_defaults() {

@@ -1,5 +1,6 @@
 //! The ECK language implementation.
 
+pub mod analysis;
 pub mod compiler;
 pub mod connectors;
 pub mod containers;
@@ -13,7 +14,7 @@ pub mod std;
 pub mod syntax;
 pub mod values;
 
-pub use crate::runtime::{RuntimeError, execute};
+pub use crate::runtime::{ExecutionOptions, Executor, RuntimeError, execute};
 pub use compiler::{CompileError, compile};
 pub use containers::array::{ArrayEndOperation, ArrayType, ArrayValue};
 pub use ir::{TypedExpression, TypedExpressionKind, TypedProgram, TypedStatement};
@@ -24,6 +25,7 @@ pub use primitives::{
     StringExtension,
 };
 pub use semantic::{
-    BinaryOperator, FunctionSignature, Registry, ScalarRepresentation, SubtypeDescriptor,
+    BinaryOperator, FunctionDeterminism, FunctionEffectSummary, FunctionExternalEffect,
+    FunctionPurity, FunctionSignature, Registry, ScalarRepresentation, SubtypeDescriptor,
 };
 pub use semantic::{default_registry, register_all};

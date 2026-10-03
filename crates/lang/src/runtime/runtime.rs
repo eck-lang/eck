@@ -10,14 +10,38 @@ use crate::RuntimeError;
 
 mod evaluation;
 mod loop_execution;
+mod parallel_execution;
 mod source_evaluation;
 
+pub(crate) use parallel_execution::PendingArrayWrite;
+use parallel_execution::{ArrayWriteJournal, ExecutionSession};
+pub use parallel_execution::{ExecutionOptions, Executor};
+
+/// Executes a compiled program with the shared production worker budget.
 pub fn execute(program: &TypedProgram, registry: &Registry) -> Result<(), RuntimeError> {
+    execute_with_executor(program, registry, parallel_execution::default_executor())
+}
+
+/// Runs one invocation using precomputed analysis and a reusable executor.
+fn execute_with_executor(
+    program: &TypedProgram,
+    registry: &Registry,
+    executor: &Executor,
+) -> Result<(), RuntimeError> {
+    let session = ExecutionSession {
+        analysis: &program.execution_analysis,
+        identity: program.execution_identity,
+        executor,
+        #[cfg(test)]
+        observer: None,
+    };
     let mut runtime = Runtime {
         registry,
         configuration: registry.default_runtime_configuration(),
         local_values: vec![None; program.local_slot_count],
         loop_control: None,
+        parallel_execution: Some(&session),
+        pending_writes: None,
     };
     for statement in &program.statements {
         runtime.execute_statement(statement)?;
@@ -30,6 +54,8 @@ pub(crate) struct Runtime<'registry> {
     pub(crate) configuration: RuntimeConfiguration,
     pub(crate) local_values: Vec<Option<Value>>,
     loop_control: Option<LoopControl>,
+    parallel_execution: Option<&'registry ExecutionSession<'registry>>,
+    pub(crate) pending_writes: Option<ArrayWriteJournal>,
 }
 
 /// Records a control transfer requested by the currently executing loop body.
@@ -141,8 +167,9 @@ impl<'registry> Runtime<'registry> {
                 end,
                 range_plan,
                 body,
+                span,
                 ..
-            } => self.execute_for(*slot, start, end, range_plan, body)?,
+            } => self.execute_for(*slot, start, end, range_plan, body, *span)?,
             TypedStatement::ForEach {
                 slot, source, body, ..
             } => {
@@ -199,6 +226,7 @@ impl<'registry> Runtime<'registry> {
         end: &'program TypedExpression,
         typed_range_plan: &'program TypedRangePlan,
         body: &'program TypedBlock,
+        span: crate::syntax::Span,
     ) -> Result<(), RuntimeError> {
         let result = (|| -> Result<(), RuntimeError> {
             let start_value = self
@@ -209,6 +237,16 @@ impl<'registry> Runtime<'registry> {
                 .ok_or_else(|| RuntimeError::Message("for range end returned no value".into()))?;
             self.require_integer_bound(&start_value)?;
             self.require_integer_bound(&end_value)?;
+            if self.try_parallel_range(
+                slot,
+                &start_value,
+                &end_value,
+                typed_range_plan,
+                body,
+                span,
+            )? {
+                return Ok(());
+            }
             let loop_body_plan = self.compile_loop_body_execution_plan(slot, body)?;
             let mut value_stack = Vec::with_capacity(loop_body_plan.value_stack_capacity);
             if self.execute_native_i64_range(
@@ -262,10 +300,9 @@ impl<'registry> Runtime<'registry> {
             || end.value_type() != integer_type
             || typed_range_plan.current_type != integer_type
             || loop_body_plan.changes_configuration
-            || !self.configuration.uses_initial_values()
             || !self
                 .registry
-                .initial_result_transform_is_identity(integer)?
+                .result_transform_is_identity(integer, &self.configuration)?
         {
             return Ok(false);
         }

@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use crate::connectors::source::CsvSource;
 use crate::semantic::{
-    CoreError, ExecutionContext, FunctionSignature, Registry, SemanticType, SourceType, Value,
+    CoreError, ExecutionContext, FunctionDeterminism, FunctionEffectSummary,
+    FunctionExternalEffect, FunctionPurity, FunctionSignature, Registry, SemanticType, SourceType,
+    Value,
 };
 
 use super::CsvConfiguration;
@@ -14,7 +16,7 @@ use super::CsvConfiguration;
 pub(crate) fn register(registry: &mut Registry) -> Result<(), CoreError> {
     let string_type = registry.default_string()?;
     let boolean_type = registry.default_boolean()?;
-    let function = registry.register_function_with_output(
+    let function = registry.register_function_with_output_and_effect_summary(
         "CSV.read",
         FunctionSignature::Exact(vec![
             string_type,
@@ -26,6 +28,12 @@ pub(crate) fn register(registry: &mut Registry) -> Result<(), CoreError> {
         ]),
         Some(SemanticType::Source(Arc::new(SourceType { row: None }))),
         read,
+        FunctionEffectSummary {
+            purity: FunctionPurity::Impure,
+            determinism: FunctionDeterminism::Nondeterministic,
+            may_fail: true,
+            external_effect: FunctionExternalEffect::ReadsExternalState,
+        },
     )?;
     registry.set_function_parameter_names(
         function,

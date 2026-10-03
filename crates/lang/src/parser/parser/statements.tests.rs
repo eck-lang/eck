@@ -645,3 +645,16 @@ fn rejects_legacy_variable_declaration_syntax() {
 
     assert!(error.message.contains("expected end of line"));
 }
+
+/// Quoted configuration keys preserve their names and signed integer values.
+#[test]
+fn parses_quoted_configuration_keys() {
+    let program = parse("@config { \"cores\": -4 }").unwrap();
+    let Statement::Configuration { entries, .. } = &program.statements[0] else {
+        panic!("expected configuration");
+    };
+    assert_eq!(entries[0].name, "cores");
+    assert!(
+        matches!(&entries[0].value, ConfigurationValue::Number { raw_text, .. } if raw_text == "-4")
+    );
+}

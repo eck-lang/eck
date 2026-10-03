@@ -1,8 +1,8 @@
 //! Native function registration and overload resolution.
 
 use crate::semantic::{
-    CoreError, FunctionDescriptor, FunctionId, FunctionSignature, NativeFunction, SemanticType,
-    TypeId, Value, ValueType,
+    CoreError, FunctionDescriptor, FunctionEffectSummary, FunctionId, FunctionSignature,
+    NativeFunction, SemanticType, TypeId, Value, ValueType,
 };
 
 use super::Registry;
@@ -32,7 +32,49 @@ impl Registry {
         output: Option<SemanticType>,
         execute: NativeFunction,
     ) -> Result<FunctionId, CoreError> {
-        let function = self.register_function_with_output(name, signature, output, execute)?;
+        self.register_global_function_with_output_and_effect_summary(
+            name,
+            signature,
+            output,
+            execute,
+            FunctionEffectSummary::UNKNOWN,
+        )
+    }
+
+    /// Registers a global native function and declares its observable effects.
+    pub fn register_global_function_with_effect_summary(
+        &mut self,
+        name: &'static str,
+        signature: FunctionSignature,
+        output: Option<TypeId>,
+        execute: NativeFunction,
+        effect_summary: FunctionEffectSummary,
+    ) -> Result<FunctionId, CoreError> {
+        self.register_global_function_with_output_and_effect_summary(
+            name,
+            signature,
+            output.map(|type_id| SemanticType::Scalar(ValueType::plain(type_id))),
+            execute,
+            effect_summary,
+        )
+    }
+
+    /// Registers a global native function with structural output and declared effects.
+    pub fn register_global_function_with_output_and_effect_summary(
+        &mut self,
+        name: &'static str,
+        signature: FunctionSignature,
+        output: Option<SemanticType>,
+        execute: NativeFunction,
+        effect_summary: FunctionEffectSummary,
+    ) -> Result<FunctionId, CoreError> {
+        let function = self.register_function_with_output_and_effect_summary(
+            name,
+            signature,
+            output,
+            execute,
+            effect_summary,
+        )?;
         self.global_functions.insert(name);
         Ok(function)
     }
@@ -76,6 +118,42 @@ impl Registry {
         output: Option<SemanticType>,
         execute: NativeFunction,
     ) -> Result<FunctionId, CoreError> {
+        self.register_function_with_output_and_effect_summary(
+            name,
+            signature,
+            output,
+            execute,
+            FunctionEffectSummary::UNKNOWN,
+        )
+    }
+
+    /// Registers a scalar-output native function with explicit observable effects.
+    pub fn register_function_with_effect_summary(
+        &mut self,
+        name: &'static str,
+        signature: FunctionSignature,
+        output: Option<TypeId>,
+        execute: NativeFunction,
+        effect_summary: FunctionEffectSummary,
+    ) -> Result<FunctionId, CoreError> {
+        self.register_function_with_output_and_effect_summary(
+            name,
+            signature,
+            output.map(|type_id| SemanticType::Scalar(ValueType::plain(type_id))),
+            execute,
+            effect_summary,
+        )
+    }
+
+    /// Registers a native function with an explicit effect summary.
+    pub fn register_function_with_output_and_effect_summary(
+        &mut self,
+        name: &'static str,
+        signature: FunctionSignature,
+        output: Option<SemanticType>,
+        execute: NativeFunction,
+        effect_summary: FunctionEffectSummary,
+    ) -> Result<FunctionId, CoreError> {
         if let FunctionSignature::Exact(types) = &signature {
             for type_id in types {
                 self.type_descriptor(*type_id)?;
@@ -112,6 +190,7 @@ impl Registry {
             parameter_names: None,
             parameter_defaults: vec![None; parameter_count],
             output,
+            effect_summary,
             execute,
         });
         self.functions_by_name.entry(name).or_default().push(id);

@@ -123,6 +123,7 @@ impl Registry {
         if self.type_configurations.len() <= slot {
             self.type_configurations.resize_with(slot + 1, || None);
         }
+        self.execution_revision += 1;
         self.type_configurations[slot] = Some(RegisteredTypeConfiguration {
             type_id,
             descriptor,
@@ -140,6 +141,26 @@ impl Registry {
             .type_configuration(type_id)
             .map(|registered| registered.descriptor.initial_result_transform_is_identity)
             .unwrap_or(true))
+    }
+
+    /// Allows source scheduling changes only when a type has no result transformer.
+    ///
+    /// Extension transformers may inspect any setting, including `cores`, so their
+    /// initial-identity promise applies only before all source overrides.
+    pub(crate) fn result_transform_is_identity(
+        &self,
+        type_id: TypeId,
+        configuration: &RuntimeConfiguration,
+    ) -> Result<bool, CoreError> {
+        if configuration.uses_initial_values() {
+            return self.initial_result_transform_is_identity(type_id);
+        }
+        self.type_descriptor(type_id)?;
+        Ok(configuration.uses_initial_value_settings()
+            && self.type_configuration(type_id).is_none_or(|registered| {
+                registered.descriptor.transform_result.is_none()
+                    && registered.descriptor.transform_owned_result.is_none()
+            }))
     }
 
     /// Applies the active configuration to one operation result when its type opts in.

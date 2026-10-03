@@ -38,6 +38,7 @@ impl Registry {
         self.type_representations
             .insert(name, ScalarRepresentation::Exact);
         self.types.insert(id, descriptor);
+        self.execution_revision += 1;
         self.allocated_type_ids.remove(&id);
         self.activate_comparison_declarations_for(name);
         Ok(())
@@ -69,6 +70,7 @@ impl Registry {
         }
         self.types_by_name.insert(alias, target);
         self.type_representations.insert(alias, representation);
+        self.execution_revision += 1;
         self.activate_comparison_declarations_for(alias);
         Ok(())
     }
@@ -157,6 +159,7 @@ impl Registry {
     ) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
         self.index_extractors.insert(id, extract);
+        self.execution_revision += 1;
         Ok(())
     }
 
@@ -194,6 +197,7 @@ impl Registry {
     /// the previously configured default unchanged.
     pub fn set_default_integer(&mut self, id: TypeId) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
+        self.execution_revision += 1;
         self.default_integer = Some(id);
         Ok(())
     }
@@ -204,6 +208,7 @@ impl Registry {
     /// the previously configured default unchanged.
     pub fn set_default_fractional(&mut self, id: TypeId) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
+        self.execution_revision += 1;
         self.default_fractional = Some(id);
         Ok(())
     }
@@ -214,6 +219,7 @@ impl Registry {
     /// the previously configured default unchanged.
     pub fn set_default_string(&mut self, id: TypeId) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
+        self.execution_revision += 1;
         self.default_string = Some(id);
         Ok(())
     }
@@ -242,6 +248,7 @@ impl Registry {
     /// the previously configured default unchanged.
     pub fn set_default_regex(&mut self, id: TypeId) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
+        self.execution_revision += 1;
         self.default_regex = Some(id);
         Ok(())
     }
@@ -263,6 +270,7 @@ impl Registry {
         evaluate: BooleanEvaluator,
     ) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
+        self.execution_revision += 1;
         self.default_boolean = Some((id, evaluate));
         Ok(())
     }
@@ -280,6 +288,7 @@ impl Registry {
     /// the previously configured default unchanged.
     pub fn set_default_null(&mut self, id: TypeId) -> Result<(), CoreError> {
         self.type_descriptor(id)?;
+        self.execution_revision += 1;
         self.default_null = Some(id);
         Ok(())
     }

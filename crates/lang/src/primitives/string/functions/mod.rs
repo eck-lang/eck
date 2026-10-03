@@ -4,7 +4,17 @@ mod replace;
 mod transform;
 mod whitespace;
 
-use crate::semantic::{CoreError, FunctionSignature, Registry, TypeId};
+use crate::semantic::{
+    CoreError, FunctionEffectSummary, FunctionExternalEffect, FunctionPurity, FunctionSignature,
+    Registry, TypeId,
+};
+
+const PURE_FUNCTION_MAY_FAIL: FunctionEffectSummary = FunctionEffectSummary {
+    purity: FunctionPurity::Pure,
+    determinism: crate::semantic::FunctionDeterminism::Deterministic,
+    may_fail: true,
+    external_effect: FunctionExternalEffect::None,
+};
 
 use self::{
     case::{capitalize, lowercase, title, uppercase},
@@ -22,6 +32,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         uppercase,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -29,6 +40,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         lowercase,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -36,6 +48,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         trim,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -43,6 +56,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         trim_start,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -50,6 +64,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         trim_end,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
 
     register_function(
@@ -58,6 +73,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         capitalize,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -65,6 +81,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         title,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -72,6 +89,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type]),
         Some(string_type),
         normalize_space,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -79,6 +97,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type, string_type, string_type]),
         Some(string_type),
         replace,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
     register_function(
         registry,
@@ -86,6 +105,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         FunctionSignature::Exact(vec![string_type, string_type]),
         Some(string_type),
         remove,
+        PURE_FUNCTION_MAY_FAIL,
     )?;
 
     if let Some(regex_type) = registry.type_by_name("regex") {
@@ -95,6 +115,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             FunctionSignature::Exact(vec![string_type, regex_type, string_type]),
             Some(string_type),
             replace_regex,
+            PURE_FUNCTION_MAY_FAIL,
         )?;
     }
 
@@ -105,6 +126,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             FunctionSignature::Exact(vec![string_type, integer_type, string_type]),
             Some(string_type),
             pad_start,
+            PURE_FUNCTION_MAY_FAIL,
         )?;
         register_function(
             registry,
@@ -112,6 +134,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             FunctionSignature::Exact(vec![string_type, integer_type, string_type]),
             Some(string_type),
             pad_end,
+            PURE_FUNCTION_MAY_FAIL,
         )?;
         register_function(
             registry,
@@ -119,6 +142,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             FunctionSignature::Exact(vec![string_type, integer_type]),
             Some(string_type),
             repeat,
+            PURE_FUNCTION_MAY_FAIL,
         )?;
     }
 
@@ -132,6 +156,7 @@ fn register_function(
     signature: FunctionSignature,
     output: Option<TypeId>,
     execute: crate::semantic::NativeFunction,
+    effect_summary: FunctionEffectSummary,
 ) -> Result<(), CoreError> {
     let member = function_name
         .strip_prefix("String.")
@@ -143,7 +168,13 @@ fn register_function(
         "repeat" => &["value", "count"],
         _ => &["value"],
     };
-    let function = registry.register_function(function_name, signature, output, execute)?;
+    let function = registry.register_function_with_effect_summary(
+        function_name,
+        signature,
+        output,
+        execute,
+        effect_summary,
+    )?;
     registry.set_function_parameter_names(function, parameter_names)?;
     match registry.namespace_symbol("String", member) {
         Ok(_) => {}

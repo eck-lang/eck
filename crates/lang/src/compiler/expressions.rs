@@ -1060,7 +1060,10 @@ impl Compiler<'_> {
                                 (
                                     element_type.clone(),
                                     dynamic.then(|| {
-                                        self.array_element_complete_type_domain(array_type.clone())
+                                        self.array_element_access_complete_type_domain(
+                                            &typed_array,
+                                            array_type.clone(),
+                                        )
                                     }),
                                 )
                             }

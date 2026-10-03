@@ -137,6 +137,7 @@ impl Registry {
             registry_id: self.registry_id,
             index: self.comparisons.len(),
         };
+        self.execution_revision += 1;
         self.comparisons.push(ComparisonDescriptor {
             id: comparison_id,
             operator,

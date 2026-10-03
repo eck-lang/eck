@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 logos = "0.16"
 num-bigint.workspace = true
+rayon = "1.12.0"
 regex.workspace = true
 rust_decimal.workspace = true
 thiserror.workspace = true

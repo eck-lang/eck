@@ -2,5 +2,5 @@ mod error;
 mod runtime;
 
 pub use error::RuntimeError;
-pub(crate) use runtime::Runtime;
-pub use runtime::execute;
+pub use runtime::{ExecutionOptions, Executor, execute};
+pub(crate) use runtime::{PendingArrayWrite, Runtime};

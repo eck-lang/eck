@@ -41,6 +41,8 @@ fn open_binary_dispatch_caches_runtime_identity_pairs() {
         span: SPAN,
     };
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::VariableDeclaration {
             name: "result".into(),
             binding: BindingId(0),
@@ -90,6 +92,8 @@ fn array_boundary_failure_leaves_destination_uninitialized() {
         ]),
     );
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::VariableDeclaration {
             name: "destination".into(),
             binding: BindingId(0),
@@ -374,6 +378,8 @@ fn fractional_subtype_scale_executes_with_the_promoted_operator() {
     };
 
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::Expression(TypedExpression {
             output: Some(SemanticType::Scalar(resolution.output)),
             kind: TypedExpressionKind::Binary {
@@ -451,6 +457,8 @@ fn relative_subtype_subtraction_combines_the_left_magnitude_with_its_fraction() 
     };
 
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::Expression(TypedExpression {
             output: Some(SemanticType::Scalar(resolution.output)),
             kind: TypedExpressionKind::Binary {
@@ -484,6 +492,8 @@ fn relative_subtype_subtraction_combines_the_left_magnitude_with_its_fraction() 
 fn false_if_condition_skips_its_body() {
     let (registry, boolean) = conditional_registry();
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::If {
             condition: boolean_expression(boolean, false),
             body: TypedBlock {
@@ -509,6 +519,8 @@ fn logical_operations_short_circuit_runtime_evaluation() {
     let (registry, boolean) = conditional_registry();
     let missing = missing_variable_expression(boolean);
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             TypedStatement::Expression(TypedExpression {
                 output: Some(SemanticType::Scalar(ValueType::plain(boolean))),
@@ -540,6 +552,8 @@ fn logical_operations_short_circuit_runtime_evaluation() {
 fn true_if_condition_executes_its_body_and_releases_local_variables() {
     let (registry, boolean) = conditional_registry();
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             TypedStatement::If {
                 condition: boolean_expression(boolean, true),
@@ -732,6 +746,8 @@ fn integer_range_plan(registry: &Registry, integer: crate::semantic::TypeId) -> 
 fn for_range_binds_each_value_and_releases_its_scope() {
     let (registry, integer) = integer_range_registry();
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::For {
             variable: "index".into(),
             binding: BindingId(0),
@@ -769,6 +785,8 @@ fn for_range_binds_each_value_and_releases_its_scope() {
 fn blocks_clear_array_and_value_slots_on_success_and_error() {
     let (registry, integer) = integer_range_registry();
     let successful = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::Block(TypedBlock {
             statements: vec![
                 array_declaration(0, integer, vec![1]),
@@ -785,6 +803,8 @@ fn blocks_clear_array_and_value_slots_on_success_and_error() {
     assert!(locals.iter().all(Option::is_none));
 
     let failing = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::Block(TypedBlock {
             statements: vec![
                 array_declaration(0, integer, vec![1]),
@@ -814,6 +834,8 @@ fn optimized_for_body_clears_owned_slots_on_break_and_continue() {
         TypedStatement::Continue { span: SPAN },
     ] {
         let program = TypedProgram {
+            execution_identity: None,
+            execution_analysis: Default::default(),
             statements: vec![TypedStatement::For {
                 variable: "index".into(),
                 binding: BindingId(0),
@@ -848,6 +870,8 @@ fn optimized_integer_assignment_preserves_overflow_errors_and_the_original_value
     let value_slot = LocalVariableSlot(0);
     let range_slot = LocalVariableSlot(1);
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             integer_declaration(value_slot.0, integer, i64::MAX),
             TypedStatement::For {
@@ -933,6 +957,8 @@ fn optimized_array_increment_copies_a_shared_payload_before_mutation() {
         span: SPAN,
     };
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             array_declaration(source_slot.0, integer, vec![1]),
             TypedStatement::VariableDeclaration {
@@ -1040,6 +1066,8 @@ fn clearing_an_inner_array_alias_preserves_the_outer_value() {
         span: SPAN,
     };
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             array_declaration(0, integer, vec![1, 2]),
             TypedStatement::Block(TypedBlock {
@@ -1066,6 +1094,8 @@ fn clearing_an_inner_array_alias_preserves_the_outer_value() {
 fn for_range_with_empty_bounds_skips_its_body() {
     let (registry, integer) = integer_range_registry();
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::For {
             variable: "index".into(),
             binding: BindingId(0),
@@ -1097,6 +1127,8 @@ fn for_range_with_empty_bounds_skips_its_body() {
 fn for_range_with_reversed_bounds_skips_its_body() {
     let (registry, integer) = integer_range_registry();
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::For {
             variable: "index".into(),
             binding: BindingId(0),
@@ -1142,6 +1174,8 @@ fn for_range_rejects_non_integer_bounds() {
         })
         .unwrap();
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![TypedStatement::For {
             variable: "index".into(),
             binding: BindingId(0),
@@ -1364,6 +1398,8 @@ fn store_boundary_program(
 ) -> TypedProgram {
     let initial_element = Value::new(narrow, 127_i8).with_subtype(element.subtype);
     TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             TypedStatement::VariableDeclaration {
                 name: "values".to_string(),
@@ -1435,6 +1471,8 @@ fn execute_collecting_locals(
         configuration: registry.default_runtime_configuration(),
         local_values: vec![None; program.local_slot_count],
         loop_control: None,
+        parallel_execution: None,
+        pending_writes: None,
     };
     let mut result = Ok(());
     for statement in &program.statements {
@@ -1591,6 +1629,8 @@ fn conversion_store_program(
         span: SPAN,
     };
     TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             TypedStatement::VariableDeclaration {
                 name: "values".into(),
@@ -1814,6 +1854,8 @@ fn removing_from_an_empty_array_produces_the_null_value() {
     let (registry, integer, null) = array_method_registry();
     let element_type = ValueType::plain(integer);
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             array_declaration(0, integer, Vec::new()),
             TypedStatement::VariableDeclaration {
@@ -1878,6 +1920,8 @@ fn empty_removals_keep_shared_array_payloads() {
             span: SPAN,
         };
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             array_declaration(0, integer, Vec::new()),
             alias_declaration(0, 1),
@@ -1923,6 +1967,8 @@ fn insertion_through_a_shared_binding_copies_the_array() {
     let (registry, integer, _) = array_method_registry();
     let element_type = ValueType::plain(integer);
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             array_declaration(0, integer, vec![1, 2]),
             TypedStatement::VariableDeclaration {
@@ -1987,6 +2033,8 @@ fn indexed_assignment_copies_a_shared_array_without_changing_its_identity() {
         ScalarRepresentation::Exact,
     );
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             array_declaration(0, integer, vec![1, 2]),
             TypedStatement::VariableDeclaration {
@@ -2078,6 +2126,8 @@ fn indexed_read_returns_the_element_at_a_runtime_index() {
         span: SPAN,
     };
     let program = TypedProgram {
+        execution_identity: None,
+        execution_analysis: Default::default(),
         statements: vec![
             array_declaration(0, integer, vec![10, 20]),
             TypedStatement::VariableDeclaration {

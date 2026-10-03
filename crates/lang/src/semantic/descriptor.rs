@@ -28,6 +28,72 @@ pub type NativeFunction = for<'a> fn(
     &ExecutionContext<'a>,
     &[Value],
 ) -> Result<Option<Value>, crate::semantic::CoreError>;
+
+/// Describes whether a native function may produce externally visible effects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FunctionPurity {
+    /// The function's purity has not been declared.
+    Unknown,
+    /// The function does not produce externally visible side effects.
+    Pure,
+    /// The function may produce externally visible side effects.
+    Impure,
+}
+
+/// Describes whether equal inputs guarantee equal function results.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FunctionDeterminism {
+    /// The function's determinism has not been declared.
+    Unknown,
+    /// The function returns the same result for equal inputs and state.
+    Deterministic,
+    /// The function's result may vary independently of its arguments.
+    Nondeterministic,
+}
+
+/// Describes a category of external state a function may access.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FunctionExternalEffect {
+    /// External effects have not been declared.
+    Unknown,
+    /// The function does not access external state.
+    None,
+    /// The function reads external state.
+    ReadsExternalState,
+    /// The function writes external state.
+    WritesExternalState,
+}
+
+/// Summarizes the observable effects and failure behavior of a native function.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FunctionEffectSummary {
+    /// Whether the function produces externally visible side effects.
+    pub purity: FunctionPurity,
+    /// Whether equal arguments guarantee an equal result.
+    pub determinism: FunctionDeterminism,
+    /// Whether the function can return an error for validly typed arguments.
+    pub may_fail: bool,
+    /// Whether the function accesses state outside the ECK value model.
+    pub external_effect: FunctionExternalEffect,
+}
+
+impl FunctionEffectSummary {
+    /// The conservative summary assigned to registrations without a declaration.
+    pub const UNKNOWN: Self = Self {
+        purity: FunctionPurity::Unknown,
+        determinism: FunctionDeterminism::Unknown,
+        may_fail: true,
+        external_effect: FunctionExternalEffect::Unknown,
+    };
+
+    /// Describes a deterministic, pure function that cannot fail or access external state.
+    pub const PURE: Self = Self {
+        purity: FunctionPurity::Pure,
+        determinism: FunctionDeterminism::Deterministic,
+        may_fail: false,
+        external_effect: FunctionExternalEffect::None,
+    };
+}
 /// Converts one opaque integer value into a zero-based array index.
 ///
 /// Integer type extensions register this contract so array indexing can read a
@@ -104,6 +170,8 @@ pub struct FunctionDescriptor {
     /// Compile-time literals substituted for omitted optional parameters.
     pub parameter_defaults: Vec<Option<Value>>,
     pub output: Option<SemanticType>,
+    /// Explicit or conservative effect metadata for this overload.
+    pub effect_summary: FunctionEffectSummary,
     pub execute: NativeFunction,
 }
 

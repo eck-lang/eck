@@ -9,7 +9,7 @@
 use crate::containers::array::{
     ArrayValue, apply_element_contract, apply_end_operation, element_at, set_element,
 };
-use crate::ir::{LocalVariableSlot, TypedExpression, TypedIndexDispatch};
+use crate::ir::{LocalVariableSlot, TypedExpression, TypedExpressionKind, TypedIndexDispatch};
 use crate::semantic::{
     ArrayElementContract, ArrayEndOperation, ArrayType, IndexExtractor, SemanticType, Value,
     ValueType,
@@ -115,6 +115,15 @@ impl Runtime<'_> {
             .ok_or_else(|| RuntimeError::Message("array expression returned no value".into()))?;
         let index =
             self.resolve_element_index(index, constant_index, index_extractor, index_dispatch)?;
+        if let (Some(journal), TypedExpressionKind::Variable { slot, .. }) =
+            (&self.pending_writes, &array.kind)
+            && let Some(write) = journal.writes[journal.iteration_start..]
+                .iter()
+                .rev()
+                .find(|write| write.slot == *slot && write.index == index)
+        {
+            return Ok(Some(write.element.clone()));
+        }
         Ok(Some(element_at(&array_value, index)?))
     }
 
@@ -184,6 +193,22 @@ impl Runtime<'_> {
             .ok_or_else(|| RuntimeError::Message("array binding is not initialized".into()))?;
         if array_value.array_type().is_none() {
             return Err(RuntimeError::Message("value is not an array".into()));
+        }
+        if let Some(journal) = &mut self.pending_writes
+            && journal.external_slots.contains(&slot)
+        {
+            let length = ArrayValue::from_value(array_value)?.length();
+            if index >= length {
+                return Err(
+                    crate::semantic::CoreError::ArrayIndexOutOfBounds { index, length }.into(),
+                );
+            }
+            journal.writes.push(crate::runtime::PendingArrayWrite {
+                slot,
+                index,
+                element,
+            });
+            return Ok(());
         }
         set_element(array_value, index, element)?;
         Ok(())

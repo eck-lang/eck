@@ -292,11 +292,15 @@ impl Compiler<'_> {
             }
             statements.push(self.compile_statement(statement)?);
         }
-        Ok(TypedProgram {
+        let mut typed_program = TypedProgram {
+            execution_identity: Some(self.registry.execution_identity()),
+            execution_analysis: Default::default(),
             statements,
             local_slot_count: self.next_local_slot,
             bindings: std::mem::take(&mut self.bindings),
-        })
+        };
+        typed_program.execution_analysis = crate::analysis::analyze(&typed_program, self.registry);
+        Ok(typed_program)
     }
 
     /// Lowers one source statement into its typed counterpart.

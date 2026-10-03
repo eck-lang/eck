@@ -41,6 +41,8 @@ static NEXT_REGISTRY_ID: AtomicU64 = AtomicU64::new(1);
 pub struct Registry {
     /// Distinguishes IDs allocated by different registry instances.
     registry_id: u64,
+    /// Invalidates execution proofs when existing callback behavior changes.
+    execution_revision: u64,
     /// Allocates compact, stable IDs for registered base types.
     next_type_id: u32,
     /// Allocates compact, stable IDs for registered subtypes.
@@ -139,6 +141,7 @@ impl Default for Registry {
     fn default() -> Self {
         Self {
             registry_id: NEXT_REGISTRY_ID.fetch_add(1, Ordering::Relaxed),
+            execution_revision: 0,
             next_type_id: 0,
             next_subtype_id: 0,
             allocated_type_ids: HashSet::new(),
@@ -180,6 +183,28 @@ impl Default for Registry {
 }
 
 impl Registry {
+    /// Identifies the registry and callback revision used by an execution proof.
+    pub(crate) fn execution_identity(&self) -> (u64, u64) {
+        (self.registry_id, self.execution_revision)
+    }
+
+    /// Exposes result hooks to the execution analyzer without invoking callbacks.
+    pub(crate) fn type_configuration_descriptor(
+        &self,
+        type_id: TypeId,
+    ) -> Option<crate::semantic::TypeConfigurationDescriptor> {
+        self.type_configurations
+            .get(type_id.index as usize)
+            .and_then(|configuration| configuration.as_ref())
+            .filter(|configuration| configuration.type_id == type_id)
+            .map(|configuration| configuration.descriptor)
+    }
+
+    /// Exposes the registered boolean evaluator for builtin identity verification.
+    pub(crate) fn default_boolean_evaluator(&self) -> Option<BooleanEvaluator> {
+        self.default_boolean.map(|(_, evaluator)| evaluator)
+    }
+
     /// Creates an empty registry with no language capabilities installed.
     ///
     /// Extensions must register types, operations, and defaults before the

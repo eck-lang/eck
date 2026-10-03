@@ -6,7 +6,9 @@ mod literal;
 mod operations;
 mod value;
 
-use crate::semantic::{CoreError, Extension, FunctionSignature, Registry, TypeDescriptor};
+use crate::semantic::{
+    CoreError, Extension, FunctionEffectSummary, FunctionSignature, Registry, TypeDescriptor,
+};
 
 /// Registers the built-in Unicode string type and its language semantics.
 pub struct StringExtension;
@@ -34,11 +36,12 @@ impl Extension for StringExtension {
         registry.set_default_string(string_type)?;
         operations::register(registry, string_type)?;
         comparisons::register(registry)?;
-        let conversion = registry.register_global_function(
+        let conversion = registry.register_global_function_with_effect_summary(
             "string",
             FunctionSignature::AnySingle,
             Some(string_type),
             conversion::format_as_string,
+            FunctionEffectSummary::UNKNOWN,
         )?;
         registry.set_function_parameter_names(conversion, &["value"])?;
         registry.register_namespace("String", Some(string_type))?;
