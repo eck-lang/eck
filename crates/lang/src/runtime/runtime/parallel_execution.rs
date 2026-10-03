@@ -19,8 +19,8 @@ use crate::semantic::Value;
 pub struct ExecutionOptions {
     /// Maximum number of reusable CPU worker threads. One forces sequential execution.
     pub workers: usize,
-    /// Minimum range length before the scheduler considers parallel execution.
-    pub minimum_parallel_iterations: usize,
+    /// Minimum estimated total work; zero forces safe ranges through the worker path.
+    pub parallelization_threshold: u64,
 }
 
 impl Default for ExecutionOptions {
@@ -28,7 +28,7 @@ impl Default for ExecutionOptions {
     fn default() -> Self {
         Self {
             workers: std::thread::available_parallelism().map_or(1, usize::from),
-            minimum_parallel_iterations: 50_000,
+            parallelization_threshold: crate::analysis::DEFAULT_PARALLELIZATION_THRESHOLD,
         }
     }
 }
@@ -41,7 +41,7 @@ struct CachedWorkerPool {
 
 /// Reusable execution budget and its most recently selected parallel pool.
 ///
-/// A single-worker budget never starts a pool. Source `cores` overrides the default
+/// A single-worker budget never starts a pool. Source `parallelization.cores` overrides the default
 /// budget but never the compiler's safety decision. Startup failure runs sequentially.
 pub struct Executor {
     pub(super) options: ExecutionOptions,
@@ -100,7 +100,7 @@ pub(super) fn default_executor() -> &'static Executor {
         Executor::new(ExecutionOptions::default()).unwrap_or_else(|_| Executor {
             options: ExecutionOptions {
                 workers: 1,
-                minimum_parallel_iterations: usize::MAX,
+                parallelization_threshold: u64::MAX,
             },
             pool: Mutex::new(None),
         })
@@ -150,7 +150,9 @@ impl Runtime<'_> {
         let Some(session) = self.parallel_execution else {
             return Ok(false);
         };
-        if session.identity != Some(self.registry.execution_identity()) {
+        if self.configuration.parallelization_level() == Some(0)
+            || session.identity != Some(self.registry.execution_identity())
+        {
             return Ok(false);
         }
         let Some(loop_analysis) = session.analysis.loop_analysis(span) else {
@@ -186,7 +188,17 @@ impl Runtime<'_> {
             return Ok(false);
         };
         let count = i128::from(end) - i128::from(start);
-        if count < 2 || count < session.executor.options.minimum_parallel_iterations as i128 {
+        if count <= 0 {
+            return Ok(false);
+        }
+        let threshold = self
+            .configuration
+            .parallelization_threshold()
+            .unwrap_or(session.executor.options.parallelization_threshold);
+        let total_work = loop_analysis
+            .cost_per_iteration
+            .saturating_mul(count as u64);
+        if total_work.units() < threshold {
             return Ok(false);
         }
         let Some(pool) = session.executor.worker_pool(workers) else {

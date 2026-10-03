@@ -2,6 +2,13 @@ use std::collections::HashMap;
 
 use crate::semantic::{ArrayType, CoreError, Registry, TypeId, Value};
 
+/// Source configuration path that selects the worker budget.
+pub const PARALLELIZATION_CORES_PATH: &str = "parallelization.cores";
+/// Source configuration path that selects the minimum work needed to parallelize.
+pub const PARALLELIZATION_LEVEL_PATH: &str = "parallelization.level";
+/// Default source parallelization level, from disabled (0) to all eligible work (100).
+pub const DEFAULT_PARALLELIZATION_LEVEL: u8 = 50;
+
 /// Stores one normalized scalar configuration value.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConfigurationValue {
@@ -67,6 +74,8 @@ pub struct TypeConfigurationDescriptor {
 pub struct ConfigurationOverride {
     entries: Vec<(String, ConfigurationValue)>,
     execution_workers: Option<usize>,
+    parallelization_level: Option<u8>,
+    parallelization_threshold: Option<u64>,
     changes_value_settings: bool,
 }
 
@@ -78,15 +87,29 @@ impl ConfigurationOverride {
                 .iter()
                 .rev()
                 .find_map(|(path, value)| match (path.as_str(), value) {
-                    ("cores", ConfigurationValue::Integer(workers)) => {
+                    (PARALLELIZATION_CORES_PATH, ConfigurationValue::Integer(workers)) => {
                         Some(usize::try_from(*workers).unwrap_or(1).max(1))
                     }
                     _ => None,
                 });
-        let changes_value_settings = entries.iter().any(|(path, _)| path != "cores");
+        let parallelization_level = entries
+            .iter()
+            .rev()
+            .find(|(path, _)| path == PARALLELIZATION_LEVEL_PATH)
+            .and_then(|(_, value)| match value {
+                ConfigurationValue::Integer(level) => u8::try_from(*level).ok(),
+                _ => None,
+            });
+        let parallelization_threshold =
+            parallelization_level.and_then(parallelization_threshold_for_level);
+        let changes_value_settings = entries.iter().any(|(path, _)| {
+            path != PARALLELIZATION_CORES_PATH && path != PARALLELIZATION_LEVEL_PATH
+        });
         Self {
             entries,
             execution_workers,
+            parallelization_level,
+            parallelization_threshold,
             changes_value_settings,
         }
     }
@@ -106,6 +129,8 @@ pub struct RuntimeConfiguration {
     uses_initial_values: bool,
     uses_initial_value_settings: bool,
     execution_workers: Option<usize>,
+    parallelization_level: Option<u8>,
+    parallelization_threshold: Option<u64>,
 }
 
 impl RuntimeConfiguration {
@@ -116,6 +141,8 @@ impl RuntimeConfiguration {
             uses_initial_values: true,
             uses_initial_value_settings: true,
             execution_workers: None,
+            parallelization_level: None,
+            parallelization_threshold: None,
         }
     }
 
@@ -144,10 +171,27 @@ impl RuntimeConfiguration {
         self.execution_workers
     }
 
+    /// Returns the cached threshold for an explicit enabled source level.
+    ///
+    /// Absence means either no override or disabled level zero; dispatch checks
+    /// the level first before falling back to the executor threshold.
+    pub(crate) fn parallelization_threshold(&self) -> Option<u64> {
+        self.parallelization_threshold
+    }
+
+    /// Returns the explicit source parallelization level, if present.
+    pub fn parallelization_level(&self) -> Option<u8> {
+        self.parallelization_level
+    }
+
     /// Merges a validated override into the current execution state.
     pub fn apply(&mut self, configuration_override: &ConfigurationOverride) {
         if let Some(workers) = configuration_override.execution_workers {
             self.execution_workers = Some(workers);
+        }
+        if let Some(level) = configuration_override.parallelization_level {
+            self.parallelization_level = Some(level);
+            self.parallelization_threshold = configuration_override.parallelization_threshold;
         }
         self.uses_initial_value_settings &= !configuration_override.changes_value_settings;
         for (path, value) in configuration_override.entries() {
@@ -155,6 +199,31 @@ impl RuntimeConfiguration {
             self.uses_initial_values = false;
         }
     }
+}
+
+/// Maps a validated source level to the cached internal work threshold.
+///
+/// The level interpolates linearly within each decade while the decade anchors
+/// halve every ten levels around the analysis default at level 50.
+fn parallelization_threshold_for_level(level: u8) -> Option<u64> {
+    if level == 0 {
+        return None;
+    }
+    if level == 100 {
+        return Some(0);
+    }
+
+    let bucket = u32::from(level / 10);
+    let offset = u128::from(level % 10);
+    let mut numerator =
+        u128::from(crate::analysis::DEFAULT_PARALLELIZATION_THRESHOLD) * (20 - offset);
+    let denominator = if bucket <= 5 {
+        numerator *= 1_u128 << (5 - bucket);
+        20
+    } else {
+        20 * (1_u128 << (bucket - 5))
+    };
+    u64::try_from(numerator / denominator).ok()
 }
 
 /// Gives native functions access to execution-scoped services and configuration.

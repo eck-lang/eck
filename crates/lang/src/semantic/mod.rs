@@ -18,8 +18,10 @@ pub use crate::containers::map::MapType;
 pub use crate::values::Value;
 pub use configuration::{
     ArrayValueFormatter, ConfigurationDescriptor, ConfigurationNormalizer, ConfigurationOverride,
-    ConfigurationValue, ConfiguredValueFormatter, ConfiguredValueTransformer, ExecutionContext,
-    OwnedConfiguredValueTransformer, RuntimeConfiguration, TypeConfigurationDescriptor,
+    ConfigurationValue, ConfiguredValueFormatter, ConfiguredValueTransformer,
+    DEFAULT_PARALLELIZATION_LEVEL, ExecutionContext, OwnedConfiguredValueTransformer,
+    PARALLELIZATION_CORES_PATH, PARALLELIZATION_LEVEL_PATH, RuntimeConfiguration,
+    TypeConfigurationDescriptor,
 };
 pub use descriptor::{
     BinaryOperatorDescriptor, BinaryOperatorExecutor, BooleanEvaluator, ComparisonDescriptor,

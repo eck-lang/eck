@@ -1,5 +1,6 @@
 //! Native function registration and overload resolution.
 
+use crate::analysis::{CostClass, WorkCost};
 use crate::semantic::{
     CoreError, FunctionDescriptor, FunctionEffectSummary, FunctionId, FunctionSignature,
     NativeFunction, SemanticType, TypeId, Value, ValueType,
@@ -191,6 +192,7 @@ impl Registry {
             parameter_defaults: vec![None; parameter_count],
             output,
             effect_summary,
+            work_cost: CostClass::High.work_cost(),
             execute,
         });
         self.functions_by_name.entry(name).or_default().push(id);
@@ -223,6 +225,20 @@ impl Registry {
             }
         }
         self.functions[id.index].parameter_names = Some(names.to_vec());
+        Ok(())
+    }
+
+    /// Sets the estimated execution work for a registered native function.
+    ///
+    /// The ID is validated against this registry before its dense descriptor
+    /// entry is updated.
+    pub fn set_function_work_cost(
+        &mut self,
+        id: FunctionId,
+        cost: WorkCost,
+    ) -> Result<(), CoreError> {
+        self.function(id)?;
+        self.functions[id.index].work_cost = cost;
         Ok(())
     }
 

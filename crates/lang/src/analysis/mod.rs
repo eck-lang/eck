@@ -7,8 +7,10 @@
 
 mod effects;
 mod resolved;
+mod work;
 
 pub use effects::*;
+pub use work::{CostClass, DEFAULT_PARALLELIZATION_THRESHOLD, WorkCost};
 
 use std::collections::HashMap;
 
@@ -35,7 +37,9 @@ impl ExecutionAnalysis {
 
 /// Computes execution effects and independence from resolved statements and slots.
 pub fn analyze(program: &TypedProgram, registry: &Registry) -> ExecutionAnalysis {
-    resolved::analyze(program, registry)
+    let mut analysis = resolved::analyze(program, registry);
+    work::estimate(program, registry, &mut analysis);
+    analysis
 }
 
 #[cfg(test)]

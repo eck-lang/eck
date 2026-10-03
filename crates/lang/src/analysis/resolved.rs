@@ -850,6 +850,7 @@ fn classify_loop(
     };
     LoopAnalysis {
         span,
+        cost_per_iteration: WorkCost::default(),
         effects,
         parallelism,
         dependencies,

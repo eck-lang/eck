@@ -16,12 +16,20 @@ pub fn default_registry() -> Result<Registry, CoreError> {
 /// Registers every built-in extension into an existing registry.
 pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     registry.register_configuration(crate::semantic::ConfigurationDescriptor {
-        path: "cores",
+        path: crate::semantic::PARALLELIZATION_CORES_PATH,
         none_object_path: None,
         default: crate::semantic::ConfigurationValue::Integer(
             std::thread::available_parallelism().map_or(1, usize::from) as i64,
         ),
         normalize: normalize_cores,
+    })?;
+    registry.register_configuration(crate::semantic::ConfigurationDescriptor {
+        path: crate::semantic::PARALLELIZATION_LEVEL_PATH,
+        none_object_path: None,
+        default: crate::semantic::ConfigurationValue::Integer(i64::from(
+            crate::semantic::DEFAULT_PARALLELIZATION_LEVEL,
+        )),
+        normalize: normalize_parallelization_level,
     })?;
     crate::primitives::register_all(registry)?;
     MeasuresExtension.register(registry)?;
@@ -43,6 +51,20 @@ fn normalize_cores(
         }
         _ => Err(CoreError::Runtime(
             "cores must be an integer worker count".into(),
+        )),
+    }
+}
+
+/// Accepts only whole-number parallelization levels in the inclusive range 0 through 100.
+fn normalize_parallelization_level(
+    value: crate::semantic::ConfigurationValue,
+) -> Result<crate::semantic::ConfigurationValue, CoreError> {
+    match value {
+        crate::semantic::ConfigurationValue::Integer(level) if (0..=100).contains(&level) => {
+            Ok(value)
+        }
+        _ => Err(CoreError::InvalidConfigurationValue(
+            "parallelization.level must be an integer from 0 through 100".into(),
         )),
     }
 }

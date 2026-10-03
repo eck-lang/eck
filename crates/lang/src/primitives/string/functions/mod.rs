@@ -4,6 +4,7 @@ mod replace;
 mod transform;
 mod whitespace;
 
+use crate::analysis::{CostClass, WorkCost};
 use crate::semantic::{
     CoreError, FunctionEffectSummary, FunctionExternalEffect, FunctionPurity, FunctionSignature,
     Registry, TypeId,
@@ -33,6 +34,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         uppercase,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::High.work_cost(),
     )?;
     register_function(
         registry,
@@ -41,6 +43,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         lowercase,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::High.work_cost(),
     )?;
     register_function(
         registry,
@@ -49,6 +52,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         trim,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::Medium.work_cost(),
     )?;
     register_function(
         registry,
@@ -57,6 +61,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         trim_start,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::Medium.work_cost(),
     )?;
     register_function(
         registry,
@@ -65,6 +70,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         trim_end,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::Medium.work_cost(),
     )?;
 
     register_function(
@@ -74,6 +80,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         capitalize,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::High.work_cost(),
     )?;
     register_function(
         registry,
@@ -82,6 +89,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         title,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::High.work_cost(),
     )?;
     register_function(
         registry,
@@ -90,6 +98,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         normalize_space,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::High.work_cost(),
     )?;
     register_function(
         registry,
@@ -98,6 +107,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         replace,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::High.work_cost(),
     )?;
     register_function(
         registry,
@@ -106,6 +116,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
         Some(string_type),
         remove,
         PURE_FUNCTION_MAY_FAIL,
+        CostClass::High.work_cost(),
     )?;
 
     if let Some(regex_type) = registry.type_by_name("regex") {
@@ -116,6 +127,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             Some(string_type),
             replace_regex,
             PURE_FUNCTION_MAY_FAIL,
+            CostClass::VeryHigh.work_cost(),
         )?;
     }
 
@@ -127,6 +139,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             Some(string_type),
             pad_start,
             PURE_FUNCTION_MAY_FAIL,
+            CostClass::High.work_cost(),
         )?;
         register_function(
             registry,
@@ -135,6 +148,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             Some(string_type),
             pad_end,
             PURE_FUNCTION_MAY_FAIL,
+            CostClass::High.work_cost(),
         )?;
         register_function(
             registry,
@@ -143,6 +157,7 @@ pub(crate) fn register(registry: &mut Registry, string_type: TypeId) -> Result<(
             Some(string_type),
             repeat,
             PURE_FUNCTION_MAY_FAIL,
+            CostClass::VeryHigh.work_cost(),
         )?;
     }
 
@@ -157,6 +172,7 @@ fn register_function(
     output: Option<TypeId>,
     execute: crate::semantic::NativeFunction,
     effect_summary: FunctionEffectSummary,
+    work_cost: WorkCost,
 ) -> Result<(), CoreError> {
     let member = function_name
         .strip_prefix("String.")
@@ -175,6 +191,7 @@ fn register_function(
         execute,
         effect_summary,
     )?;
+    registry.set_function_work_cost(function, work_cost)?;
     registry.set_function_parameter_names(function, parameter_names)?;
     match registry.namespace_symbol("String", member) {
         Ok(_) => {}

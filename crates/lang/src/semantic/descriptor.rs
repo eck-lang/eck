@@ -1,3 +1,4 @@
+use crate::analysis::WorkCost;
 use crate::semantic::{
     BinaryOperator, ComparisonId, ComparisonOperator, ExecutionContext, FunctionId, OperatorId,
     SemanticType, TypeId, Value,
@@ -172,6 +173,8 @@ pub struct FunctionDescriptor {
     pub output: Option<SemanticType>,
     /// Explicit or conservative effect metadata for this overload.
     pub effect_summary: FunctionEffectSummary,
+    /// Estimated execution work, independent of the function's observable effects.
+    pub work_cost: WorkCost,
     pub execute: NativeFunction,
 }
 

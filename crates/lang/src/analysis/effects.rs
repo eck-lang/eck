@@ -176,6 +176,8 @@ pub enum Parallelism {
 #[derive(Clone, Debug)]
 pub struct LoopAnalysis {
     pub span: Span,
+    /// Static work for one logical iteration, including range bookkeeping.
+    pub cost_per_iteration: super::WorkCost,
     pub effects: EffectSummary,
     pub parallelism: Parallelism,
     pub dependencies: Vec<LoopCarriedDependency>,
