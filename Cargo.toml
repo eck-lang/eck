@@ -12,6 +12,8 @@ license = "MIT"
 version = "0.0.1"
 
 [workspace.dependencies]
+csv = "1.4.0"
+sysinfo = "0.39.6"
 thiserror = "2"
 rust_decimal = "1.43"
 regex = "1.13"

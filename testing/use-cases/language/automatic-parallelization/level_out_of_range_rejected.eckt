@@ -1,0 +1,14 @@
+# Parallelization level above 100 is rejected
+
+A level above 100 is outside the supported range and must fail before execution.
+
+>>> source
+@config { parallelization: { level: 101 } }
+
+<<< stdout
+
+<<< stderr
+eck: invalid value for configuration `parallelization.level`: parallelization.level must be an integer from 0 through 100 at Span { start: 36, end: 39 }
+
+<<< exit
+1

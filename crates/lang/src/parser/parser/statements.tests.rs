@@ -649,12 +649,34 @@ fn rejects_legacy_variable_declaration_syntax() {
 /// Quoted configuration keys preserve their names and signed integer values.
 #[test]
 fn parses_quoted_configuration_keys() {
-    let program = parse("@config { \"cores\": -4 }").unwrap();
+    let program = parse("@config { \"parallelization\": { \"cores\": -4 } }").unwrap();
     let Statement::Configuration { entries, .. } = &program.statements[0] else {
         panic!("expected configuration");
+    };
+    assert_eq!(entries[0].name, "parallelization");
+    let ConfigurationValue::Object { entries, .. } = &entries[0].value else {
+        panic!("expected parallelization configuration");
     };
     assert_eq!(entries[0].name, "cores");
     assert!(
         matches!(&entries[0].value, ConfigurationValue::Number { raw_text, .. } if raw_text == "-4")
     );
+}
+
+/// Treats configuration `null` as the existing optional setting with its original span.
+#[test]
+fn parses_null_configuration_values() {
+    let source = "@config { parallelization: { cores: null } }";
+    let program = parse(source).unwrap();
+    let Statement::Configuration { entries, .. } = &program.statements[0] else {
+        panic!("expected configuration");
+    };
+    let ConfigurationValue::Object { entries, .. } = &entries[0].value else {
+        panic!("expected nested configuration");
+    };
+    let ConfigurationValue::Symbol { name, span } = &entries[0].value else {
+        panic!("expected optional configuration setting");
+    };
+    assert_eq!(name, "None");
+    assert_eq!(&source[span.start..span.end], "null");
 }

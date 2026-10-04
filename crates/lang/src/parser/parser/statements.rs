@@ -417,7 +417,7 @@ impl Parser {
         })
     }
 
-    /// Parses a numeric, enum-like, or nested object configuration value.
+    /// Parses configuration values, lowering `null` to the existing `None` setting.
     fn parse_configuration_value(&mut self) -> Result<ConfigurationValue, ParseError> {
         match self.peek().kind.clone() {
             TokenKind::Number(raw_text) => {
@@ -444,6 +444,13 @@ impl Parser {
             TokenKind::Ident(name) => {
                 let span = self.advance().span;
                 Ok(ConfigurationValue::Symbol { name, span })
+            }
+            TokenKind::Null => {
+                let span = self.advance().span;
+                Ok(ConfigurationValue::Symbol {
+                    name: "None".into(),
+                    span,
+                })
             }
             TokenKind::LeftBrace => self.parse_configuration_object(),
             _ => Err(self.error_here("expected configuration value")),

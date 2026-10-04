@@ -1,0 +1,16 @@
+# Level 0 disables parallel scheduling
+
+Level 0 disables parallel scheduling even with four configured cores, and a safe independent range retains its expected result.
+
+>>> source
+@config { parallelization: { cores: 4
+level: 0 } }
+let output: int[] = [0,0,0,0]
+const input: int[] = [1,2,3,4]
+for (i in 0..4) { output[i] = input[i] * 2 }
+print(output)
+
+<<< stdout
+[2, 4, 6, 8]
+
+<<< stderr

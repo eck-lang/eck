@@ -1,0 +1,30 @@
+# Source-configured parallelization budget
+
+Switches between serial and four-worker budgets around a heavy independent
+array transform. Zero and null serial budgets preserve the final ordered result.
+
+>>> source
+@config { parallelization: { cores: 0
+level: 50 } }
+let values: int[] = []
+for (index in 0..60000) {
+    values->push(index)
+}
+@config { parallelization: { cores: 4
+level: 50 } }
+for (index in 0..60000) {
+    values[index] = values[index] * 2
+}
+@config { parallelization: { cores: null
+level: 50 } }
+for (index in 0..60000) {
+    values[index] = values[index] + 1
+}
+print(values[0])
+print(values[59999])
+
+<<< stdout
+1
+119999
+
+<<< stderr

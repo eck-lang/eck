@@ -1,0 +1,24 @@
+# Disjoint adaptive array range transform
+
+Fills 60,000 integer elements, then doubles each independent input element into
+its matching output position under the default level-50 setting. The first and
+last results preserve ordinary array and iteration semantics.
+
+>>> source
+let input: int[] = []
+let output: int[] = []
+for (index in 0..60000) {
+    input->push(index)
+    output->push(0)
+}
+for (index in 0..60000) {
+    output[index] = input[index] * 2
+}
+print(output[0])
+print(output[59999])
+
+<<< stdout
+0
+119998
+
+<<< stderr

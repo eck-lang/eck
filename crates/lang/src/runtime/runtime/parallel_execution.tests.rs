@@ -66,7 +66,7 @@ fn compile_source(source: &str, registry: &Registry) -> TypedProgram {
 fn executor(workers: usize) -> Executor {
     Executor::new(ExecutionOptions {
         workers,
-        minimum_parallel_iterations: 0,
+        parallelization_threshold: 0,
     })
     .unwrap()
 }
@@ -343,12 +343,393 @@ fn tiny_ranges_do_not_start_workers() {
     let program = compile_source("for (i in 0..2) { let value = twice(i) }", &registry);
     let executor = Executor::new(ExecutionOptions {
         workers: 4,
-        minimum_parallel_iterations: 100,
+        parallelization_threshold: 100,
     })
     .unwrap();
     let (result, _) = run_collecting(&program, &registry, &executor, None);
     result.unwrap();
     assert!(executor.pool.lock().unwrap().is_none());
+}
+
+/// Separates static safety from invocation profitability at both threshold boundaries.
+#[test]
+fn work_threshold_selects_real_workers_only_at_or_above_boundary() {
+    let mut registry = test_registry();
+    let program = compile_source(
+        &array_source(257, "output[i] = twice(input[i]) * 2 + 1").replace(
+            "for (i in 0..257)",
+            "const count = 257\nfor (i in 0..count)",
+        ),
+        &registry,
+    );
+    let analysis = program.execution_analysis().loops.values().next().unwrap();
+    assert!(matches!(
+        analysis.parallelism,
+        crate::analysis::Parallelism::IndependentIterations { .. }
+    ));
+    let total_work = analysis.cost_per_iteration.saturating_mul(257).units();
+    let sequential = run_collecting(&program, &registry, &executor(1), None);
+    sequential.0.unwrap();
+    let expected = array_contents(&program, &sequential.1, "output");
+    assert_eq!(
+        expected,
+        (0..257).map(|index| index * 4 + 1).collect::<Vec<_>>()
+    );
+
+    // Changing native cost metadata after compilation must not trigger re-estimation.
+    let integer = registry.default_integer().unwrap();
+    let function = registry.resolve_function("twice", &[integer]).unwrap();
+    registry
+        .set_function_work_cost(function, crate::analysis::WorkCost::from_units(u64::MAX))
+        .unwrap();
+    for threshold in [u64::MAX, total_work + 1, total_work, total_work - 1, 0] {
+        let executor = Executor::new(ExecutionOptions {
+            workers: 4,
+            parallelization_threshold: threshold,
+        })
+        .unwrap();
+        let observations = Mutex::new(Vec::new());
+        let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+        let (result, locals) = run_collecting(&program, &registry, &executor, Some(&observe));
+        result.unwrap();
+        assert_eq!(array_contents(&program, &locals, "output"), expected);
+        assert_eq!(
+            program
+                .execution_analysis()
+                .loops
+                .values()
+                .next()
+                .unwrap()
+                .cost_per_iteration,
+            analysis.cost_per_iteration
+        );
+        let observations = observations.into_inner().unwrap();
+        if total_work < threshold {
+            assert!(
+                observations.is_empty(),
+                "below-threshold safety must not dispatch workers"
+            );
+            assert!(executor.pool.lock().unwrap().is_none());
+        } else {
+            let mut counts = HashMap::new();
+            let mut threads = HashSet::new();
+            for (iteration, thread) in observations {
+                *counts.entry(iteration).or_insert(0) += 1;
+                threads.insert(thread);
+            }
+            assert_eq!(counts.len(), 257);
+            assert!(counts.values().all(|count| *count == 1));
+            assert!(threads.len() >= 2);
+            assert!(!threads.contains(&std::thread::current().id()));
+            assert!(executor.pool.lock().unwrap().is_some());
+        }
+    }
+}
+
+/// Source levels override executor defaults while retaining native integer guards.
+#[test]
+fn source_level_overrides_preserve_results_and_control_dispatch() {
+    let registry = test_registry();
+    for (level, selected) in [(0, false), (50, false), (99, false), (100, true)] {
+        let program = compile_source(
+            &format!(
+                "@config {{ parallelization: {{ cores: 4\nlevel: {level} }} }}\n{}",
+                array_source(65, "output[i] = input[i] * 2")
+            ),
+            &registry,
+        );
+        let executor = Executor::new(ExecutionOptions {
+            workers: 1,
+            parallelization_threshold: u64::MAX,
+        })
+        .unwrap();
+        let observations = Mutex::new(Vec::new());
+        let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+        let (result, locals) = run_collecting(&program, &registry, &executor, Some(&observe));
+        result.unwrap();
+        assert_eq!(
+            array_contents(&program, &locals, "output"),
+            (0..65).map(|index| index * 2).collect::<Vec<_>>()
+        );
+        assert_eq!(!observations.into_inner().unwrap().is_empty(), selected);
+        assert_eq!(executor.pool.lock().unwrap().is_some(), selected);
+    }
+}
+
+/// Later disabled levels suppress dispatch even when reusable workers already exist.
+#[test]
+fn source_level_switches_leave_cached_workers_idle_when_disabled() {
+    let registry = test_registry();
+    let program = compile_source(
+        "@config { parallelization: { level: 100 } }\nfor (i in 0..17) { let x = i + 1 }\n@config { parallelization: { level: 0 } }\n@config { parallelization: { cores: 4 } }\nfor (i in 100..117) { let x = i + 1 }\n@config { parallelization: { level: 100 } }\nfor (i in 200..217) { let x = i + 1 }",
+        &registry,
+    );
+    let executor = executor(4);
+    let observations = Mutex::new(Vec::new());
+    let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+    run_collecting(&program, &registry, &executor, Some(&observe))
+        .0
+        .unwrap();
+    let observations = observations.into_inner().unwrap();
+    assert_eq!(observations.len(), 34);
+    assert!(
+        observations
+            .iter()
+            .all(|(iteration, _)| *iteration < 17 || *iteration >= 200)
+    );
+    assert_eq!(
+        observations
+            .iter()
+            .map(|(_, thread)| *thread)
+            .collect::<HashSet<_>>()
+            .len(),
+        4
+    );
+}
+
+/// The maximum level dispatches a singleton safe loop; empty and reversed ranges still do no work.
+#[test]
+fn maximum_level_dispatches_every_nonempty_safe_range() {
+    let registry = test_registry();
+    for (start, end, expected) in [(0, 1, 1), (0, 0, 0), (5, 2, 0)] {
+        let program = compile_source(
+            &format!(
+                "@config {{ parallelization: {{ level: 100 }} }}\nfor (i in {start}..{end}) {{ let x = i + 1 }}"
+            ),
+            &registry,
+        );
+        let observations = Mutex::new(Vec::new());
+        let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+        run_collecting(&program, &registry, &executor(4), Some(&observe))
+            .0
+            .unwrap();
+        assert_eq!(observations.into_inner().unwrap().len(), expected);
+    }
+}
+
+/// Default scheduling avoids trivial loops without changing the compiler's safety proof.
+#[test]
+fn default_work_threshold_keeps_trivial_loop_sequential() {
+    let registry = test_registry();
+    let program = compile_source("for (i in 0..3) { let x = i + 1 }", &registry);
+    let analysis = program.execution_analysis().loops.values().next().unwrap();
+    assert!(matches!(
+        analysis.parallelism,
+        crate::analysis::Parallelism::IndependentIterations { .. }
+    ));
+    let executor = Executor::new(ExecutionOptions {
+        workers: 4,
+        ..ExecutionOptions::default()
+    })
+    .unwrap();
+    assert_eq!(
+        executor.options.parallelization_threshold,
+        crate::analysis::DEFAULT_PARALLELIZATION_THRESHOLD
+    );
+    let observations = Mutex::new(Vec::new());
+    let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+    run_collecting(&program, &registry, &executor, Some(&observe))
+        .0
+        .unwrap();
+    assert!(observations.into_inner().unwrap().is_empty());
+    assert!(executor.pool.lock().unwrap().is_none());
+}
+
+/// Stops immediately with a deterministic error naming the evaluated iteration.
+fn reject_iteration(
+    _context: &ExecutionContext<'_>,
+    arguments: &[Value],
+) -> Result<Option<Value>, CoreError> {
+    Err(CoreError::Runtime(format!(
+        "rejected {}",
+        arguments[0].downcast_ref::<i64>().unwrap()
+    )))
+}
+
+/// The full signed-bound difference saturates work and qualifies at the maximum threshold.
+#[test]
+fn extreme_runtime_trip_count_saturates_before_worker_dispatch() {
+    let mut registry = test_registry();
+    let integer = registry.default_integer().unwrap();
+    registry
+        .register_global_function_with_effect_summary(
+            "reject_iteration",
+            FunctionSignature::Exact(vec![integer]),
+            Some(integer),
+            reject_iteration,
+            FunctionEffectSummary {
+                may_fail: true,
+                ..FunctionEffectSummary::PURE
+            },
+        )
+        .unwrap();
+    let program = compile_source(
+        "for (i in -9223372036854775808..9223372036854775807) { let value = reject_iteration(i) }",
+        &registry,
+    );
+    let parallel_executor = Executor::new(ExecutionOptions {
+        workers: 4,
+        parallelization_threshold: u64::MAX,
+    })
+    .unwrap();
+    let observations = Mutex::new(Vec::new());
+    let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+    let sequential = run_collecting(&program, &registry, &executor(1), None)
+        .0
+        .unwrap_err();
+    let parallel = run_collecting(&program, &registry, &parallel_executor, Some(&observe))
+        .0
+        .unwrap_err();
+    assert_eq!(parallel.to_string(), sequential.to_string());
+    assert!(
+        parallel
+            .to_string()
+            .contains("rejected -9223372036854775808")
+    );
+    assert!(
+        observations
+            .into_inner()
+            .unwrap()
+            .iter()
+            .any(|(iteration, _)| *iteration == i64::MIN)
+    );
+    assert!(parallel_executor.pool.lock().unwrap().is_some());
+
+    let disabled_program = compile_source(
+        "@config { parallelization: { level: 0 } }\nfor (i in -9223372036854775808..9223372036854775807) { let value = reject_iteration(i) }",
+        &registry,
+    );
+    assert_eq!(
+        disabled_program
+            .execution_analysis()
+            .loops
+            .values()
+            .next()
+            .unwrap()
+            .cost_per_iteration
+            .saturating_mul(u64::MAX)
+            .units(),
+        u64::MAX
+    );
+    let disabled_executor = executor(4);
+    let observe = |_, _| panic!("level zero must disable even saturated work");
+    let disabled = run_collecting(
+        &disabled_program,
+        &registry,
+        &disabled_executor,
+        Some(&observe),
+    )
+    .0
+    .unwrap_err();
+    assert_eq!(disabled.to_string(), sequential.to_string());
+    assert!(disabled_executor.pool.lock().unwrap().is_none());
+}
+
+/// Raising the source level admits more identical work without changing any array result.
+#[test]
+fn increasing_source_levels_select_more_work_with_identical_results() {
+    let registry = test_registry();
+    let body = array_source(5000, "output[i] = input[i] * 2");
+    for (level, selected) in [
+        (0, false),
+        (1, false),
+        (25, false),
+        (50, false),
+        (60, false),
+        (70, true),
+        (75, true),
+        (99, true),
+        (100, true),
+    ] {
+        let program = compile_source(
+            &format!("@config {{ parallelization: {{ level: {level} }} }}\n{body}"),
+            &registry,
+        );
+        let executor = Executor::new(ExecutionOptions {
+            workers: 4,
+            ..ExecutionOptions::default()
+        })
+        .unwrap();
+        let observations = Mutex::new(Vec::new());
+        let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+        let (result, locals) = run_collecting(&program, &registry, &executor, Some(&observe));
+        result.unwrap();
+        assert_eq!(
+            array_contents(&program, &locals, "output"),
+            (0..5000).map(|index| index * 2).collect::<Vec<_>>()
+        );
+        let observations = observations.into_inner().unwrap();
+        assert_eq!(!observations.is_empty(), selected, "level {level}");
+        if selected {
+            assert_eq!(observations.len(), 5000);
+            assert!(
+                observations
+                    .iter()
+                    .map(|(_, thread)| thread)
+                    .collect::<HashSet<_>>()
+                    .len()
+                    >= 2
+            );
+        }
+    }
+}
+
+/// Real built-in pure String calls and branch blocks retain exact value identities.
+#[test]
+fn pure_string_calls_match_sequential_values_under_work_scheduling() {
+    let registry = test_registry();
+    let program = compile_source(
+        &format!(
+            "use String\nlet output: string[] = [{}]\nfor (i in 0..129) {{ {{ const local = \" ababa \"->trim()\nif (i % 2 == 0) {{ output[i] = local->replace(/a/g, \"X\") }} else {{ output[i] = local->uppercase() }} }} }}",
+            vec!["\"\""; 129].join(",")
+        ),
+        &registry,
+    );
+    assert!(matches!(
+        program
+            .execution_analysis()
+            .loops
+            .values()
+            .next()
+            .unwrap()
+            .parallelism,
+        crate::analysis::Parallelism::IndependentIterations { .. }
+    ));
+    let sequential = run_collecting(&program, &registry, &executor(1), None);
+    let observations = Mutex::new(Vec::new());
+    let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+    let parallel = run_collecting(&program, &registry, &executor(4), Some(&observe));
+    sequential.0.unwrap();
+    parallel.0.unwrap();
+    let sequential_array =
+        crate::ArrayValue::from_value(sequential.1[0].as_ref().unwrap()).unwrap();
+    let parallel_array = crate::ArrayValue::from_value(parallel.1[0].as_ref().unwrap()).unwrap();
+    for (index, (sequential, parallel)) in sequential_array
+        .elements()
+        .iter()
+        .zip(parallel_array.elements())
+        .enumerate()
+    {
+        assert_eq!(sequential.scalar_type(), parallel.scalar_type());
+        assert_eq!(
+            sequential.downcast_ref::<String>(),
+            parallel.downcast_ref::<String>()
+        );
+        assert_eq!(
+            parallel.downcast_ref::<String>().unwrap(),
+            if index % 2 == 0 { "XbXbX" } else { "ABABA" }
+        );
+    }
+    let observations = observations.into_inner().unwrap();
+    assert_eq!(observations.len(), 129);
+    assert!(
+        observations
+            .iter()
+            .map(|(_, thread)| *thread)
+            .collect::<HashSet<_>>()
+            .len()
+            >= 2
+    );
 }
 
 /// Keeps empty, reversed and negative ranges equivalent under forced scheduling.
@@ -376,7 +757,7 @@ fn zero_workers_are_rejected() {
     assert!(
         Executor::new(ExecutionOptions {
             workers: 0,
-            minimum_parallel_iterations: 0
+            parallelization_threshold: 0
         })
         .is_err()
     );
@@ -446,7 +827,13 @@ fn unsafe_array_indices_and_native_effects_never_dispatch_workers() {
         "output[i] = unknown(i)",
         "output[i] = effectful(i)",
     ] {
-        let program = compile_source(&array_source(32, body), &registry);
+        let program = compile_source(
+            &format!(
+                "@config {{ parallelization: {{ level: 100 }} }}\n{}",
+                array_source(32, body)
+            ),
+            &registry,
+        );
         let observations = Mutex::new(Vec::new());
         let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
         let sequential = run_collecting(&program, &registry, &executor(1), None);
@@ -560,14 +947,14 @@ fn extending_registry_dispatch_cannot_keep_a_stale_callback_inventory() {
     assert!(observations.into_inner().unwrap().is_empty());
 }
 
-/// Source budgets at or below one never start workers and preserve array results.
+/// Zero, one and null source budgets never start workers and preserve array results.
 #[test]
-fn source_cores_at_or_below_one_disable_parallelism() {
+fn source_serial_core_settings_disable_parallelism() {
     let registry = test_registry();
-    for cores in [-7, 0, 1] {
+    for cores in ["0", "1", "None", "null"] {
         let program = compile_source(
             &format!(
-                "@config {{ \"cores\": {cores} }}\n{}",
+                "@config {{ parallelization: {{ \"cores\": {cores}\nlevel: 100 }} }}\n{}",
                 array_source(31, "output[i] = input[i] * 2")
             ),
             &registry,
@@ -591,7 +978,7 @@ fn source_cores_at_or_below_one_disable_parallelism() {
 fn source_cores_four_overrides_executor_default() {
     let registry = test_registry();
     let program = compile_source(
-        "@config { \"cores\": 4 }\nfor (i in 0..257) { let value = i * 2 }",
+        "@config { parallelization: { \"cores\": 4 } }\nfor (i in 0..257) { let value = i * 2 }",
         &registry,
     );
     let executor = executor(1);
@@ -612,11 +999,11 @@ fn source_cores_four_overrides_executor_default() {
     );
 }
 
-/// Root overrides apply to later loops and serial sections retain the parallel pool.
+/// Worker overrides apply to later loops and serial sections retain the parallel pool.
 #[test]
 fn source_cores_switches_dispatch_and_reuses_pool() {
     let registry = test_registry();
-    let source = "@config { cores: 1 }\nfor (i in 0..31) { let x = i * 2 }\n@config { cores: 4 }\nfor (i in 100..131) { let x = i * 2 }\n@config { cores: 0 }\nfor (i in 200..231) { let x = i * 2 }\n@config { cores: 4 }\nfor (i in 300..331) { let x = i * 2 }";
+    let source = "@config { parallelization: { cores: 1 } }\nfor (i in 0..31) { let x = i * 2 }\n@config { parallelization: { cores: 4 } }\nfor (i in 100..131) { let x = i * 2 }\n@config { parallelization: { cores: null } }\nfor (i in 200..231) { let x = i * 2 }\n@config { parallelization: { cores: 4 } }\nfor (i in 300..331) { let x = i * 2 }";
     let program = compile_source(source, &registry);
     let executor = executor(1);
     let observations = Mutex::new(Vec::new());
@@ -657,7 +1044,7 @@ fn source_cores_switches_dispatch_and_reuses_pool() {
 fn source_cores_does_not_ignore_numeric_configuration() {
     let registry = test_registry();
     let program = compile_source(
-        "@config { cores: 4\ndecimal: { scale: 2 } }\nfor (i in 0..31) { let x = i * 2 }",
+        "@config { parallelization: { cores: 4 }\ndecimal: { scale: 2 } }\nfor (i in 0..31) { let x = i * 2 }",
         &registry,
     );
     let executor = executor(4);
@@ -668,12 +1055,15 @@ fn source_cores_does_not_ignore_numeric_configuration() {
     assert!(executor.pool.lock().unwrap().is_none());
 }
 
-/// Rejects enum-like, optional and fractional worker budgets during compilation.
+/// Rejects negative, enum-like and fractional worker budgets during compilation.
 #[test]
 fn source_cores_rejects_noninteger_values() {
     let registry = test_registry();
-    for value in ["HalfEven", "None", "1.5"] {
-        let program = crate::parse(&format!("@config {{ cores: {value} }}")).unwrap();
+    for value in ["-1", "HalfEven", "1.5", "NaN", "Infinity"] {
+        let program = crate::parse(&format!(
+            "@config {{ parallelization: {{ cores: {value} }} }}"
+        ))
+        .unwrap();
         assert!(crate::compile(&program, &registry).is_err());
     }
 }
@@ -686,7 +1076,7 @@ fn cores_integer_transform(
     if configuration.uses_initial_values() {
         return Ok(value.clone());
     }
-    let adjustment = match configuration.value("cores") {
+    let adjustment = match configuration.value(crate::semantic::PARALLELIZATION_CORES_PATH) {
         Some(crate::semantic::ConfigurationValue::Integer(cores)) => *cores,
         _ => 0,
     };
@@ -713,12 +1103,77 @@ fn source_cores_preserves_extension_result_transform() {
         )
         .unwrap();
     let program = compile_source(
-        "@config { cores: 4 }\nlet output: int[] = [0]\nfor (i in 0..1) { let value = 2 * 3\noutput[0] = value }",
+        "@config { parallelization: { cores: 4 } }\nlet output: int[] = [0]\nfor (i in 0..1) { let value = 2 * 3\noutput[0] = value }",
         &registry,
     );
     let (result, locals) = run_collecting(&program, &registry, &executor(4), None);
     result.unwrap();
     assert_eq!(array_contents(&program, &locals, "output"), vec![10]);
+}
+
+/// Makes a level-only override observable through an extension result callback.
+fn level_integer_transform(
+    value: &Value,
+    configuration: &crate::semantic::RuntimeConfiguration,
+) -> Result<Value, CoreError> {
+    if configuration.uses_initial_values() {
+        return Ok(value.clone());
+    }
+    let adjustment = match configuration.value(crate::semantic::PARALLELIZATION_LEVEL_PATH) {
+        Some(crate::semantic::ConfigurationValue::Integer(level)) => level + 1,
+        _ => 0,
+    };
+    Ok(Value::new(
+        value.type_id(),
+        value.downcast_ref::<i64>().unwrap() + adjustment,
+    ))
+}
+
+/// Level overrides never bypass extension callbacks, including changed registry revisions.
+#[test]
+fn source_level_preserves_extension_transform_and_callback_revision_guard() {
+    for register_before_compilation in [true, false] {
+        let mut registry = test_registry();
+        let integer = registry.default_integer().unwrap();
+        let descriptor = crate::semantic::TypeConfigurationDescriptor {
+            transform_result: Some(level_integer_transform),
+            transform_owned_result: None,
+            initial_result_transform_is_identity: true,
+            format: None,
+        };
+        if register_before_compilation {
+            registry
+                .register_type_configuration(integer, descriptor)
+                .unwrap();
+        }
+        let program = compile_source(
+            "@config { parallelization: { level: 100 } }\nlet output: int[] = [0]\nfor (i in 0..1) { output[i] = 2 * 3 }",
+            &registry,
+        );
+        if !register_before_compilation {
+            assert!(matches!(
+                program
+                    .execution_analysis()
+                    .loops
+                    .values()
+                    .next()
+                    .unwrap()
+                    .parallelism,
+                crate::analysis::Parallelism::IndependentIterations { .. }
+            ));
+            registry
+                .register_type_configuration(integer, descriptor)
+                .unwrap();
+        }
+        let executor = executor(4);
+        let observations = Mutex::new(Vec::new());
+        let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+        let (result, locals) = run_collecting(&program, &registry, &executor, Some(&observe));
+        result.unwrap();
+        assert_eq!(array_contents(&program, &locals, "output"), vec![107]);
+        assert!(observations.into_inner().unwrap().is_empty());
+        assert!(executor.pool.lock().unwrap().is_none());
+    }
 }
 
 /// Applies an observable adjustment to a promoted integer under source configuration.
@@ -752,7 +1207,7 @@ fn source_cores_preserves_promoted_result_transform() {
         )
         .unwrap();
     let program = compile_source(
-        "@config { cores: 1 }\nlet output = 0\nfor (i in 0..1) { let promoted = 9223372036854775807 * 2\noutput = promoted }",
+        "@config { parallelization: { cores: 1 } }\nlet output = 0\nfor (i in 0..1) { let promoted = 9223372036854775807 * 2\noutput = promoted }",
         &registry,
     );
     let (result, locals) = run_collecting(&program, &registry, &executor(4), None);

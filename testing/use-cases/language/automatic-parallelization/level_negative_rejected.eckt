@@ -1,0 +1,14 @@
+# Negative parallelization level is rejected
+
+A negative level is outside the supported integer range and must fail before execution.
+
+>>> source
+@config { parallelization: { level: -1 } }
+
+<<< stdout
+
+<<< stderr
+eck: invalid value for configuration `parallelization.level`: parallelization.level must be an integer from 0 through 100 at Span { start: 36, end: 38 }
+
+<<< exit
+1

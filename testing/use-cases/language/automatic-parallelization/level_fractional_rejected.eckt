@@ -1,0 +1,14 @@
+# Fractional parallelization level is rejected
+
+Parallelization levels use whole integer settings; a fractional number cannot become a scheduling value.
+
+>>> source
+@config { parallelization: { level: 0.5 } }
+
+<<< stdout
+
+<<< stderr
+eck: configuration numbers must be whole integers at Span { start: 36, end: 39 }
+
+<<< exit
+1

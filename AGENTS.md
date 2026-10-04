@@ -11,6 +11,7 @@ Read the relevant files before making changes:
 * `.agents/docs/eck-lang/adaptive-integer-arrays.md` — current adaptive `int[]` storage contract and deferred vectorized execution design
 * `.agents/docs/eck-lang/use-cases.md` — language use-case test conventions
 * `.agents/docs/eck-lang/performance.md` — raw execution speed as the primary implementation goal
+* `.agents/docs/eck-lang/automatic-parallelization.md` — resolved safety analysis, static work estimates, source parallelization cores and level configuration, runtime guarantees, and current limits
 * `.agents/docs/eck-lang/syntax/array-declaration.md` — array literals, element constraints, indexing, mutation, and rendering
 * `.agents/docs/eck-lang/syntax/map-declaration.md` — dynamic map literals, strict scalar key identities, lookup, assignment, missing keys, and rendering
 * `.agents/docs/eck-lang/syntax/type-expressions.md` — structural aliases, unions, recursive arrays, precedence, and nullable lowering

@@ -1,0 +1,14 @@
+# Negative parallelization core budgets are rejected
+
+A worker count below zero is outside the supported nonnegative budget range and fails before execution.
+
+>>> source
+@config { parallelization: { cores: -1 } }
+
+<<< stdout
+
+<<< stderr
+eck: invalid value for configuration `parallelization.cores`: parallelization.cores must be a nonnegative integer worker count or null at Span { start: 36, end: 38 }
+
+<<< exit
+1

@@ -1,0 +1,16 @@
+# High scheduling level preserves results with one core
+
+A level of 100 with one configured core still produces the expected ordered values for a safe transform.
+
+>>> source
+@config { parallelization: { cores: 1
+level: 100 } }
+let output: int[] = [0,0,0,0]
+const input: int[] = [1,2,3,4]
+for (i in 0..4) { output[i] = input[i] * 2 }
+print(output)
+
+<<< stdout
+[2, 4, 6, 8]
+
+<<< stderr

@@ -1,0 +1,16 @@
+# Level 100 accepts the highest scheduling level
+
+A four-worker configuration accepts level 100 for a safe range and preserves the ordered transform result.
+
+>>> source
+@config { parallelization: { cores: 4
+level: 100 } }
+let output: int[] = [0,0,0,0]
+const input: int[] = [1,2,3,4]
+for (i in 0..4) { output[i] = input[i] * 2 }
+print(output)
+
+<<< stdout
+[2, 4, 6, 8]
+
+<<< stderr

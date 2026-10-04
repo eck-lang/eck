@@ -39,18 +39,19 @@ pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     Ok(())
 }
 
-/// Validates an integer worker budget; values at or below one select serial execution.
+/// Accepts nonnegative worker counts or `None`; zero, one and `None` run serially.
 fn normalize_cores(
     value: crate::semantic::ConfigurationValue,
 ) -> Result<crate::semantic::ConfigurationValue, CoreError> {
     match value {
         crate::semantic::ConfigurationValue::Integer(workers)
-            if workers <= 1 || usize::try_from(workers).is_ok() =>
+            if workers >= 0 && usize::try_from(workers).is_ok() =>
         {
             Ok(value)
         }
-        _ => Err(CoreError::Runtime(
-            "cores must be an integer worker count".into(),
+        crate::semantic::ConfigurationValue::None => Ok(value),
+        _ => Err(CoreError::InvalidConfigurationValue(
+            "parallelization.cores must be a nonnegative integer worker count or null".into(),
         )),
     }
 }

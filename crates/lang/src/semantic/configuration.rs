@@ -90,6 +90,7 @@ impl ConfigurationOverride {
                     (PARALLELIZATION_CORES_PATH, ConfigurationValue::Integer(workers)) => {
                         Some(usize::try_from(*workers).unwrap_or(1).max(1))
                     }
+                    (PARALLELIZATION_CORES_PATH, ConfigurationValue::None) => Some(1),
                     _ => None,
                 });
         let parallelization_level = entries

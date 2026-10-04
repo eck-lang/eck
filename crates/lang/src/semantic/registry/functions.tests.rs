@@ -2,6 +2,129 @@ use super::*;
 
 use super::super::test_support::{execute_function, foreign_type_id, register_type};
 
+/// Gives every ordinary function registration the conservative high work estimate.
+#[test]
+fn function_work_cost_defaults_independently_of_effects() {
+    use crate::analysis::CostClass;
+
+    let mut registry = Registry::new();
+    let type_id = register_type(&mut registry, "int");
+    let unknown = registry
+        .register_function(
+            "unknown",
+            FunctionSignature::Exact(vec![type_id]),
+            Some(type_id),
+            execute_function,
+        )
+        .unwrap();
+    let pure = registry
+        .register_function_with_effect_summary(
+            "pure",
+            FunctionSignature::Exact(vec![type_id]),
+            Some(type_id),
+            execute_function,
+            FunctionEffectSummary::PURE,
+        )
+        .unwrap();
+
+    assert_eq!(
+        registry.function(unknown).unwrap().work_cost,
+        CostClass::High.work_cost()
+    );
+    let pure_descriptor = registry.function(pure).unwrap();
+    assert_eq!(pure_descriptor.effect_summary, FunctionEffectSummary::PURE);
+    assert_eq!(pure_descriptor.work_cost, CostClass::High.work_cost());
+}
+
+/// Updates function work metadata only for IDs owned by the registry.
+#[test]
+fn function_work_cost_can_be_set_and_rejects_foreign_ids() {
+    use crate::analysis::CostClass;
+
+    let mut registry = Registry::new();
+    let type_id = register_type(&mut registry, "int");
+    let function = registry
+        .register_function_with_effect_summary(
+            "pure",
+            FunctionSignature::Exact(vec![type_id]),
+            Some(type_id),
+            execute_function,
+            FunctionEffectSummary::PURE,
+        )
+        .unwrap();
+
+    registry
+        .set_function_work_cost(function, CostClass::Medium.work_cost())
+        .unwrap();
+    let descriptor = registry.function(function).unwrap();
+    assert_eq!(descriptor.work_cost, CostClass::Medium.work_cost());
+    assert_eq!(descriptor.effect_summary, FunctionEffectSummary::PURE);
+
+    let mut foreign_registry = Registry::new();
+    let foreign_type = register_type(&mut foreign_registry, "int");
+    let foreign_function = foreign_registry
+        .register_function(
+            "foreign",
+            FunctionSignature::Exact(vec![foreign_type]),
+            None,
+            execute_function,
+        )
+        .unwrap();
+    assert!(matches!(
+        registry.set_function_work_cost(foreign_function, CostClass::Low.work_cost()),
+        Err(CoreError::UnknownFunctionId(id)) if id == foreign_function
+    ));
+}
+
+/// Keeps representative built-in String costs aligned with their work profiles.
+#[test]
+fn builtin_string_work_costs_reflect_transformation_complexity() {
+    use crate::analysis::CostClass;
+    use crate::semantic::default_registry;
+
+    let registry = default_registry().unwrap();
+    let string_type = registry.type_by_name("string").unwrap();
+    let integer_type = registry.type_by_name("int").unwrap();
+    let regex_type = registry.type_by_name("regex").unwrap();
+    let cases = [
+        (
+            "String.trim",
+            vec![string_type],
+            CostClass::Medium.work_cost(),
+        ),
+        (
+            "String.uppercase",
+            vec![string_type],
+            CostClass::High.work_cost(),
+        ),
+        (
+            "String.replace",
+            vec![string_type, string_type, string_type],
+            CostClass::High.work_cost(),
+        ),
+        (
+            "String.repeat",
+            vec![string_type, integer_type],
+            CostClass::VeryHigh.work_cost(),
+        ),
+        (
+            "String.replace",
+            vec![string_type, regex_type, string_type],
+            CostClass::VeryHigh.work_cost(),
+        ),
+    ];
+
+    for (name, arguments, expected) in cases {
+        let function = registry.resolve_function(name, &arguments).unwrap();
+        let descriptor = registry.function(function).unwrap();
+        assert_eq!(descriptor.work_cost, expected, "{name} {arguments:?}");
+        assert_eq!(
+            descriptor.effect_summary.purity,
+            crate::semantic::FunctionPurity::Pure
+        );
+    }
+}
+
 /// Keeps undeclared native functions conservative and preserves explicit summaries by ID.
 #[test]
 fn function_effect_summaries_default_to_unknown_and_accept_declarations() {

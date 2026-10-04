@@ -1,0 +1,18 @@
+# Null core budgets disable parallel scheduling
+
+Both null and None preserve ordered array results at level 100 without an explicit parallel worker budget.
+
+>>> source
+@config { parallelization: { cores: null
+level: 100 } }
+let output: int[] = [0,0,0,0]
+const input: int[] = [1,2,3,4]
+for (i in 0..4) { output[i] = input[i] * 2 }
+@config { parallelization: { cores: None } }
+for (i in 0..4) { output[i] = output[i] * 2 }
+print(output)
+
+<<< stdout
+[4, 8, 12, 16]
+
+<<< stderr

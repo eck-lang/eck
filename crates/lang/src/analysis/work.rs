@@ -459,3 +459,7 @@ fn literal_integer(expression: &TypedExpression) -> Option<i128> {
         .or_else(|| value.downcast_ref::<i16>().map(|value| i128::from(*value)))
         .or_else(|| value.downcast_ref::<i8>().map(|value| i128::from(*value)))
 }
+
+#[cfg(test)]
+#[path = "work.tests.rs"]
+mod tests;
