@@ -24,10 +24,10 @@ pub struct ExecutionOptions {
 }
 
 impl Default for ExecutionOptions {
-    /// Uses the available CPU budget and avoids scheduling small interpreted loops.
+    /// Uses sixty percent of available logical CPUs and avoids scheduling small loops.
     fn default() -> Self {
         Self {
-            workers: std::thread::available_parallelism().map_or(1, usize::from),
+            workers: crate::semantic::automatic_parallelization_workers(),
             parallelization_threshold: crate::analysis::DEFAULT_PARALLELIZATION_THRESHOLD,
         }
     }

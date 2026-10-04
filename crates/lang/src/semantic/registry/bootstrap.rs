@@ -18,9 +18,7 @@ pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     registry.register_configuration(crate::semantic::ConfigurationDescriptor {
         path: crate::semantic::PARALLELIZATION_CORES_PATH,
         none_object_path: None,
-        default: crate::semantic::ConfigurationValue::Integer(
-            std::thread::available_parallelism().map_or(1, usize::from) as i64,
-        ),
+        default: crate::semantic::ConfigurationValue::Null,
         normalize: normalize_cores,
     })?;
     registry.register_configuration(crate::semantic::ConfigurationDescriptor {
@@ -39,7 +37,7 @@ pub fn register_all(registry: &mut Registry) -> Result<(), CoreError> {
     Ok(())
 }
 
-/// Accepts nonnegative worker counts or `None`; zero, one and `None` run serially.
+/// Accepts nonnegative worker counts or automatic `null`; zero and one run serially.
 fn normalize_cores(
     value: crate::semantic::ConfigurationValue,
 ) -> Result<crate::semantic::ConfigurationValue, CoreError> {
@@ -49,7 +47,7 @@ fn normalize_cores(
         {
             Ok(value)
         }
-        crate::semantic::ConfigurationValue::None => Ok(value),
+        crate::semantic::ConfigurationValue::Null => Ok(value),
         _ => Err(CoreError::InvalidConfigurationValue(
             "parallelization.cores must be a nonnegative integer worker count or null".into(),
         )),

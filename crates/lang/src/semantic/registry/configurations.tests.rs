@@ -41,10 +41,40 @@ fn normalize_optional_integer(value: ConfigurationValue) -> Result<Configuration
     match value {
         ConfigurationValue::Integer(value) => Ok(ConfigurationValue::Integer(value)),
         ConfigurationValue::None => Ok(ConfigurationValue::None),
-        ConfigurationValue::Symbol(_) => Err(CoreError::InvalidConfigurationValue(
-            "expected an integer or None".into(),
-        )),
+        ConfigurationValue::Symbol(_) | ConfigurationValue::Null => Err(
+            CoreError::InvalidConfigurationValue("expected an integer or None".into()),
+        ),
     }
+}
+
+/// Null retains its own core identity while optional decimal object aliases keep their behavior.
+#[test]
+fn null_configuration_preserves_leaf_and_optional_object_contracts() {
+    let registry = crate::semantic::default_registry().unwrap();
+    assert_eq!(
+        registry
+            .normalize_null_configuration_value(crate::semantic::PARALLELIZATION_CORES_PATH)
+            .unwrap(),
+        (
+            crate::semantic::PARALLELIZATION_CORES_PATH.into(),
+            ConfigurationValue::Null
+        )
+    );
+    assert!(
+        registry
+            .normalize_none_configuration_value(crate::semantic::PARALLELIZATION_CORES_PATH)
+            .is_err()
+    );
+    assert_eq!(
+        registry
+            .normalize_null_configuration_value("decimal.format")
+            .unwrap(),
+        ("decimal.format.scale".into(), ConfigurationValue::None)
+    );
+    assert!(matches!(
+        registry.normalize_null_configuration_value("unknown.null.setting"),
+        Err(CoreError::UnknownConfiguration(_))
+    ));
 }
 
 /// Registers a minimal integer leaf configuration used by the tests in this module.

@@ -174,6 +174,79 @@ fn defaults_parallelization_level_to_fifty() {
     );
     assert_eq!(configuration.parallelization_level(), None);
     assert_eq!(configuration.parallelization_threshold(), None);
+    assert_eq!(
+        configuration.value(PARALLELIZATION_CORES_PATH),
+        Some(&ConfigurationValue::Null)
+    );
+    assert_eq!(configuration.execution_workers(), None);
+    assert_eq!(
+        crate::ExecutionOptions::default().workers,
+        automatic_parallelization_workers()
+    );
+}
+
+/// Automatic CPU budgets use sixty percent rounded down, including small and extreme counts.
+#[test]
+fn automatic_core_budgets_round_down_without_overflow() {
+    for (available, expected) in [
+        (0, 1),
+        (1, 1),
+        (2, 1),
+        (3, 1),
+        (4, 2),
+        (5, 3),
+        (8, 4),
+        (10, 6),
+        (12, 7),
+        (100000, 60000),
+    ] {
+        assert_eq!(automatic_parallelization_workers_for(available), expected);
+    }
+    assert_eq!(
+        automatic_parallelization_workers_for(usize::MAX),
+        (usize::MAX as u128 * 3 / 5) as usize
+    );
+}
+
+/// Null replaces an explicit source budget with the automatic budget while preserving level.
+#[test]
+fn null_core_overrides_restore_automatic_workers() {
+    let mut configuration = RuntimeConfiguration::new(HashMap::new());
+    configuration.apply(&ConfigurationOverride::new(vec![
+        (
+            PARALLELIZATION_CORES_PATH.into(),
+            ConfigurationValue::Integer(4),
+        ),
+        (
+            PARALLELIZATION_LEVEL_PATH.into(),
+            ConfigurationValue::Integer(75),
+        ),
+    ]));
+    assert_eq!(configuration.execution_workers(), Some(4));
+    configuration.apply(&ConfigurationOverride::new(vec![(
+        PARALLELIZATION_CORES_PATH.into(),
+        ConfigurationValue::Null,
+    )]));
+    assert_eq!(
+        configuration.execution_workers(),
+        Some(automatic_parallelization_workers())
+    );
+    assert_eq!(configuration.parallelization_level(), Some(75));
+    assert_eq!(
+        configuration.value(PARALLELIZATION_CORES_PATH),
+        Some(&ConfigurationValue::Null)
+    );
+    configuration.apply(&ConfigurationOverride::default());
+    assert_eq!(
+        configuration.execution_workers(),
+        Some(automatic_parallelization_workers())
+    );
+    configuration.apply(&ConfigurationOverride::new(vec![(
+        PARALLELIZATION_CORES_PATH.into(),
+        ConfigurationValue::Integer(0),
+    )]));
+    assert_eq!(configuration.execution_workers(), Some(1));
+    assert_eq!(configuration.parallelization_level(), Some(75));
 }
 
 /// Decodes nonnegative budgets without confusing large core counts with the level limit.
@@ -186,8 +259,7 @@ fn core_configuration_accepts_large_counts_and_null() {
         ("4", 4),
         ("100000", 100000),
         ("100001", 100001),
-        ("null", 1),
-        ("None", 1),
+        ("null", automatic_parallelization_workers()),
     ] {
         let source =
             format!("@config {{ parallelization: {{ cores: {source_value}\nlevel: 60 }} }}");
@@ -207,10 +279,10 @@ fn core_configuration_accepts_large_counts_and_null() {
         assert_eq!(configuration.parallelization_threshold(), Some(375000));
         assert!(configuration.uses_initial_value_settings());
         assert!(!configuration.uses_initial_values());
-        if source_value == "null" || source_value == "None" {
+        if source_value == "null" {
             assert_eq!(
                 configuration.value(PARALLELIZATION_CORES_PATH),
-                Some(&ConfigurationValue::None)
+                Some(&ConfigurationValue::Null)
             );
         }
     }

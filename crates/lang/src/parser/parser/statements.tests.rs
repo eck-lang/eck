@@ -663,7 +663,7 @@ fn parses_quoted_configuration_keys() {
     );
 }
 
-/// Treats configuration `null` as the existing optional setting with its original span.
+/// Retains configuration null as its own value with the original source span.
 #[test]
 fn parses_null_configuration_values() {
     let source = "@config { parallelization: { cores: null } }";
@@ -674,9 +674,8 @@ fn parses_null_configuration_values() {
     let ConfigurationValue::Object { entries, .. } = &entries[0].value else {
         panic!("expected nested configuration");
     };
-    let ConfigurationValue::Symbol { name, span } = &entries[0].value else {
-        panic!("expected optional configuration setting");
+    let ConfigurationValue::Null { span } = &entries[0].value else {
+        panic!("expected null configuration setting");
     };
-    assert_eq!(name, "None");
     assert_eq!(&source[span.start..span.end], "null");
 }

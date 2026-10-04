@@ -1,7 +1,8 @@
 # Source-configured parallelization budget
 
 Switches between serial and four-worker budgets around a heavy independent
-array transform. Zero and null serial budgets preserve the final ordered result.
+array transform. Zero selects sequential execution, while null selects the
+automatic worker budget; both preserve the final ordered result.
 
 >>> source
 @config { parallelization: { cores: 0

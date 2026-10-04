@@ -46,6 +46,19 @@ impl Compiler<'_> {
                         compiled_entries,
                     )?;
                 }
+                SyntaxConfigurationValue::Null { span } => {
+                    let (normalized_path, normalized_value) = self
+                        .registry
+                        .normalize_null_configuration_value(&path)
+                        .map_err(|error| CompileError::core(*span, error))?;
+                    Self::push_configuration_entry(
+                        normalized_path,
+                        normalized_value,
+                        *span,
+                        seen_paths,
+                        compiled_entries,
+                    )?;
+                }
                 SyntaxConfigurationValue::Symbol { name, span } if name == "None" => {
                     let (normalized_path, normalized_value) = self
                         .registry
@@ -83,6 +96,7 @@ impl Compiler<'_> {
         value: &SyntaxConfigurationValue,
     ) -> Result<CoreConfigurationValue, CompileError> {
         match value {
+            SyntaxConfigurationValue::Null { .. } => Ok(CoreConfigurationValue::Null),
             SyntaxConfigurationValue::Number { raw_text, span } => raw_text
                 .parse::<i64>()
                 .map(CoreConfigurationValue::Integer)

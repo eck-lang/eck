@@ -16,6 +16,7 @@ pub use crate::containers::array::{
 };
 pub use crate::containers::map::MapType;
 pub use crate::values::Value;
+pub(crate) use configuration::automatic_parallelization_workers;
 pub use configuration::{
     ArrayValueFormatter, ConfigurationDescriptor, ConfigurationNormalizer, ConfigurationOverride,
     ConfigurationValue, ConfiguredValueFormatter, ConfiguredValueTransformer,

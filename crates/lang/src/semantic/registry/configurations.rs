@@ -84,16 +84,33 @@ impl Registry {
         &self,
         path: &str,
     ) -> Result<(String, ConfigurationValue), CoreError> {
+        self.normalize_optional_configuration_value(path, ConfigurationValue::None)
+    }
+
+    /// Validates source `null` for a leaf or an explicitly registered optional object.
+    pub fn normalize_null_configuration_value(
+        &self,
+        path: &str,
+    ) -> Result<(String, ConfigurationValue), CoreError> {
+        self.normalize_optional_configuration_value(path, ConfigurationValue::Null)
+    }
+
+    /// Resolves optional object aliases without conflating null and legacy None values.
+    fn normalize_optional_configuration_value(
+        &self,
+        path: &str,
+        value: ConfigurationValue,
+    ) -> Result<(String, ConfigurationValue), CoreError> {
         if self.configurations.contains_key(path) {
             return self
-                .normalize_configuration_value(path, ConfigurationValue::None)
+                .normalize_configuration_value(path, value)
                 .map(|value| (path.to_string(), value));
         }
         let leaf_path = self
             .configuration_none_objects
             .get(path)
             .ok_or_else(|| CoreError::UnknownConfiguration(path.to_string()))?;
-        self.normalize_configuration_value(leaf_path, ConfigurationValue::None)
+        self.normalize_configuration_value(leaf_path, value)
             .map(|value| ((*leaf_path).to_string(), value))
     }
 

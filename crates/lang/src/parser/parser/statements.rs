@@ -417,7 +417,7 @@ impl Parser {
         })
     }
 
-    /// Parses configuration values, lowering `null` to the existing `None` setting.
+    /// Parses configuration values while retaining `null` as a distinct source value.
     fn parse_configuration_value(&mut self) -> Result<ConfigurationValue, ParseError> {
         match self.peek().kind.clone() {
             TokenKind::Number(raw_text) => {
@@ -447,10 +447,7 @@ impl Parser {
             }
             TokenKind::Null => {
                 let span = self.advance().span;
-                Ok(ConfigurationValue::Symbol {
-                    name: "None".into(),
-                    span,
-                })
+                Ok(ConfigurationValue::Null { span })
             }
             TokenKind::LeftBrace => self.parse_configuration_object(),
             _ => Err(self.error_here("expected configuration value")),

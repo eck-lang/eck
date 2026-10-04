@@ -123,7 +123,8 @@ at each call site.
 
 `Executor` and `ExecutionOptions { workers, parallelization_threshold }`
 provide a reusable Rayon worker pool with source-overridable settings. The
-worker default uses the available CPU count. The default threshold is
+worker default uses sixty percent of the available logical CPU count, rounded
+down with a minimum of one worker. The default threshold is
 **750,000 relative units**, shared by executor defaults and the source level-50
 mapping through `analysis::DEFAULT_PARALLELIZATION_THRESHOLD`. The source default
 is `parallelization.level: 50`. These are profitability settings, not safety proofs.
@@ -153,7 +154,7 @@ Both user controls live under `parallelization` in a root-level directive:
 ```eck
 @config {
     parallelization: {
-        cores: 4
+        cores: null
         level: 50
     }
 }
@@ -165,16 +166,28 @@ paths are `parallelization.cores` and `parallelization.level`. The former root
 `cores` and raw source `parallelization.threshold` paths are rejected; migrate
 worker settings into this object and replace raw thresholds with a level.
 
-`cores` sets the worker budget. It accepts nonnegative integers, `null`, or
-`None`. Values zero, one, `null`, and `None` select sequential execution and
-never start a pool; `null` is parsed as the existing `None` configuration value.
-Values above one select that many workers, including when the executor default
-is one. Core counts are independent of the 0–100 level scale: `cores: 100000`
-is valid, with no artificial 100-core or 100,000-core cap. Integer counts must
-fit the platform worker-count representation. Negative, fractional, and other
-symbolic values are rejected at compile time. Omission preserves the executor
-budget, normally the available CPU count. Choosing more cores does not make an
-unsafe loop parallel or bypass the work threshold.
+`cores` sets the worker budget. Its default is **`null`**, meaning automatic
+selection of **60% of available logical CPUs**, rounded down with a minimum of
+one worker. For example, 10 available CPUs select six workers and 12 select
+seven. One selected worker runs sequentially. Omission uses the same automatic
+budget through `ExecutionOptions::default()`; explicit Rust execution options
+can still supply a test or embedding budget.
+
+Source `null` has its own syntax and semantic configuration values. It is not
+lowered to the legacy `None` option. `cores: None` is rejected. Nonnegative
+integer counts are also accepted: zero and one select sequential execution;
+values above one select that many workers regardless of the automatic budget.
+Counts are independent of the 0–100 level scale: `cores: 100000` is valid, with
+no artificial 100-core or 100,000-core cap. Counts must fit the platform worker
+representation. Negative, fractional and other symbolic values are rejected.
+Choosing more cores does not authorize an unsafe loop or bypass profitability.
+
+The automatic budget is calculated once when preparing executor defaults or
+compiling an explicit null override, then cached in typed execution state.
+The calculation is `max(1, floor(available_cpus * 3 / 5))`, implemented without
+multiplication overflow. There is no CPU-count query or budget calculation per
+iteration. A `null` override replaces a previously explicit numeric budget;
+empty or level-only directives preserve the active budget.
 
 `level` is an integer from **0 through 100**, with a default of **50**. It controls
 how much estimated work is needed before using the parallel path. Higher levels
@@ -210,10 +223,10 @@ ranges may use the worker path. Empty/reversed ranges perform no iterations.
 Safety proofs, native range guards, identity transforms, at least two workers
 and successful pool startup remain required at every level, including 100.
 
-A later `cores: null` or `cores: None` directive disables workers previously
-selected by a numeric core count; it preserves the active level. Selecting a
-numeric count above one later re-enables the worker budget subject to the same
-safety and profitability checks.
+A later `cores: null` directive restores the automatic 60% budget after an
+explicit numeric count while preserving the active level. A later zero or one
+budget runs sequentially, and a positive budget above one permits workers
+subject to the same safety and profitability checks.
 
 The compiler converts each explicit level to its internal threshold once while
 building a configuration override. Runtime consumes typed cached fields with

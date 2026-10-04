@@ -12,6 +12,8 @@ pub const DEFAULT_PARALLELIZATION_LEVEL: u8 = 50;
 /// Stores one normalized scalar configuration value.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConfigurationValue {
+    /// Represents source `null`, including an automatic parallel worker budget.
+    Null,
     /// Represents a signed whole number supplied by source configuration.
     Integer(i64),
     /// Represents an enum-like source identifier such as `HalfEven`.
@@ -90,7 +92,9 @@ impl ConfigurationOverride {
                     (PARALLELIZATION_CORES_PATH, ConfigurationValue::Integer(workers)) => {
                         Some(usize::try_from(*workers).unwrap_or(1).max(1))
                     }
-                    (PARALLELIZATION_CORES_PATH, ConfigurationValue::None) => Some(1),
+                    (PARALLELIZATION_CORES_PATH, ConfigurationValue::Null) => {
+                        Some(automatic_parallelization_workers())
+                    }
                     _ => None,
                 });
         let parallelization_level = entries
@@ -121,6 +125,18 @@ impl ConfigurationOverride {
             .iter()
             .map(|(path, value)| (path.as_str(), value))
     }
+}
+
+/// Resolves the automatic budget once from the currently available logical CPUs.
+pub(crate) fn automatic_parallelization_workers() -> usize {
+    automatic_parallelization_workers_for(
+        std::thread::available_parallelism().map_or(1, usize::from),
+    )
+}
+
+/// Uses sixty percent rounded down, with one worker minimum and no multiplication overflow.
+fn automatic_parallelization_workers_for(available_workers: usize) -> usize {
+    (available_workers / 5 * 3 + available_workers % 5 * 3 / 5).max(1)
 }
 
 /// Holds the complete configuration state for one program execution.

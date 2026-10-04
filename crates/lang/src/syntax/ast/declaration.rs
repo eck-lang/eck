@@ -118,6 +118,9 @@ pub struct ConfigurationEntry {
 /// Represents the source forms accepted inside `@config` objects.
 #[derive(Clone, Debug)]
 pub enum ConfigurationValue {
+    Null {
+        span: Span,
+    },
     Number {
         raw_text: String,
         span: Span,
@@ -136,9 +139,10 @@ impl ConfigurationValue {
     /// Returns the byte range occupied by this configuration value.
     pub fn span(&self) -> Span {
         match self {
-            Self::Number { span, .. } | Self::Symbol { span, .. } | Self::Object { span, .. } => {
-                *span
-            }
+            Self::Null { span }
+            | Self::Number { span, .. }
+            | Self::Symbol { span, .. }
+            | Self::Object { span, .. } => *span,
         }
     }
 }

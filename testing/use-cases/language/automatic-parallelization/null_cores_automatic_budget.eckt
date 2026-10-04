@@ -1,0 +1,17 @@
+# Null core budget selects the automatic worker count
+
+An explicit null core budget uses the automatic worker count, and level 100
+still preserves the ordered result of a safe array transform.
+
+>>> source
+@config { parallelization: { cores: null
+level: 100 } }
+let output: int[] = [0,0,0,0]
+const input: int[] = [1,2,3,4]
+for (i in 0..4) { output[i] = input[i] * 2 }
+print(output)
+
+<<< stdout
+[2, 4, 6, 8]
+
+<<< stderr

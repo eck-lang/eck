@@ -41,12 +41,23 @@ and 5969.784750 / 1579.396209 / 997.642417 ms at four million iterations. New
 this rerun separately from historical measurements. Unpaired timing changes
 are not evidence that this configuration change improves execution speed.
 
-The core-count follow-up accepts nonnegative integers and `null`/`None`.
-Zero, one, null and None select sequential execution. Large budgets such as
-100,000 are accepted independently of the level scale; negative budgets are
-rejected. Level 50 remains the conservative default. Configuration `null`
-uses the existing None representation. Later null overrides disable an active
-parallel budget without resetting the level.
+The current core-count default is `null`, which automatically selects 60% of
+available logical CPUs, rounded down with at least one worker. Null has its own
+syntax and semantic representation; cores no longer accepts the legacy None
+option. Zero and one remain sequential, and larger nonnegative integers select
+an explicit budget, including 100,000. Level 50 remains the conservative default.
+A later null override restores the automatic budget while preserving the level.
+This supersedes the initial null-as-disabled contract in commit 4789cdd. The
+previous validation and timing records below refer to that earlier contract.
+
+Automatic-budget correction validation on 4 October 2026: `cargo test-all`
+passes 957 language-library tests, five CLI integration tests, 45 runner tests,
+one doctest and 561 language cases. All 13 automatic-parallelization language
+cases pass, including omitted/null cores and rejection of `None`. Rust coverage
+checks rounding, overflow, restoring automatic budgets and actual worker
+dispatch. The release source-core compile-only benchmark accepts all six
+one/four/ten-worker variants. Formatting and diff checks pass. No timing
+measurements were rerun for this correction.
 
 Core-count validation on 4 October 2026: the complete working-tree suite passes
 953 language-library tests, five CLI integration tests, 44 runner tests, one

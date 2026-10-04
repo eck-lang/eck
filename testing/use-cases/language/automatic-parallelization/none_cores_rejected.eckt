@@ -1,0 +1,15 @@
+# None is rejected as a parallelization core budget
+
+Core budgets accept an integer or null; the legacy `None` spelling is rejected
+before the source program executes.
+
+>>> source
+@config { parallelization: { cores: None } }
+
+<<< stdout
+
+<<< stderr
+eck: invalid value for configuration `parallelization.cores`: parallelization.cores must be a nonnegative integer worker count or null at Span { start: 36, end: 40 }
+
+<<< exit
+1

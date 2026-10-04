@@ -89,9 +89,11 @@ fn normalize_precision(value: ConfigurationValue) -> Result<ConfigurationValue, 
         ConfigurationValue::Symbol(symbol) => Err(CoreError::InvalidConfigurationValue(format!(
             "expected a positive integer or `Max`, found `{symbol}`"
         ))),
-        ConfigurationValue::None => Err(CoreError::InvalidConfigurationValue(
-            "precision cannot be `None`; use `Max` for full precision".into(),
-        )),
+        ConfigurationValue::None | ConfigurationValue::Null => {
+            Err(CoreError::InvalidConfigurationValue(
+                "precision cannot be `None`; use `Max` for full precision".into(),
+            ))
+        }
     }
 }
 
@@ -110,16 +112,18 @@ fn normalize_arithmetic_scale(value: ConfigurationValue) -> Result<Configuration
         ConfigurationValue::Symbol(symbol) => Err(CoreError::InvalidConfigurationValue(format!(
             "expected a non-negative integer or `Max`, found `{symbol}`"
         ))),
-        ConfigurationValue::None => Err(CoreError::InvalidConfigurationValue(
-            "scale cannot be `None`; use `Max` for the maximum scale".into(),
-        )),
+        ConfigurationValue::None | ConfigurationValue::Null => {
+            Err(CoreError::InvalidConfigurationValue(
+                "scale cannot be `None`; use `Max` for the maximum scale".into(),
+            ))
+        }
     }
 }
 
 /// Normalizes an optional display scale and caps it to decimal capacity.
 fn normalize_scale(value: ConfigurationValue) -> Result<ConfigurationValue, CoreError> {
     match value {
-        ConfigurationValue::None => Ok(ConfigurationValue::None),
+        ConfigurationValue::None | ConfigurationValue::Null => Ok(ConfigurationValue::None),
         ConfigurationValue::Integer(value) if value >= 0 => {
             Ok(ConfigurationValue::Integer(value.min(MAXIMUM_PRECISION)))
         }
@@ -155,9 +159,11 @@ fn normalize_rounding(value: ConfigurationValue) -> Result<ConfigurationValue, C
         ConfigurationValue::Integer(value) => Err(CoreError::InvalidConfigurationValue(format!(
             "expected a rounding strategy, found `{value}`"
         ))),
-        ConfigurationValue::None => Err(CoreError::InvalidConfigurationValue(
-            "rounding strategy cannot be `None`; disable formatting with `format: None`".into(),
-        )),
+        ConfigurationValue::None | ConfigurationValue::Null => {
+            Err(CoreError::InvalidConfigurationValue(
+                "rounding strategy cannot be `None`; disable formatting with `format: None`".into(),
+            ))
+        }
     }
 }
 

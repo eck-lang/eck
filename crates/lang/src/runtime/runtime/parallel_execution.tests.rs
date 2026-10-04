@@ -947,11 +947,11 @@ fn extending_registry_dispatch_cannot_keep_a_stale_callback_inventory() {
     assert!(observations.into_inner().unwrap().is_empty());
 }
 
-/// Zero, one and null source budgets never start workers and preserve array results.
+/// Zero and one source budgets never start workers and preserve array results.
 #[test]
 fn source_serial_core_settings_disable_parallelism() {
     let registry = test_registry();
-    for cores in ["0", "1", "None", "null"] {
+    for cores in ["0", "1"] {
         let program = compile_source(
             &format!(
                 "@config {{ parallelization: {{ \"cores\": {cores}\nlevel: 100 }} }}\n{}",
@@ -970,6 +970,59 @@ fn source_serial_core_settings_disable_parallelism() {
             array_contents(&program, &locals, "output"),
             (0..31).map(|index| index * 2).collect::<Vec<_>>()
         );
+    }
+}
+
+/// Omitted and null source cores use the same automatic budget and preserve exact results.
+#[test]
+fn automatic_core_settings_dispatch_the_expected_worker_budget() {
+    let registry = test_registry();
+    let workers = crate::semantic::automatic_parallelization_workers();
+    for explicit_null in [false, true] {
+        let prefix = if explicit_null {
+            "@config { parallelization: { cores: null\nlevel: 100 } }"
+        } else {
+            "@config { parallelization: { level: 100 } }"
+        };
+        let program = compile_source(
+            &format!(
+                "{prefix}\n{}",
+                array_source(257, "output[i] = input[i] * 2")
+            ),
+            &registry,
+        );
+        let executor = if explicit_null {
+            executor(1)
+        } else {
+            Executor::new(ExecutionOptions::default()).unwrap()
+        };
+        let observations = Mutex::new(Vec::new());
+        let observe = |iteration, thread| observations.lock().unwrap().push((iteration, thread));
+        let (result, locals) = run_collecting(&program, &registry, &executor, Some(&observe));
+        result.unwrap();
+        assert_eq!(
+            array_contents(&program, &locals, "output"),
+            (0..257).map(|index| index * 2).collect::<Vec<_>>()
+        );
+        let observations = observations.into_inner().unwrap();
+        if workers < 2 {
+            assert!(observations.is_empty());
+            assert!(executor.pool.lock().unwrap().is_none());
+        } else {
+            assert_eq!(observations.len(), 257);
+            assert_eq!(
+                observations
+                    .iter()
+                    .map(|(_, thread)| thread)
+                    .collect::<HashSet<_>>()
+                    .len(),
+                workers.min(257)
+            );
+            assert_eq!(
+                executor.pool.lock().unwrap().as_ref().unwrap().workers,
+                workers
+            );
+        }
     }
 }
 
@@ -1003,7 +1056,7 @@ fn source_cores_four_overrides_executor_default() {
 #[test]
 fn source_cores_switches_dispatch_and_reuses_pool() {
     let registry = test_registry();
-    let source = "@config { parallelization: { cores: 1 } }\nfor (i in 0..31) { let x = i * 2 }\n@config { parallelization: { cores: 4 } }\nfor (i in 100..131) { let x = i * 2 }\n@config { parallelization: { cores: null } }\nfor (i in 200..231) { let x = i * 2 }\n@config { parallelization: { cores: 4 } }\nfor (i in 300..331) { let x = i * 2 }";
+    let source = "@config { parallelization: { cores: 1 } }\nfor (i in 0..31) { let x = i * 2 }\n@config { parallelization: { cores: 4 } }\nfor (i in 100..131) { let x = i * 2 }\n@config { parallelization: { cores: 0 } }\nfor (i in 200..231) { let x = i * 2 }\n@config { parallelization: { cores: 4 } }\nfor (i in 300..331) { let x = i * 2 }";
     let program = compile_source(source, &registry);
     let executor = executor(1);
     let observations = Mutex::new(Vec::new());
@@ -1059,7 +1112,7 @@ fn source_cores_does_not_ignore_numeric_configuration() {
 #[test]
 fn source_cores_rejects_noninteger_values() {
     let registry = test_registry();
-    for value in ["-1", "HalfEven", "1.5", "NaN", "Infinity"] {
+    for value in ["-1", "None", "HalfEven", "1.5", "NaN", "Infinity"] {
         let program = crate::parse(&format!(
             "@config {{ parallelization: {{ cores: {value} }} }}"
         ))
