@@ -7,6 +7,7 @@
 use super::format::{
     finish_required_description, parse_title_line, remove_line_ending, remove_separator_blank_line,
 };
+use super::preparation::{PreparationStep, parse_preparation};
 
 #[cfg(test)]
 #[path = "eckb.tests.rs"]
@@ -17,6 +18,7 @@ mod tests;
 pub(crate) struct BenchmarkDefinition {
     pub(crate) title: String,
     pub(crate) description: String,
+    pub(crate) preparation: Vec<PreparationStep>,
     pub(crate) checkpoints: Vec<BenchmarkCheckpoint>,
     pub(crate) source: String,
 }
@@ -40,6 +42,8 @@ pub(crate) fn parse_benchmark(contents: &str) -> Result<BenchmarkDefinition, Str
 
     let mut description_buffer = String::new();
     let mut description = None;
+    let mut preparation = Vec::new();
+    let mut preparation_buffer: Option<String> = None;
     let mut checkpoints = Vec::new();
     let mut current_comment = String::new();
     let mut active_checkpoint = None;
@@ -53,6 +57,9 @@ pub(crate) fn parse_benchmark(contents: &str) -> Result<BenchmarkDefinition, Str
             if structural_line == ">>> source" {
                 return Err("section `source` occurs more than once".into());
             }
+            if structural_line == ">>> prepare" {
+                return Err("section `prepare` must occur before `>>> source`".into());
+            }
             if structural_line.starts_with(">>>") || structural_line.starts_with("<<<") {
                 return Err(format!("unknown section marker `{structural_line}`"));
             }
@@ -64,6 +71,7 @@ pub(crate) fn parse_benchmark(contents: &str) -> Result<BenchmarkDefinition, Str
         }
 
         if structural_line == ">>> source" {
+            finish_preparation(&mut preparation, &mut preparation_buffer)?;
             finish_checkpoint_comment(
                 &mut checkpoints,
                 &mut active_checkpoint,
@@ -77,6 +85,20 @@ pub(crate) fn parse_benchmark(contents: &str) -> Result<BenchmarkDefinition, Str
             continue;
         }
 
+        if structural_line == ">>> prepare" {
+            if !checkpoints.is_empty() {
+                return Err("section `prepare` must occur before checkpoints".into());
+            }
+            if preparation_buffer.is_some() || !preparation.is_empty() {
+                return Err("section `prepare` occurs more than once".into());
+            }
+            if description.is_none() {
+                description = Some(finish_required_description(&mut description_buffer)?);
+            }
+            preparation_buffer = Some(String::new());
+            continue;
+        }
+
         if let Some(checkpoint) = parse_checkpoint_marker(structural_line)? {
             if source.is_some() {
                 return Err("checkpoint markers must occur before `>>> source`".into());
@@ -87,9 +109,10 @@ pub(crate) fn parse_benchmark(contents: &str) -> Result<BenchmarkDefinition, Str
                     &mut active_checkpoint,
                     &mut current_comment,
                 );
-            } else {
+            } else if description.is_none() {
                 description = Some(finish_required_description(&mut description_buffer)?);
             }
+            finish_preparation(&mut preparation, &mut preparation_buffer)?;
             checkpoints.push(checkpoint);
             active_checkpoint = Some(checkpoints.len() - 1);
             continue;
@@ -99,7 +122,9 @@ pub(crate) fn parse_benchmark(contents: &str) -> Result<BenchmarkDefinition, Str
             return Err(format!("unknown section marker `{structural_line}`"));
         }
 
-        if active_checkpoint.is_some() {
+        if let Some(buffer) = preparation_buffer.as_mut() {
+            buffer.push_str(line);
+        } else if active_checkpoint.is_some() {
             current_comment.push_str(line);
         } else {
             description_buffer.push_str(line);
@@ -119,9 +144,22 @@ pub(crate) fn parse_benchmark(contents: &str) -> Result<BenchmarkDefinition, Str
     Ok(BenchmarkDefinition {
         title,
         description,
+        preparation,
         checkpoints,
         source,
     })
+}
+
+/// Parses and clears a completed preparation section, if one is active.
+fn finish_preparation(
+    preparation: &mut Vec<PreparationStep>,
+    preparation_buffer: &mut Option<String>,
+) -> Result<(), String> {
+    let Some(contents) = preparation_buffer.take() else {
+        return Ok(());
+    };
+    *preparation = parse_preparation(&contents)?;
+    Ok(())
 }
 
 /// Parses a checkpoint marker, distinguishing it from unrelated document text.

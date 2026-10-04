@@ -1,0 +1,27 @@
+# Typed CSV streaming over a small mixed file
+
+Measures typed lazy streaming for 256 rows with integer, string, and boolean
+fields. The checksum reads the converted integer field while string and boolean
+columns exercise mixed typed row conversion.
+
+>>> prepare
+python generate_data.py
+
+>>> checkpoint lazy-csv 4789cddab3297ac9753fc94e0c4e64ca739b1c2f First buildable commit after lazy streaming CSV
+
+>>> source
+use CSV
+
+type MixedRow {
+    id: int
+    name: string
+    region: string
+    active: bool
+}
+
+let source = CSV.read("data/small_mixed.csv")->as(MixedRow[])
+let checksum = 0
+for (row in source) {
+    checksum = checksum + row.id
+}
+print(checksum)

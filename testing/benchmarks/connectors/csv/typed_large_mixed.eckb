@@ -1,0 +1,27 @@
+# Typed CSV streaming over a multi-buffer mixed file
+
+Measures lazy typed conversion for 100,000 rows with integer, text, boolean,
+and decimal fields. The checksum consumes each row while every field is decoded.
+
+>>> prepare
+python generate_data.py
+
+>>> checkpoint lazy-csv 4789cddab3297ac9753fc94e0c4e64ca739b1c2f First buildable commit after lazy streaming CSV
+
+>>> source
+use CSV
+
+type MixedRow {
+    id: int
+    name: string
+    region: string
+    active: bool
+    score: decimal
+}
+
+let source = CSV.read("data/large_mixed.csv")->as(MixedRow[])
+let checksum = 0
+for (row in source) {
+    checksum = checksum + row.id
+}
+print(checksum)

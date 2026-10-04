@@ -1,0 +1,20 @@
+# Untyped CSV streaming over a multi-buffer mixed file
+
+Measures lazy untyped row streaming for 100,000 mixed rows in a multi-megabyte
+file. Cells include integer-looking, text, boolean-looking, and decimal-looking
+values; the loop counts rows without materializing the source.
+
+>>> prepare
+python generate_data.py
+
+>>> checkpoint lazy-csv 4789cddab3297ac9753fc94e0c4e64ca739b1c2f First buildable commit after lazy streaming CSV
+
+>>> source
+use CSV
+
+let source = CSV.read("data/large_mixed.csv")
+let rows = 0
+for (row in source) {
+    rows = rows + 1
+}
+print(rows)

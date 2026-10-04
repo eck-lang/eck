@@ -8,9 +8,10 @@ use super::{
     cargo::project_root,
     discovery::discover_benchmark_paths,
     eckb::{BenchmarkCheckpoint, BenchmarkDefinition, parse_benchmark},
+    preparation::prepare_benchmark,
 };
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env, fs,
     path::{Path, PathBuf},
     process::{self, Command, Stdio},
@@ -39,7 +40,7 @@ static TEMPORARY_PATH_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// An Eck runtime binary built for one resolved commit.
 struct BuiltRuntime {
-    worktree: TemporaryWorktree,
+    _worktree: TemporaryWorktree,
     binary_path: PathBuf,
 }
 
@@ -137,6 +138,7 @@ pub(crate) fn execute_benchmarks(search_roots: &[PathBuf]) -> Result<bool, Strin
 
     let repository_root = project_root();
     let mut runtime_cache = HashMap::new();
+    let mut prepared = HashSet::new();
     let mut all_succeeded = true;
 
     for benchmark_path in benchmark_paths {
@@ -144,6 +146,13 @@ pub(crate) fn execute_benchmarks(search_roots: &[PathBuf]) -> Result<bool, Strin
             .map_err(|error| format!("cannot read benchmark: {error}"))?;
         let benchmark =
             parse_benchmark(&contents).map_err(|error| format!("invalid benchmark: {error}"))?;
+        prepare_benchmark(
+            benchmark_path
+                .parent()
+                .expect("a benchmark file has a parent directory"),
+            &benchmark.preparation,
+            &mut prepared,
+        )?;
         if !execute_benchmark(
             &benchmark_path,
             &benchmark,
@@ -164,6 +173,11 @@ fn execute_benchmark(
     repository_root: &Path,
     runtime_cache: &mut HashMap<String, CachedRuntime>,
 ) -> Result<bool, String> {
+    let working_directory = benchmark_path
+        .parent()
+        .expect("a benchmark file has a parent directory")
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve benchmark directory: {error}"))?;
     let source = TemporarySource::create(&benchmark.source)?;
     let display_path = benchmark_path
         .strip_prefix(repository_root)
@@ -183,7 +197,13 @@ fn execute_benchmark(
     let mut previous_measurement = None;
     let mut benchmark_succeeded = true;
     for checkpoint in &benchmark.checkpoints {
-        let result = measure_checkpoint(checkpoint, repository_root, &source.path, runtime_cache);
+        let result = measure_checkpoint(
+            checkpoint,
+            repository_root,
+            &source.path,
+            &working_directory,
+            runtime_cache,
+        );
         println!(
             "{}",
             render_measurement_row(checkpoint, &result, previous_measurement)
@@ -207,6 +227,7 @@ fn execute_benchmark(
         &head_checkpoint,
         repository_root,
         &source.path,
+        &working_directory,
         runtime_cache,
     );
     println!(
@@ -232,6 +253,7 @@ fn measure_checkpoint(
     checkpoint: &BenchmarkCheckpoint,
     repository_root: &Path,
     source_path: &Path,
+    working_directory: &Path,
     runtime_cache: &mut HashMap<String, CachedRuntime>,
 ) -> Result<Measurement, String> {
     let resolved_commit = resolve_commit(repository_root, &checkpoint.git_reference)?;
@@ -250,14 +272,14 @@ fn measure_checkpoint(
     };
 
     for _ in 0..WARMUP_RUNS {
-        run_once(&runtime.binary_path, &runtime.worktree.path, source_path)?;
+        run_once(&runtime.binary_path, working_directory, source_path)?;
     }
 
     let mut samples = Vec::with_capacity(MEASURED_RUNS);
     for _ in 0..MEASURED_RUNS {
         samples.push(run_once(
             &runtime.binary_path,
-            &runtime.worktree.path,
+            working_directory,
             source_path,
         )?);
     }
@@ -323,7 +345,7 @@ fn build_runtime(repository_root: &Path, commit: &str) -> Result<BuiltRuntime, S
         ));
     }
     Ok(BuiltRuntime {
-        worktree,
+        _worktree: worktree,
         binary_path,
     })
 }

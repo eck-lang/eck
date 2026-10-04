@@ -1,0 +1,26 @@
+# Typed CSV streaming over a multi-buffer integer file
+
+Measures typed lazy streaming and integer conversion for 100,000 rows with
+three integer columns. The checksum consumes every converted field and avoids
+materializing the source.
+
+>>> prepare
+python generate_data.py
+
+>>> checkpoint lazy-csv 4789cddab3297ac9753fc94e0c4e64ca739b1c2f First buildable commit after lazy streaming CSV
+
+>>> source
+use CSV
+
+type IntegerRow {
+    id: int
+    account: int
+    quantity: int
+}
+
+let source = CSV.read("data/large_integer.csv")->as(IntegerRow[])
+let checksum = 0
+for (row in source) {
+    checksum = checksum + row.id + row.account + row.quantity
+}
+print(checksum)

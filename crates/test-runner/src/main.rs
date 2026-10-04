@@ -25,6 +25,7 @@ mod eckb;
 mod eckt;
 mod execution;
 mod format;
+mod preparation;
 
 /// Selects the test scope from the raw command-line arguments.
 #[derive(Debug, PartialEq, Eq)]

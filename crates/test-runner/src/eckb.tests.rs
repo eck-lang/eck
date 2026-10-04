@@ -28,6 +28,7 @@ fn parses_benchmark_with_inline_and_multiline_annotations() {
         benchmark.description,
         "Measures repeated decimal additions across runtime changes."
     );
+    assert!(benchmark.preparation.is_empty());
     assert_eq!(
         benchmark.checkpoints,
         vec![
@@ -52,6 +53,36 @@ fn parses_benchmark_with_inline_and_multiline_annotations() {
         benchmark.source,
         "value: decimal = 0.0000\nvalue = value + 1.0000\n"
     );
+}
+
+/// Parses preparation lines before ordered checkpoints without consuming checkpoint comments.
+#[test]
+fn parses_multiline_preparation_before_checkpoints() {
+    let preparation = "python generate_data.py\nlinux,macos: sh prepare.sh";
+    let benchmark = parse_benchmark(&format!(
+        "# Prepared benchmark\n\nGenerates inputs before running.\n\n>>> prepare\n{preparation}\n>>> checkpoint baseline main\nBaseline implementation.\n\n>>> source\nprint(1)\n"
+    )).unwrap();
+    assert_eq!(
+        benchmark.preparation,
+        parse_preparation(preparation).unwrap()
+    );
+    assert_eq!(benchmark.checkpoints.len(), 1);
+    assert_eq!(
+        benchmark.checkpoints[0].comment.as_deref(),
+        Some("Baseline implementation.")
+    );
+    assert_eq!(benchmark.source, "print(1)\n");
+}
+
+/// Parses portable preparation and preserves CRLF source text for HEAD-only workloads.
+#[test]
+fn parses_head_only_benchmark_with_preparation() {
+    let benchmark = parse_benchmark(
+        "# Head only\r\n\r\nGenerates inputs.\r\n\r\n>>> prepare\r\npython generate_data.py\r\n>>> source\r\nprint(1)\r\n"
+    ).unwrap();
+    assert_eq!(benchmark.preparation.len(), 1);
+    assert!(benchmark.checkpoints.is_empty());
+    assert_eq!(benchmark.source, "print(1)\r\n");
 }
 
 /// Accepts a checkpoint with no inline annotation or multiline comment.
@@ -166,4 +197,79 @@ fn rejects_duplicate_source() {
     .unwrap_err();
 
     assert_eq!(error, "section `source` occurs more than once");
+}
+
+/// Rejects duplicate and out-of-order preparation section markers.
+#[test]
+fn rejects_duplicate_and_out_of_order_preparation() {
+    let duplicate_error = parse_benchmark(
+        "# Duplicate preparation\n\
+         \n\
+         Rejects repeated setup sections.\n\
+         \n\
+         >>> prepare\n\
+         python one.py\n\
+         >>> prepare\n",
+    )
+    .unwrap_err();
+    assert_eq!(duplicate_error, "section `prepare` occurs more than once");
+
+    let out_of_order_error = parse_benchmark(
+        "# Late preparation\n\
+         \n\
+         Rejects setup after a checkpoint.\n\
+         \n\
+         >>> checkpoint baseline main\n\
+         >>> prepare\n",
+    )
+    .unwrap_err();
+    assert_eq!(
+        out_of_order_error,
+        "section `prepare` must occur before checkpoints"
+    );
+}
+
+/// Rejects preparation after source and malformed preparation markers.
+#[test]
+fn rejects_late_and_malformed_preparation_markers() {
+    let late_error = parse_benchmark(
+        "# Late preparation\n\
+         \n\
+         Rejects setup after source.\n\
+         \n\
+         >>> source\n\
+         >>> prepare\n",
+    )
+    .unwrap_err();
+    assert_eq!(
+        late_error,
+        "section `prepare` must occur before `>>> source`"
+    );
+
+    let malformed_error = parse_benchmark(
+        "# Malformed preparation\n\
+         \n\
+         Requires an exact preparation marker.\n\
+         \n\
+         >>> prepare extra\n",
+    )
+    .unwrap_err();
+    assert_eq!(
+        malformed_error,
+        "unknown section marker `>>> prepare extra`"
+    );
+}
+
+/// Propagates preparation grammar errors before executing any workload.
+#[test]
+fn propagates_preparation_argument_errors() {
+    let invalid_preparation = "python \"unclosed.py";
+    let expected_error = parse_preparation(invalid_preparation).unwrap_err();
+    let benchmark_text = format!(
+        "# Invalid preparation\n\nRejects invalid arguments.\n\n>>> prepare\n{invalid_preparation}\n>>> source\nprint(1)\n"
+    );
+    assert_eq!(
+        parse_benchmark(&benchmark_text).unwrap_err(),
+        expected_error
+    );
 }
