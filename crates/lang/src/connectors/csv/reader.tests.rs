@@ -67,7 +67,7 @@ fn reads_one_record_without_batch_prefetch() {
     assert!(reader.headers().is_none());
 
     let record = reader.next_record().unwrap().unwrap();
-    assert!(reader.memory_budget_bytes.is_some());
+    assert!(reader.memory_budget_bytes.is_none());
     assert_eq!(reader.headers().unwrap().get(0), Some(&b"name"[..]));
     assert_eq!(record.get(0), Some(&b"first"[..]));
     assert_eq!(record.position().unwrap().record(), 1);
@@ -76,6 +76,21 @@ fn reads_one_record_without_batch_prefetch() {
     let mut reader = CsvReader::new(fixture.configuration());
     assert!(reader.next_record().unwrap().is_some());
     assert!(reader.next_batch().is_err());
+}
+
+/// Row reads defer the RAM query until a caller first requests a bounded batch.
+#[test]
+fn initializes_memory_budget_only_for_batches() {
+    let fixture = CsvFixture::new(b"one\ntwo\nthree\n");
+    let mut reader = CsvReader::new(fixture.configuration());
+    assert!(reader.next_record().unwrap().is_some());
+    assert!(reader.memory_budget_bytes.is_none());
+    let batch = reader.next_batch().unwrap().unwrap();
+    assert_eq!(batch.records.len(), 2);
+    let budget = reader.memory_budget_bytes.unwrap();
+    assert!((MINIMUM_MEMORY_BUDGET..=MAXIMUM_MEMORY_BUDGET).contains(&budget));
+    assert!(reader.next_batch().unwrap().is_none());
+    assert_eq!(reader.memory_budget_bytes, Some(budget));
 }
 
 /// Quoting, mixed line endings, trimming, header positions, and raw bytes survive parsing.

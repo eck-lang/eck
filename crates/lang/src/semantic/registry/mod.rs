@@ -43,6 +43,8 @@ pub struct Registry {
     registry_id: u64,
     /// Invalidates execution proofs when existing callback behavior changes.
     execution_revision: u64,
+    /// Certifies the builtin callback inventory only at its construction revision.
+    certified_builtin_revision: Option<u64>,
     /// Allocates compact, stable IDs for registered base types.
     next_type_id: u32,
     /// Allocates compact, stable IDs for registered subtypes.
@@ -142,6 +144,7 @@ impl Default for Registry {
         Self {
             registry_id: NEXT_REGISTRY_ID.fetch_add(1, Ordering::Relaxed),
             execution_revision: 0,
+            certified_builtin_revision: None,
             next_type_id: 0,
             next_subtype_id: 0,
             allocated_type_ids: HashSet::new(),
@@ -183,6 +186,11 @@ impl Default for Registry {
 }
 
 impl Registry {
+    /// Reuses builtin certification until a callback or dispatch mutation invalidates it.
+    pub(crate) fn builtin_inventory_is_certified(&self) -> bool {
+        self.certified_builtin_revision == Some(self.execution_revision)
+    }
+
     /// Identifies the registry and callback revision used by an execution proof.
     pub(crate) fn execution_identity(&self) -> (u64, u64) {
         (self.registry_id, self.execution_revision)

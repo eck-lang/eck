@@ -137,7 +137,7 @@ impl CsvReader {
         }))
     }
 
-    /// Initialize the parser, memory target, and header only on first consumption.
+    /// Initialize the parser and header only on first consumption.
     fn open_if_needed(&mut self) -> Result<(), csv::Error> {
         if self.reader.is_some() {
             return Ok(());
@@ -157,8 +157,6 @@ impl CsvReader {
         if self.configuration.header {
             self.headers = Some(reader.byte_headers()?.clone());
         }
-        self.memory_budget_bytes
-            .get_or_insert_with(default_memory_budget);
         self.reader = Some(reader);
         Ok(())
     }
@@ -175,7 +173,7 @@ fn memory_budget(available_memory_bytes: Option<u64>) -> usize {
         .unwrap_or(FALLBACK_MEMORY_BUDGET)
 }
 
-/// Sample available RAM once, at first consumption rather than construction.
+/// Sample available RAM once when the reader first needs a batch target.
 fn default_memory_budget() -> usize {
     let mut system = System::new();
     system.refresh_memory();

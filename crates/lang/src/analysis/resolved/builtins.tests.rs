@@ -178,3 +178,90 @@ fn counterfeit_index(_: &Value) -> Result<usize, CoreError> {
 fn counterfeit_format(_: &Value) -> Result<String, CoreError> {
     Ok("0".into())
 }
+
+/// A fresh default registry proves independent writes without constructing a second inventory.
+#[test]
+fn certifies_only_fresh_default_registries() {
+    let registry = crate::semantic::default_registry().unwrap();
+    assert!(std::ptr::eq(Builtins::new(&registry).canonical, &registry));
+    let program = crate::compile(
+        &crate::parse("let output: int[] = [0,0,0]\nfor (i in 0..3) { output[i] = i }").unwrap(),
+        &registry,
+    )
+    .unwrap();
+    assert!(matches!(
+        program
+            .execution_analysis()
+            .loops
+            .values()
+            .next()
+            .unwrap()
+            .parallelism,
+        crate::analysis::Parallelism::IndependentIterations { .. }
+    ));
+
+    let mut custom = Registry::new();
+    crate::semantic::register_all(&mut custom).unwrap();
+    assert!(!custom.builtin_inventory_is_certified());
+    assert!(!std::ptr::eq(Builtins::new(&custom).canonical, &custom));
+}
+
+/// Recompiling after a colliding index callback cannot reuse builtin certification.
+#[test]
+fn changed_index_extractor_rejects_independent_writes() {
+    let mut registry = crate::semantic::default_registry().unwrap();
+    let integer = registry.default_integer().unwrap();
+    registry
+        .register_index_extractor(integer, counterfeit_index)
+        .unwrap();
+    assert!(!registry.builtin_inventory_is_certified());
+    let program = crate::compile(
+        &crate::parse("let output: int[] = [0,0,0]\nfor (i in 0..3) { output[i] = i }").unwrap(),
+        &registry,
+    )
+    .unwrap();
+    assert!(matches!(
+        program
+            .execution_analysis()
+            .loops
+            .values()
+            .next()
+            .unwrap()
+            .parallelism,
+        crate::analysis::Parallelism::Sequential { .. }
+    ));
+}
+
+/// An appended result hook must be verified against independent builtin callbacks.
+#[test]
+fn changed_configuration_hook_rejects_builtin_arithmetic() {
+    let mut registry = crate::semantic::default_registry().unwrap();
+    let integer = registry.default_integer().unwrap();
+    registry
+        .register_type_configuration(
+            integer,
+            TypeConfigurationDescriptor {
+                transform_result: Some(counterfeit_transform),
+                transform_owned_result: None,
+                initial_result_transform_is_identity: true,
+                format: None,
+            },
+        )
+        .unwrap();
+    assert!(!registry.builtin_inventory_is_certified());
+    let program = crate::compile(
+        &crate::parse("for (i in 0..3) { let value = i * 2 }").unwrap(),
+        &registry,
+    )
+    .unwrap();
+    assert!(matches!(
+        program
+            .execution_analysis()
+            .loops
+            .values()
+            .next()
+            .unwrap()
+            .parallelism,
+        crate::analysis::Parallelism::Sequential { .. }
+    ));
+}

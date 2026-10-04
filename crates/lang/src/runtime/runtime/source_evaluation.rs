@@ -4,12 +4,33 @@ use std::sync::Arc;
 
 use crate::RuntimeError;
 use crate::connectors::source::CsvSource;
-use crate::ir::TypedExpression;
+use crate::ir::{TypedExpression, TypedExpressionKind};
 use crate::semantic::{RowType, Value};
 
 use super::Runtime;
 
 impl Runtime<'_> {
+    /// Keeps source and row evaluation outside the scalar evaluator's hot code.
+    #[cold]
+    #[inline(never)]
+    pub(super) fn eval_source_expression(
+        &mut self,
+        expression: &TypedExpressionKind,
+    ) -> Result<Option<Value>, RuntimeError> {
+        match expression {
+            TypedExpressionKind::SourceAs { source, row_type } => {
+                self.eval_source_as(source, row_type.clone())
+            }
+            TypedExpressionKind::RowField { row, field_index } => {
+                self.eval_row_field(row, *field_index)
+            }
+            TypedExpressionKind::DynamicRowField { row, field } => {
+                self.eval_dynamic_row_field(row, field)
+            }
+            _ => unreachable!("source evaluation requires a source or row expression"),
+        }
+    }
+
     /// Retypes an unopened source without consuming a CSV record.
     pub(super) fn eval_source_as(
         &mut self,

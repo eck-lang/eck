@@ -13,6 +13,7 @@ use super::Runtime;
 use crate::RuntimeError;
 
 impl<'registry> Runtime<'registry> {
+    /// Evaluates a resolved expression while retaining concrete value identities.
     pub(crate) fn eval(
         &mut self,
         expression: &TypedExpression,
@@ -32,15 +33,9 @@ impl<'registry> Runtime<'registry> {
                 })?;
                 self.retype_array_value(value, array_type.clone()).map(Some)
             }
-            TypedExpressionKind::SourceAs { source, row_type } => {
-                self.eval_source_as(source, row_type.clone())
-            }
-            TypedExpressionKind::RowField { row, field_index } => {
-                self.eval_row_field(row, *field_index)
-            }
-            TypedExpressionKind::DynamicRowField { row, field } => {
-                self.eval_dynamic_row_field(row, field)
-            }
+            kind @ (TypedExpressionKind::SourceAs { .. }
+            | TypedExpressionKind::RowField { .. }
+            | TypedExpressionKind::DynamicRowField { .. }) => self.eval_source_expression(kind),
             TypedExpressionKind::Binary {
                 resolution,
                 execution_plan,

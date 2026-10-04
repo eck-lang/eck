@@ -12,13 +12,20 @@ static CANONICAL_REGISTRY: OnceLock<Registry> = OnceLock::new();
 /// Maps resolved registry identities onto verified builtin implementations.
 pub(super) struct Builtins<'registry> {
     registry: &'registry Registry,
-    canonical: &'static Registry,
+    canonical: &'registry Registry,
     dispatch_inventory_trusted: bool,
 }
 
 impl<'registry> Builtins<'registry> {
     /// Acquires the trusted builtin callback inventory without executing user code.
     pub(super) fn new(registry: &'registry Registry) -> Self {
+        if registry.builtin_inventory_is_certified() {
+            return Self {
+                registry,
+                canonical: registry,
+                dispatch_inventory_trusted: true,
+            };
+        }
         let mut builtins = Self {
             registry,
             canonical: CANONICAL_REGISTRY.get_or_init(|| {

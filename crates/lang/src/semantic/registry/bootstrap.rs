@@ -10,6 +10,9 @@ use crate::std::io::IoExtension;
 pub fn default_registry() -> Result<Registry, CoreError> {
     let mut registry = Registry::new();
     register_all(&mut registry)?;
+    // Only this fresh, exclusively builtin registry can certify itself. Public
+    // register_all may extend user-defined capabilities and must not do so.
+    registry.certified_builtin_revision = Some(registry.execution_revision);
     Ok(registry)
 }
 
